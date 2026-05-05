@@ -7,10 +7,12 @@ import { Link } from 'react-router-dom'
 interface Restaurante {
   id: string
   nombre: string
-  foto_fachada_url: string
-  hora_apertura: string
-  hora_cierre: string
   telefono: string
+  direccion?: string
+  foto_fachada_url?: string
+  hora_apertura?: string
+  hora_cierre?: string
+  categorias?: string[]
 }
 
 export function PublicLandingPage() {
@@ -21,15 +23,26 @@ export function PublicLandingPage() {
     async function load() {
       const { data, error } = await supabase
         .from('restaurantes')
-        .select('id, nombre, foto_fachada_url, hora_apertura, hora_cierre, telefono')
-        .eq('activo', true)
+        .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias')
         .order('nombre')
       
-      if (!error && data) setRestaurantes(data)
+      if (error) console.error("Error fetching restaurants:", error)
+      if (data) setRestaurantes(data)
       setLoading(false)
     }
     load()
   }, [])
+
+  // Función para determinar si está abierto
+  const estaAbierto = (apertura?: string, cierre?: string) => {
+    if (!apertura || !cierre) return false;
+    
+    const ahora = new Date();
+    // Obtener hora actual en formato HH:MM:SS
+    const horaLocal = ahora.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
+    return horaLocal >= apertura && horaLocal <= cierre;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -111,10 +124,34 @@ export function PublicLandingPage() {
                     <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
                     <span className="text-xs font-bold text-slate-700">4.9</span>
                   </div>
+                  
+                  {/* Badge Abierto/Cerrado */}
+                  {estaAbierto(rest.hora_apertura, rest.hora_cierre) ? (
+                    <div className="absolute top-3 left-3 bg-green-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm text-xs font-bold uppercase tracking-wider">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                      Abierto
+                    </div>
+                  ) : rest.hora_apertura ? (
+                    <div className="absolute top-3 left-3 bg-slate-800 text-white px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm text-xs font-bold uppercase tracking-wider">
+                      <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />
+                      Cerrado
+                    </div>
+                  ) : null}
                 </div>
                 
                 <div className="p-5 flex flex-col flex-grow">
-                  <h3 className="font-bold text-xl text-slate-800 mb-3 group-hover:text-orange-500 transition-colors line-clamp-1">{rest.nombre}</h3>
+                  <h3 className="font-bold text-xl text-slate-800 mb-1 group-hover:text-orange-500 transition-colors line-clamp-1">{rest.nombre}</h3>
+                  
+                  {/* Categorías */}
+                  {rest.categorias && rest.categorias.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {rest.categorias.map(cat => (
+                        <span key={cat} className="text-[0.65rem] font-bold tracking-wider uppercase bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="space-y-2 mb-4 flex-grow">
                     <div className="flex items-center gap-2 text-sm text-slate-600">

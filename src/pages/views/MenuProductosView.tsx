@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Image as ImageIcon, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, X, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante, MenuItem, MenuCategoria } from '../../lib/supabase'
 
@@ -78,7 +78,11 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     await supabase.from('menu_items').update({ disponible: newVal }).eq('id', item.id)
   }
 
-  if (loading) return <div className="text-muted text-center py-10">Cargando productos...</div>
+  if (loading) return (
+    <div className="flex justify-center items-center py-20 text-brand">
+      <Loader2 size={32} className="animate-spin" />
+    </div>
+  )
 
   return (
     <div className="pb-24">
@@ -194,7 +198,12 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
               </div>
 
               <button type="submit" className="btn btn-primary mt-4 py-3" disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar Platillo'}
+                {saving ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Guardando...
+                  </>
+                ) : 'Guardar Platillo'}
               </button>
             </form>
           </div>

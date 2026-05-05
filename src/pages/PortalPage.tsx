@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store } from 'lucide-react'
+import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2 } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,10 +10,11 @@ import { DashboardView } from './views/DashboardView'
 import { MenuProductosView } from './views/MenuProductosView'
 import { MenuCombosView } from './views/MenuCombosView'
 import { MenuPromosView } from './views/MenuPromosView'
+import { PerfilView } from './views/PerfilView'
 
 export function PortalPage() {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'productos' | 'combos' | 'promos'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'productos' | 'combos' | 'promos' | 'perfil'>('dashboard')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,7 +28,11 @@ export function PortalPage() {
     await supabase.auth.signOut()
   }
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>Cargando portal...</div>
+  if (loading) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--brand)' }}>
+      <Loader2 size={40} className="animate-spin" />
+    </div>
+  )
 
   if (!restaurante) {
     return (
@@ -61,9 +66,18 @@ export function PortalPage() {
           </div>
         </div>
         
-        <button onClick={handleLogout} className="btn btn-ghost" style={{ padding: '0.5rem' }} title="Cerrar sesión">
-          <LogOut size={18} />
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            onClick={() => setActiveTab('perfil')}
+            className={`btn btn-ghost ${activeTab === 'perfil' ? 'active' : ''}`}
+            title="Mi Perfil"
+          >
+            <Store size={18} />
+          </button>
+          <button onClick={handleLogout} className="btn btn-ghost" style={{ padding: '0.5rem' }} title="Cerrar sesión">
+            <LogOut size={18} />
+          </button>
+        </div>
       </header>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -92,6 +106,13 @@ export function PortalPage() {
             active={activeTab === 'promos'} icon={<Tag size={18}/>} label="Promociones" 
             onClick={() => setActiveTab('promos')} 
           />
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', marginTop: '1rem', marginBottom: '0.25rem', paddingLeft: '0.75rem', textTransform: 'uppercase', letterSpacing: 1 }}>
+            Ajustes
+          </div>
+          <NavButton 
+            active={activeTab === 'perfil'} icon={<Store size={18}/>} label="Mi Perfil" 
+            onClick={() => setActiveTab('perfil')} 
+          />
         </aside>
 
         {/* ── Main Content Area ── */}
@@ -109,6 +130,7 @@ export function PortalPage() {
                 {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
                 {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
                 {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
+                {activeTab === 'perfil'    && <PerfilView restaurante={restaurante} />}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -124,6 +146,7 @@ export function PortalPage() {
         <MobileNavBtn active={activeTab === 'productos'} icon={<Utensils size={20}/>} label="Menú" onClick={() => setActiveTab('productos')} />
         <MobileNavBtn active={activeTab === 'combos'} icon={<Package size={20}/>} label="Combos" onClick={() => setActiveTab('combos')} />
         <MobileNavBtn active={activeTab === 'promos'} icon={<Tag size={20}/>} label="Promos" onClick={() => setActiveTab('promos')} />
+        <MobileNavBtn active={activeTab === 'perfil'} icon={<Store size={20}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
       </nav>
 
       {/* Mobile styles inline for quick setup */}

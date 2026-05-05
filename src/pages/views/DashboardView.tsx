@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
-import { Activity, Utensils, Package, Tag } from 'lucide-react'
+import { Activity, Utensils, Package, Tag, Loader2 } from 'lucide-react'
 
 export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   const [stats, setStats] = useState({ platillos: 0, combos: 0, promos: 0 })
@@ -30,12 +30,16 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   }, [restaurante.id])
 
   return (
-    <div>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>Hola, {restaurante.nombre} 👋</h1>
-      <p style={{ color: 'var(--muted)', marginBottom: '2rem' }}>Aquí tienes el resumen de tu menú digital.</p>
+    <div className="pb-24">
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-slate-800 mb-2">¡Hola, {restaurante.nombre}! 👋</h1>
+        <p className="text-muted">Bienvenido a tu panel de control. Aquí tienes el resumen de tu menú digital.</p>
+      </div>
 
       {loading ? (
-        <p>Cargando estadísticas...</p>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 0', color: 'var(--brand)' }}>
+          <Loader2 size={32} className="animate-spin" />
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
           

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, X, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante, MenuPromocion } from '../../lib/supabase'
 
@@ -160,7 +160,12 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
               </div>
 
               <button type="submit" className="btn btn-primary mt-4 py-3" disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar Promoción'}
+                {saving ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Guardando...
+                  </>
+                ) : 'Guardar Promoción'}
               </button>
             </form>
           </div>
