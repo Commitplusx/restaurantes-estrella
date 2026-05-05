@@ -17,6 +17,10 @@ export interface Restaurante {
   telefono: string
   direccion: string | null
   activo: boolean
+  foto_fachada_url?: string
+  hora_apertura?: string
+  hora_cierre?: string
+  categorias?: string[]
 }
 
 export interface MenuCategoria {
@@ -79,7 +83,7 @@ export async function getMyRestaurante(): Promise<Restaurante | null> {
   if (!user) return null
   const { data } = await supabase
     .from('restaurantes')
-    .select('id, nombre, telefono, direccion, activo')
+    .select('id, nombre, telefono, direccion, activo, foto_fachada_url, hora_apertura, hora_cierre, categorias')
     .eq('admin_id', user.id)
     .maybeSingle()
   return data ?? null

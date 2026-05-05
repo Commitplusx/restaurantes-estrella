@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
 import { Save, Store, Clock, Image as ImageIcon, Loader2 } from 'lucide-react'
@@ -38,7 +38,7 @@ export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
     setFormData(prev => {
       const current = prev.categorias || []
       if (current.includes(cat)) {
-        return { ...prev, categorias: current.filter(c => c !== cat) }
+        return { ...prev, categorias: current.filter((c: string) => c !== cat) }
       } else {
         if (current.length >= 3) return prev // Limitar a 3 categorías
         return { ...prev, categorias: [...current, cat] }
