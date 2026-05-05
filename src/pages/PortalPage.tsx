@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
 
 
 // Sub-pages
@@ -96,10 +97,20 @@ export function PortalPage() {
         {/* ── Main Content Area ── */}
         <main style={{ flex: 1, overflowY: 'auto', background: 'var(--bg)', padding: '1rem' }}>
           <div style={{ maxWidth: 800, margin: '0 auto' }}>
-            {activeTab === 'dashboard' && <DashboardView restaurante={restaurante} />}
-            {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
-            {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
-            {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.3 }}
+              >
+                {activeTab === 'dashboard' && <DashboardView restaurante={restaurante} />}
+                {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
+                {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
+                {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
       </div>

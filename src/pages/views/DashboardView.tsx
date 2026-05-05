@@ -72,12 +72,12 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
         </div>
       )}
 
-      <div className="card" style={{ marginTop: '2rem', background: 'linear-gradient(135deg, var(--surface) 0%, #2a1508 100%)', border: '1px solid #3d210b' }}>
+      <div className="card" style={{ marginTop: '2rem', background: 'linear-gradient(135deg, var(--surface) 0%, var(--brand-light) 100%)', border: '1px solid #fed7aa' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}>
           <Activity size={20} color="var(--brand)" />
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Menú público</h3>
         </div>
-        <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
           Tu menú está visible para todos los clientes en la app principal. 
           Cuando agregues o modifiques platillos, los cambios se reflejarán inmediatamente en el bot de WhatsApp y en la página web.
         </p>

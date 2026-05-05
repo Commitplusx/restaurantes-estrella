@@ -21,7 +21,7 @@ export function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '1rem', background: 'radial-gradient(ellipse at top, #1a0f00 0%, #0f0f0f 60%)'
+      padding: '1rem', background: 'radial-gradient(ellipse at top, #fff7ed 0%, #f8fafc 60%)'
     }}>
       <motion.div
         initial={{ opacity: 0, y: 24 }}
@@ -38,10 +38,10 @@ export function LoginPage() {
           }}>
             <UtensilsCrossed size={30} color="white" />
           </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f5f5f5' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>
             Portal Restaurantes
           </h1>
-          <p style={{ color: '#888', fontSize: '0.875rem', marginTop: 4 }}>
+          <p style={{ color: '#64748b', fontSize: '0.875rem', marginTop: 4 }}>
             Estrella Delivery — Gestiona tu menú
           </p>
         </div>
@@ -52,7 +52,7 @@ export function LoginPage() {
             <div className="field">
               <label>Correo electrónico</label>
               <div style={{ position: 'relative' }}>
-                <Mail size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                <Mail size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="restaurante@correo.com" required
@@ -64,7 +64,7 @@ export function LoginPage() {
             <div className="field">
               <label>Contraseña</label>
               <div style={{ position: 'relative' }}>
-                <Lock size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                <Lock size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input
                   type="password" value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" required style={{ paddingLeft: 36 }}
@@ -86,7 +86,7 @@ export function LoginPage() {
           </form>
         </div>
 
-        <p style={{ textAlign: 'center', color: '#555', fontSize: '0.78rem', marginTop: '1.25rem' }}>
+        <p style={{ textAlign: 'center', color: '#64748b', fontSize: '0.78rem', marginTop: '1.25rem' }}>
           ¿No tienes acceso? Contacta a Estrella Delivery.
         </p>
       </motion.div>
