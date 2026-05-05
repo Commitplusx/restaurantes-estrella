@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Image as ImageIcon, X, Utensils } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante, MenuItem, MenuCategoria } from '../../lib/supabase'
 

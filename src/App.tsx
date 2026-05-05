@@ -24,5 +24,5 @@ export default function App() {
     </div>
   )
 
-  return session ? <PortalPage session={session} /> : <LoginPage />
+  return session ? <PortalPage /> : <LoginPage />
 }

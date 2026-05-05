@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
-import type { Session } from '@supabase/supabase-js'
+
 
 // Sub-pages
 import { DashboardView } from './views/DashboardView'
@@ -10,7 +10,7 @@ import { MenuProductosView } from './views/MenuProductosView'
 import { MenuCombosView } from './views/MenuCombosView'
 import { MenuPromosView } from './views/MenuPromosView'
 
-export function PortalPage({ session }: { session: Session }) {
+export function PortalPage() {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'productos' | 'combos' | 'promos'>('dashboard')
   const [loading, setLoading] = useState(true)
