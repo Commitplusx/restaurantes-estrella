@@ -65,8 +65,8 @@ export function PublicLandingPage() {
             Estrella<span className="text-orange-500">Delivery</span>
           </span>
         </div>
-        <Link to="/login" className="text-sm font-bold text-slate-500 hover:text-orange-500 transition-colors bg-slate-100/50 hover:bg-orange-50 px-4 py-2 rounded-xl">
-          Acceso Socios
+        <Link to="/login" className="text-sm font-bold text-white transition-all bg-slate-900 hover:bg-orange-500 hover:shadow-lg hover:shadow-orange-200 px-5 py-2.5 rounded-xl flex items-center gap-2">
+          Acceso Socios <ArrowRight size={16} />
         </Link>
       </header>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, X, Loader2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuPromocion } from '../../lib/supabase'
 
 export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
@@ -11,6 +11,25 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Partial<MenuPromocion>>({})
   const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setUploadingImage(true)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
+    const filePath = `${restaurante.id}/promos/${fileName}`
+    
+    const url = await subirFoto(file, filePath)
+    if (url) {
+      setEditingItem({...editingItem, foto_url: url})
+    } else {
+      alert('Hubo un error al subir la foto. Intenta de nuevo.')
+    }
+    setUploadingImage(false)
+  }
 
   useEffect(() => {
     loadData()
@@ -157,8 +176,22 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
               </div>
 
               <div className="field">
-                <label>URL de la Foto (Opcional)</label>
-                <input type="url" value={editingItem.foto_url || ''} onChange={e => setEditingItem({...editingItem, foto_url: e.target.value})} placeholder="https://..." />
+                <label>Foto de la Promoción (Opcional)</label>
+                <div className="flex items-center gap-4">
+                  {editingItem.foto_url && (
+                    <img src={editingItem.foto_url} alt="Vista previa" className="w-16 h-16 rounded-xl object-cover bg-slate-100 shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 cursor-pointer transition-colors"
+                    />
+                    {uploadingImage && <p className="text-xs text-orange-500 mt-2 font-bold flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Subiendo imagen...</p>}
+                  </div>
+                </div>
               </div>
 
               <button type="submit" className="btn btn-primary mt-4 py-3" disabled={saving}>

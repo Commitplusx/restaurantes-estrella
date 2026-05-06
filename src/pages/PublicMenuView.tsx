@@ -50,10 +50,38 @@ export function PublicMenuView() {
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
   const [toastMsg, setToastMsg] = useState<{title: string, message?: string, type?: 'success'|'error'} | null>(null)
+  
+  // Estado para validación de cupones
+  const [validandoCupon, setValidandoCupon] = useState(false)
+  const [cuponValido, setCuponValido] = useState(false)
+  const [descuento, setDescuento] = useState(0)
 
   const showToast = (title: string, message?: string, type: 'success'|'error' = 'success') => {
     setToastMsg({ title, message, type })
     setTimeout(() => setToastMsg(null), 3500)
+  }
+
+  const validarCuponBtn = async () => {
+    if (!cuponCliente.trim()) return
+    setValidandoCupon(true)
+    
+    try {
+      const { data, error } = await supabase.rpc('validar_cupon_publico', { p_codigo: cuponCliente })
+      
+      if (error || !data?.ok) {
+        showToast('Cupón Inválido', data?.error || 'El cupón no es válido o ya expiró', 'error')
+        setCuponValido(false)
+        setDescuento(0)
+      } else {
+        showToast('Cupón Aplicado', `¡Se descontarán $${data.monto.toFixed(2)} de tu orden!`, 'success')
+        setCuponValido(true)
+        setDescuento(data.monto)
+      }
+    } catch (err) {
+      showToast('Error', 'Hubo un error de conexión', 'error')
+    } finally {
+      setValidandoCupon(false)
+    }
   }
 
   useEffect(() => {
@@ -147,6 +175,8 @@ export function PublicMenuView() {
 
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
+  
+  const total = Math.max(0, subtotal - descuento)
 
   // Bug #5: reset fields when closing cart without ordering
   const closeCart = () => {
@@ -186,8 +216,8 @@ export function PublicMenuView() {
       }])
     } catch (err) { console.warn('Intercepción db fallida:', err) }
 
-    const textoCupon = cuponCliente.trim() ? `\n🎟️ *Cupón a canjear:* ${cuponCliente.trim()}` : ''
-    const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Total a pagar: $${subtotal.toFixed(2)}*${textoCupon}\n\n_(Ticket Web: #${ticketId})_`
+    const textoCupon = cuponValido ? `\n🎁 *Cupón aplicado:* ${cuponCliente.trim()} (-$${descuento.toFixed(2)})` : cuponCliente.trim() ? `\n🎟️ *Cupón a canjear:* ${cuponCliente.trim()}` : ''
+    const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Subtotal:* $${subtotal.toFixed(2)}${textoCupon}\n*Total a pagar: $${total.toFixed(2)}*\n\n_(Ticket Web: #${ticketId})_`
     const waUrl = `https://wa.me/${telLimpio}?text=${encodeURIComponent(mensaje)}`
     
     setProcesando(false)
@@ -196,6 +226,8 @@ export function PublicMenuView() {
     setClienteNombre('')
     setClienteTel('')
     setCuponCliente('')
+    setCuponValido(false)
+    setDescuento(0)
     window.open(waUrl, '_blank')
   }
 
@@ -483,9 +515,9 @@ export function PublicMenuView() {
                         <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
                           {combo.incluye?.map((inc, i) => <span key={i} className="text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-md">✓ {inc}</span>)}
                         </div>
-                        <div className="flex items-center justify-center md:justify-between">
+                        <div className="flex items-center justify-between mt-2 w-full">
                           <span className="text-orange-600 font-black text-2xl">${combo.precio.toFixed(2)}</span>
-                          <div className="hidden md:block">
+                          <div>
                             {cant > 0 ? (
                               <div className="flex items-center gap-3 bg-slate-100 rounded-xl px-2 py-1">
                                 <button onClick={() => removeFromCart(combo.id, 'combo')} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-orange-600"><Minus size={14} /></button>
@@ -529,9 +561,9 @@ export function PublicMenuView() {
                       <div className="flex-1 text-center md:text-left">
                         <h4 className="font-bold text-slate-900 text-xl mb-1">{promo.titulo}</h4>
                         <p className="text-slate-400 text-sm mb-4 line-clamp-2">{promo.descripcion}</p>
-                        <div className="flex items-center justify-center md:justify-between">
+                        <div className="flex items-center justify-between mt-2 w-full">
                           <span className="text-red-500 font-black text-2xl">${promo.precio_especial?.toFixed(2)}</span>
-                          <div className="hidden md:block">
+                          <div>
                             {cant > 0 ? (
                               <div className="flex items-center gap-3 bg-slate-100 rounded-xl px-2 py-1">
                                 <button onClick={() => removeFromCart(promo.id, 'promo')} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-red-600"><Minus size={14} /></button>
@@ -542,9 +574,6 @@ export function PublicMenuView() {
                               <button onClick={() => addToCart(cartItem)} className="bg-slate-900 hover:bg-orange-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all">Añadir</button>
                             )}
                           </div>
-                        </div>
-                        <div className="md:hidden mt-4">
-                          <button onClick={() => addToCart(cartItem)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold">Añadir al Carrito</button>
                         </div>
                       </div>
                     </motion.div>
@@ -642,22 +671,48 @@ export function PublicMenuView() {
                     {/* CUPÓN DE DESCUENTO */}
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Ticket size={16} className="text-orange-400" />
+                        <Ticket size={16} className={`${cuponValido ? 'text-green-500' : 'text-orange-400'}`} />
                       </div>
-                      <input 
-                        type="text" 
-                        placeholder="¿Tienes un cupón de Loyalty? Ingrésalo aquí"
-                        value={cuponCliente} 
-                        onChange={e => setCuponCliente(e.target.value.toUpperCase())}
-                        className="w-full pl-9 p-3.5 rounded-2xl border border-orange-100 focus:border-orange-500 outline-none text-sm bg-orange-50/30 uppercase placeholder:normal-case font-mono"
-                      />
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="¿Tienes cupón? Ingrésalo"
+                          value={cuponCliente} 
+                          onChange={e => {
+                            setCuponCliente(e.target.value.toUpperCase());
+                            if (cuponValido) { setCuponValido(false); setDescuento(0); }
+                          }}
+                          disabled={validandoCupon}
+                          className={`w-full pl-9 p-3.5 rounded-2xl border outline-none text-sm uppercase placeholder:normal-case font-mono transition-colors ${cuponValido ? 'border-green-400 bg-green-50/50 text-green-700' : 'border-orange-100 focus:border-orange-500 bg-orange-50/30'}`}
+                        />
+                        <button 
+                          onClick={validarCuponBtn}
+                          disabled={!cuponCliente || validandoCupon || cuponValido}
+                          className="bg-slate-900 text-white px-4 rounded-xl font-bold text-sm disabled:opacity-50 transition-colors hover:bg-orange-600 flex items-center gap-2 shrink-0"
+                        >
+                          {validandoCupon ? <Loader2 size={16} className="animate-spin" /> : 'Aplicar'}
+                        </button>
+                      </div>
+                      {cuponValido && (
+                        <p className="text-xs font-bold text-green-600 mt-1 ml-1">✓ Cupón verificado (-${descuento.toFixed(2)})</p>
+                      )}
                     </div>
                   </div>
                   
                   <div className="pt-3 border-t border-slate-100">
-                    <div className="flex justify-between items-center text-slate-900 font-black text-xl mb-4">
+                    <div className="flex justify-between items-center text-slate-500 mb-2 text-sm font-bold">
+                      <span>Subtotal</span>
+                      <span className="text-slate-900">${subtotal.toFixed(2)}</span>
+                    </div>
+                    {descuento > 0 && (
+                      <div className="flex justify-between items-center text-green-600 mb-3 text-sm font-bold">
+                        <span className="flex items-center gap-1"><Ticket size={14}/> Descuento</span>
+                        <span>-${descuento.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-slate-900 font-black text-xl mb-4 pt-3 border-t border-slate-100">
                       <span>Total</span>
-                      <span className="text-orange-600">${subtotal.toFixed(2)}</span>
+                      <span className="text-orange-600">${total.toFixed(2)}</span>
                     </div>
                     <button 
                       onClick={handlePedir}
