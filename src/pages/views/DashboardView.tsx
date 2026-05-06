@@ -85,7 +85,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
           Tu menú está visible para todos los clientes en la app principal. 
           Cuando agregues o modifiques platillos, los cambios se reflejarán inmediatamente en el bot de WhatsApp y en la página web.
         </p>
-        <button className="btn btn-primary" onClick={() => window.open(`https://app-estrella.shop`, '_blank')}>
+        <button className="btn btn-primary" onClick={() => window.open(`/menu/${restaurante.id}`, '_blank')}>
           Ver cómo lo ve el cliente
         </button>
       </div>

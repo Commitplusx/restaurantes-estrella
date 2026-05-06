@@ -43,9 +43,11 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
     const payload = { ...editingItem, restaurante_id: restaurante.id, incluye: arrayIncluye }
     
     if (payload.id) {
-      await supabase.from('menu_combos').update(payload).eq('id', payload.id)
+      const { error } = await supabase.from('menu_combos').update(payload).eq('id', payload.id)
+      if (error) { alert('Error al guardar: ' + error.message); setSaving(false); return }
     } else {
-      await supabase.from('menu_combos').insert(payload)
+      const { error } = await supabase.from('menu_combos').insert(payload)
+      if (error) { alert('Error al crear: ' + error.message); setSaving(false); return }
     }
     
     await loadData()

@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { motion } from 'framer-motion'
-import { Clock, Star, Store, ArrowRight, Phone } from 'lucide-react'
+import { Star, Store, ArrowRight, Search, Filter } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 interface Restaurante {
@@ -18,16 +17,16 @@ interface Restaurante {
 export function PublicLandingPage() {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
     async function load() {
-      // Fetch restaurantes
       const { data, error } = await supabase
         .from('restaurantes')
         .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias')
+        .eq('activo', true)
         .order('nombre')
       
-
       if (error) console.error("Error fetching restaurants:", error)
       if (data) setRestaurantes(data)
       setLoading(false)
@@ -35,169 +34,199 @@ export function PublicLandingPage() {
     load()
   }, [])
 
-  // Función para determinar si está abierto
+  const filteredRestaurants = useMemo(() => 
+    restaurantes.filter(r => 
+      r.nombre.toLowerCase().includes(search.toLowerCase()) || 
+      (r.categorias && r.categorias.some(c => c.toLowerCase().includes(search.toLowerCase())))
+    ),
+  [search, restaurantes]);
+
   const estaAbierto = (apertura?: string, cierre?: string) => {
     if (!apertura || !cierre) return false;
-    
     const ahora = new Date();
-    // Obtener hora actual en formato HH:MM:SS
     const horaLocal = ahora.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    
-    // Si la hora de apertura es menor a la de cierre (ej. 09:00 a 22:00)
     if (apertura <= cierre) {
       return horaLocal >= apertura && horaLocal <= cierre;
     } else {
-      // Horario nocturno que cruza la medianoche (ej. 18:00 a 03:00)
       return horaLocal >= apertura || horaLocal <= cierre;
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-orange-100">
+
       {/* Navbar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-              <Store className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-xl text-slate-800 tracking-tight">Estrella<span className="text-orange-500">Delivery</span></span>
+      <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-5 px-6 md:px-10 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-200">
+            <Store className="w-4 h-4 text-white" />
           </div>
-          <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-orange-500 transition-colors bg-slate-100 hover:bg-orange-50 px-4 py-2 rounded-full">
-            Acceso a Socios
-          </Link>
+          <span className="font-black text-xl text-slate-800 tracking-tighter">
+            Estrella<span className="text-orange-500">Delivery</span>
+          </span>
         </div>
+        <Link to="/login" className="text-sm font-bold text-slate-500 hover:text-orange-500 transition-colors bg-slate-100/50 hover:bg-orange-50 px-4 py-2 rounded-xl">
+          Acceso Socios
+        </Link>
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-white border-b border-slate-100 py-16 lg:py-24 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-50 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2" />
-        <div className="max-w-6xl mx-auto px-4 relative z-10 text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <span className="inline-block py-1 px-3 rounded-full bg-orange-100 text-orange-600 text-xs font-bold tracking-wider uppercase mb-4">
-              La mejor selección
+      <main className="p-6 md:p-12 max-w-[1400px] mx-auto min-h-screen">
+
+        {/* Hero Section */}
+        <div className="relative rounded-[2.5rem] bg-slate-900 h-[360px] overflow-hidden mb-12 flex items-center px-8 md:px-12">
+          <img 
+            src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=1200" 
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
+            alt="Hero Estrella Delivery"
+          />
+          {/* Gradient overlay con color de marca */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/40 to-transparent" />
+          <div className="relative z-10 max-w-xl">
+            <span className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full mb-4 inline-block shadow-lg shadow-orange-500/30">
+              ⭐ Estrella Delivery
             </span>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight mb-6 leading-tight">
-              Tus restaurantes favoritos, <br className="hidden md:block"/> a un clic de distancia.
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+              Tus favoritos, <br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400">
+                donde quieras.
+              </span>
             </h1>
-            <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto">
-              Descubre los comercios asociados a Estrella Delivery. Apoyamos el comercio local con entregas rápidas y seguras.
+            <div className="relative max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="¿Qué restaurante buscas hoy?"
+                className="w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl py-4 pl-12 pr-6 text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section Header */}
+        <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Comercios Asociados</h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Descubre lo mejor de Comitán · {restaurantes.length} disponibles
             </p>
-          </motion.div>
+          </div>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 rounded-xl bg-white border border-slate-100 text-sm font-bold text-orange-500 shadow-sm">
+              Todos
+            </button>
+            <button className="px-4 py-2 rounded-xl bg-white border border-slate-100 text-sm font-bold text-slate-400 hover:border-orange-400 transition-all">
+              <Filter size={16} />
+            </button>
+          </div>
         </div>
-      </section>
 
-      {/* Grid de Restaurantes */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-slate-800">Comercios Asociados</h2>
-          <span className="text-sm text-slate-500 font-medium">{restaurantes.length} disponibles</span>
-        </div>
-
+        {/* Restaurants Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1,2,3,4,5,6].map(i => (
-              <div key={i} className="bg-white rounded-2xl h-72 animate-pulse border border-slate-100 shadow-sm" />
+              <div key={i} className="bg-white rounded-[2rem] h-72 animate-pulse border border-slate-100 shadow-sm" />
             ))}
           </div>
-        ) : restaurantes.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
-            <Store className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-slate-700">Aún no hay restaurantes</h3>
-            <p className="text-slate-500">Pronto se añadirán nuevos comercios asociados.</p>
+        ) : filteredRestaurants.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
+            <Store className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-slate-700">Sin resultados</h3>
+            <p className="text-slate-500">Prueba con otra búsqueda o categoría.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {restaurantes.map((rest) => (
-              <motion.div 
-                initial={{ opacity: 0, y: 30 }} 
-                whileInView={{ opacity: 1, y: 0 }} 
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.5 }}
-                key={rest.id} 
-                className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col"
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
+            {filteredRestaurants.map((res) => (
+              <Link 
+                to={`/menu/${res.id}`}
+                key={res.id} 
+                className="group cursor-pointer bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:border-orange-100 hover:shadow-2xl hover:shadow-orange-500/5 transition-all duration-500 flex flex-col"
               >
-                <div className="h-48 relative overflow-hidden bg-slate-100">
-                  {rest.foto_fachada_url ? (
+                <div className="relative h-52 overflow-hidden bg-slate-100">
+                  {res.foto_fachada_url ? (
                     <img 
-                      src={rest.foto_fachada_url} 
-                      alt={rest.nombre} 
-                      loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                      src={res.foto_fachada_url} 
+                      alt={res.nombre} 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                      <Store className="w-12 h-12 text-slate-300" />
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
+                      <Store className="w-12 h-12 text-orange-200" />
                     </div>
                   )}
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
-                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                    <span className="text-xs font-bold text-slate-700">4.9</span>
-                  </div>
                   
                   {/* Badge Abierto/Cerrado */}
-                  {estaAbierto(rest.hora_apertura, rest.hora_cierre) ? (
-                    <div className="absolute top-3 left-3 bg-green-500 text-white px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm text-xs font-bold uppercase tracking-wider">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                      Abierto
-                    </div>
-                  ) : rest.hora_apertura ? (
-                    <div className="absolute top-3 left-3 bg-slate-800 text-white px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm text-xs font-bold uppercase tracking-wider">
-                      <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />
-                      Cerrado
-                    </div>
-                  ) : null}
+                  <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/20 ${estaAbierto(res.hora_apertura, res.hora_cierre) ? 'bg-green-500 text-white' : 'bg-slate-800/90 text-white'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${estaAbierto(res.hora_apertura, res.hora_cierre) ? 'bg-white animate-pulse' : 'bg-red-400'}`} />
+                    {estaAbierto(res.hora_apertura, res.hora_cierre) ? 'Abierto' : 'Cerrado'}
+                  </div>
                 </div>
                 
-                <div className="p-5 flex flex-col flex-grow">
-                  <h3 className="font-bold text-xl text-slate-800 mb-1 group-hover:text-orange-500 transition-colors line-clamp-1">{rest.nombre}</h3>
+                <div className="p-7 flex flex-col flex-grow">
+                  <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-orange-500 transition-colors line-clamp-1">
+                    {res.nombre}
+                  </h3>
+                  <p className="text-slate-400 text-[10px] mb-4 font-bold uppercase tracking-[0.1em]">
+                    {res.categorias?.[0] || 'Restaurante'} · {res.hora_apertura?.slice(0,5)} - {res.hora_cierre?.slice(0,5)}
+                  </p>
                   
-                  {/* Categorías */}
-                  {rest.categorias && rest.categorias.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {rest.categorias.map(cat => (
-                        <span key={cat} className="text-[0.65rem] font-bold tracking-wider uppercase bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
+                  {/* Categorías extra */}
+                  {res.categorias && res.categorias.length > 1 && (
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {res.categorias.slice(1).map(cat => (
+                        <span key={cat} className="text-[10px] font-bold bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full border border-orange-100">
                           {cat}
                         </span>
                       ))}
                     </div>
                   )}
                   
-                  <div className="space-y-2 mb-4 flex-grow">
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <Clock className="w-4 h-4 text-orange-500" />
-                      <span>{rest.hora_apertura?.slice(0,5) || '09:00'} - {rest.hora_cierre?.slice(0,5) || '22:00'}</span>
+                  <div className="flex items-center justify-between pt-5 border-t border-slate-50 mt-auto">
+                    <span className="text-sm font-bold text-orange-500 flex items-center gap-1">
+                      <Star size={13} className="fill-orange-500" />
+                      Más pedido
+                    </span>
+                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-300 group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-red-500 group-hover:text-white transition-all transform group-hover:translate-x-0.5">
+                      <ArrowRight size={18} />
                     </div>
-                    {rest.telefono && (
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Phone className="w-4 h-4 text-green-500" />
-                        <span>{rest.telefono}</span>
-                      </div>
-                    )}
                   </div>
-                  
-                  <Link 
-                    to={`/menu/${rest.id}`}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-50 text-slate-700 font-semibold rounded-xl hover:bg-orange-50 hover:text-orange-600 transition-colors border border-slate-200 hover:border-orange-200"
-                  >
-                    Ver Menú y Pedir
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
                 </div>
-              </motion.div>
+              </Link>
             ))}
           </div>
         )}
-      </section>
+      </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-12">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <Store className="w-5 h-5 text-slate-400" />
-            <span className="font-bold text-lg text-slate-400 tracking-tight">Estrella<span className="text-slate-300">Delivery</span></span>
+      <footer className="bg-white border-t border-slate-100 py-16 px-10">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="text-center md:text-left">
+            <div className="flex items-center gap-2 mb-3 justify-center md:justify-start">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow">
+                <Store className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="text-lg font-black text-slate-800 tracking-tighter">
+                Estrella<span className="text-orange-500">Delivery</span>
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm font-medium">La mejor selección gastronómica de Comitán.</p>
           </div>
-          <p className="text-slate-500 text-sm">© {new Date().getFullYear()} Estrella Delivery. Todos los derechos reservados.</p>
+          <div className="flex gap-12">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-900">Ayuda</p>
+              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Soporte 24/7</a>
+              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Seguridad</a>
+            </div>
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-900">Legal</p>
+              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Privacidad</a>
+              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Términos</a>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-[1400px] mx-auto mt-12 pt-8 border-t border-slate-50 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+          © {new Date().getFullYear()} Estrella Delivery · Comitán de Domínguez, Chiapas
         </div>
       </footer>
     </div>

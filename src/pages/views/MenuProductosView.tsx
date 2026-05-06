@@ -15,7 +15,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [restaurante.id])
 
   async function loadData() {
     setLoading(true)
@@ -56,9 +56,11 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     const payload = { ...editingItem, restaurante_id: restaurante.id, categoria_id: catId }
     
     if (payload.id) {
-      await supabase.from('menu_items').update(payload).eq('id', payload.id)
+      const { error } = await supabase.from('menu_items').update(payload).eq('id', payload.id)
+      if (error) { alert('Error al guardar: ' + error.message); setSaving(false); return }
     } else {
-      await supabase.from('menu_items').insert(payload)
+      const { error } = await supabase.from('menu_items').insert(payload)
+      if (error) { alert('Error al crear: ' + error.message); setSaving(false); return }
     }
     
     await loadData()

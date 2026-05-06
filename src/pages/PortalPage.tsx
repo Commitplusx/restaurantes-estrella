@@ -20,11 +20,14 @@ export function PortalPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getMyRestaurante().then(res => {
-      setRestaurante(res)
-      setLoading(false)
-    })
+    loadRestaurante()
   }, [])
+
+  const loadRestaurante = async () => {
+    const res = await getMyRestaurante()
+    setRestaurante(res)
+    setLoading(false)
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -133,7 +136,7 @@ export function PortalPage() {
                   {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
                   {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
                   {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
-                  {activeTab === 'perfil'    && <PerfilView restaurante={restaurante} />}
+                  {activeTab === 'perfil'    && <PerfilView restaurante={restaurante} onUpdate={loadRestaurante} />}
                 </Suspense>
               </motion.div>
             </AnimatePresence>

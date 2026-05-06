@@ -11,7 +11,7 @@ const CATEGORIAS_COMUNES = [
   'Comida China', 'Antojitos'
 ]
 
-export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
+export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante, onUpdate?: () => void }) {
   // Estado local para los campos
   const [formData, setFormData] = useState({
     nombre: restaurante.nombre || '',
@@ -103,6 +103,7 @@ export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
     setSaving(false)
     if (!error) {
       setSuccess(true)
+      if (onUpdate) onUpdate()
       setTimeout(() => setSuccess(false), 3000)
     } else {
       console.error(error)
