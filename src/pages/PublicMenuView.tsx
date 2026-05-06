@@ -15,7 +15,9 @@ import {
   Clock,
   MapPin,
   ChevronLeft,
-  X
+  X,
+  Ticket,
+  CheckCircle2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -44,8 +46,15 @@ export function PublicMenuView() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [clienteNombre, setClienteNombre] = useState('')
   const [clienteTel, setClienteTel] = useState('')
+  const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
+  const [toastMsg, setToastMsg] = useState<{title: string, message?: string, type?: 'success'|'error'} | null>(null)
+
+  const showToast = (title: string, message?: string, type: 'success'|'error' = 'success') => {
+    setToastMsg({ title, message, type })
+    setTimeout(() => setToastMsg(null), 3500)
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -148,7 +157,7 @@ export function PublicMenuView() {
   const handlePedir = async () => {
     if (!restaurante || carrito.length === 0) return
     if (!clienteNombre.trim()) {
-      alert('Por favor ingresa tu nombre para continuar.')
+      showToast('Falta el nombre', 'Por favor ingresa tu nombre para continuar', 'error')
       return
     }
     // Bug #1: proper phone validation
@@ -177,7 +186,8 @@ export function PublicMenuView() {
       }])
     } catch (err) { console.warn('Intercepción db fallida:', err) }
 
-    const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Total a pagar: $${subtotal.toFixed(2)}*\n\n_(Ticket Web: #${ticketId})_`
+    const textoCupon = cuponCliente.trim() ? `\n🎟️ *Cupón a canjear:* ${cuponCliente.trim()}` : ''
+    const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Total a pagar: $${subtotal.toFixed(2)}*${textoCupon}\n\n_(Ticket Web: #${ticketId})_`
     const waUrl = `https://wa.me/${telLimpio}?text=${encodeURIComponent(mensaje)}`
     
     setProcesando(false)
@@ -185,6 +195,7 @@ export function PublicMenuView() {
     setCarrito([])
     setClienteNombre('')
     setClienteTel('')
+    setCuponCliente('')
     window.open(waUrl, '_blank')
   }
 
@@ -380,7 +391,13 @@ export function PublicMenuView() {
                   const catItems = items.filter(i => i.categoria_id === cat.id)
                   if (catItems.length === 0) return null
                   return (
-                    <div key={cat.id} className="mb-12">
+                    <motion.div 
+                      key={cat.id} 
+                      className="mb-12"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4 }}
+                    >
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
                         <span className="w-1.5 h-6 bg-orange-500 rounded-full" />
                         {cat.emoji} {cat.nombre}
@@ -425,7 +442,7 @@ export function PublicMenuView() {
                           )
                         })}
                       </div>
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>
@@ -446,7 +463,13 @@ export function PublicMenuView() {
                   const cartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' as const, foto_url: combo.foto_url || undefined }
                   const cant = getCantidad(combo.id, 'combo')
                   return (
-                    <div key={combo.id} className="bg-white p-5 rounded-[2rem] border border-orange-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative">
+                    <motion.div 
+                      key={combo.id} 
+                      className="bg-white p-5 rounded-[2rem] border border-orange-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
                       <div className="w-full md:w-36 h-36 rounded-2xl overflow-hidden bg-slate-50 shrink-0">
                         {combo.foto_url ? (
                           <img src={combo.foto_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={combo.nombre} />
@@ -475,7 +498,7 @@ export function PublicMenuView() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>
@@ -488,7 +511,13 @@ export function PublicMenuView() {
                   const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined }
                   const cant = getCantidad(promo.id, 'promo')
                   return (
-                    <div key={promo.id} className="bg-white p-5 rounded-[2rem] border border-red-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative overflow-hidden">
+                    <motion.div 
+                      key={promo.id} 
+                      className="bg-white p-5 rounded-[2rem] border border-red-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative overflow-hidden"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
                       <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-widest">Oferta</div>
                       <div className="w-full md:w-36 h-36 rounded-2xl overflow-hidden bg-slate-50 shrink-0">
                         {promo.foto_url ? (
@@ -518,7 +547,7 @@ export function PublicMenuView() {
                           <button onClick={() => addToCart(cartItem)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold">Añadir al Carrito</button>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>
@@ -609,6 +638,20 @@ export function PublicMenuView() {
                       />
                       {telError && <p className="text-red-500 text-xs mt-1 ml-1">Ingresa un número válido de 10 dígitos</p>}
                     </div>
+
+                    {/* CUPÓN DE DESCUENTO */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Ticket size={16} className="text-orange-400" />
+                      </div>
+                      <input 
+                        type="text" 
+                        placeholder="¿Tienes un cupón de Loyalty? Ingrésalo aquí"
+                        value={cuponCliente} 
+                        onChange={e => setCuponCliente(e.target.value.toUpperCase())}
+                        className="w-full pl-9 p-3.5 rounded-2xl border border-orange-100 focus:border-orange-500 outline-none text-sm bg-orange-50/30 uppercase placeholder:normal-case font-mono"
+                      />
+                    </div>
                   </div>
                   
                   <div className="pt-3 border-t border-slate-100">
@@ -647,6 +690,28 @@ export function PublicMenuView() {
           </button>
         </div>
       )}
+
+      {/* TOAST NOTIFICATION */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 z-[200]"
+          >
+            <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl shadow-slate-200/50 border font-medium ${
+              toastMsg.type === 'error' ? 'bg-red-50 border-red-100 text-red-800' : 'bg-slate-900 border-slate-800 text-white'
+            }`}>
+              {toastMsg.type === 'error' ? <AlertCircle size={20} className="text-red-500" /> : <CheckCircle2 size={20} className="text-emerald-400" />}
+              <div>
+                <p className="text-sm font-bold">{toastMsg.title}</p>
+                {toastMsg.message && <p className="text-xs opacity-80">{toastMsg.message}</p>}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   )
