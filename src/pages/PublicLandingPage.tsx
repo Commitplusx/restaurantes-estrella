@@ -18,13 +18,26 @@ interface Restaurante {
 export function PublicLandingPage() {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [loading, setLoading] = useState(true)
+  const [botPhone, setBotPhone] = useState('529631550244')
 
   useEffect(() => {
     async function load() {
+      // Fetch restaurantes
       const { data, error } = await supabase
         .from('restaurantes')
         .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias')
         .order('nombre')
+      
+      // Fetch app config para el número del bot
+      const { data: configData } = await supabase
+        .from('app_config')
+        .select('contacto')
+        .eq('id', 'default')
+        .single()
+        
+      if (configData?.contacto?.whatsapp) {
+        setBotPhone(configData.contacto.whatsapp.replace(/\D/g, ''))
+      }
       
       if (error) console.error("Error fetching restaurants:", error)
       if (data) setRestaurantes(data)
@@ -41,7 +54,13 @@ export function PublicLandingPage() {
     // Obtener hora actual en formato HH:MM:SS
     const horaLocal = ahora.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     
-    return horaLocal >= apertura && horaLocal <= cierre;
+    // Si la hora de apertura es menor a la de cierre (ej. 09:00 a 22:00)
+    if (apertura <= cierre) {
+      return horaLocal >= apertura && horaLocal <= cierre;
+    } else {
+      // Horario nocturno que cruza la medianoche (ej. 18:00 a 03:00)
+      return horaLocal >= apertura || horaLocal <= cierre;
+    }
   }
 
   return (
@@ -100,11 +119,12 @@ export function PublicLandingPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {restaurantes.map((rest, index) => (
+            {restaurantes.map((rest) => (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                transition={{ duration: 0.4, delay: index * 0.05 }}
+                initial={{ opacity: 0, y: 30 }} 
+                whileInView={{ opacity: 1, y: 0 }} 
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.5 }}
                 key={rest.id} 
                 className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col"
               >
@@ -113,6 +133,7 @@ export function PublicLandingPage() {
                     <img 
                       src={rest.foto_fachada_url} 
                       alt={rest.nombre} 
+                      loading="lazy"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                     />
                   ) : (
@@ -167,7 +188,7 @@ export function PublicLandingPage() {
                   </div>
                   
                   <a 
-                    href="https://wa.me/529631234567" // Acá deberías poner el tel del admin o el link al portal del cliente
+                    href={`https://wa.me/${botPhone}?text=${encodeURIComponent(`Hola, quiero pedir del menú de *${rest.nombre}*:\n\n`)}`}
                     target="_blank" rel="noreferrer"
                     className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-50 text-slate-700 font-semibold rounded-xl hover:bg-orange-50 hover:text-orange-600 transition-colors border border-slate-200 hover:border-orange-200"
                   >

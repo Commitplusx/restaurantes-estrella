@@ -5,12 +5,14 @@ import type { Restaurante } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 
 
-// Sub-pages
-import { DashboardView } from './views/DashboardView'
-import { MenuProductosView } from './views/MenuProductosView'
-import { MenuCombosView } from './views/MenuCombosView'
-import { MenuPromosView } from './views/MenuPromosView'
-import { PerfilView } from './views/PerfilView'
+import { Suspense, lazy } from 'react'
+
+// Lazy loaded sub-pages to reduce initial bundle size
+const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })))
+const MenuProductosView = lazy(() => import('./views/MenuProductosView').then(m => ({ default: m.MenuProductosView })))
+const MenuCombosView = lazy(() => import('./views/MenuCombosView').then(m => ({ default: m.MenuCombosView })))
+const MenuPromosView = lazy(() => import('./views/MenuPromosView').then(m => ({ default: m.MenuPromosView })))
+const PerfilView = lazy(() => import('./views/PerfilView').then(m => ({ default: m.PerfilView })))
 
 export function PortalPage() {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
@@ -126,11 +128,13 @@ export function PortalPage() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.3 }}
               >
-                {activeTab === 'dashboard' && <DashboardView restaurante={restaurante} />}
-                {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
-                {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
-                {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
-                {activeTab === 'perfil'    && <PerfilView restaurante={restaurante} />}
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-orange-500 w-8 h-8" /></div>}>
+                  {activeTab === 'dashboard' && <DashboardView restaurante={restaurante} />}
+                  {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
+                  {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
+                  {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
+                  {activeTab === 'perfil'    && <PerfilView restaurante={restaurante} />}
+                </Suspense>
               </motion.div>
             </AnimatePresence>
           </div>

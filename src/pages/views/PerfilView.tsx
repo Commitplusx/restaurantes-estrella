@@ -26,6 +26,7 @@ export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
 
   // Actualizar el estado si el prop cambia
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
       foto_fachada_url: restaurante.foto_fachada_url || '',
       hora_apertura: restaurante.hora_apertura || '09:00:00',
