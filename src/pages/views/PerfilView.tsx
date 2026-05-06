@@ -14,6 +14,8 @@ const CATEGORIAS_COMUNES = [
 export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
   // Estado local para los campos
   const [formData, setFormData] = useState({
+    nombre: restaurante.nombre || '',
+    telefono: restaurante.telefono || '',
     foto_fachada_url: restaurante.foto_fachada_url || '',
     hora_apertura: restaurante.hora_apertura || '09:00:00',
     hora_cierre: restaurante.hora_cierre || '22:00:00',
@@ -28,6 +30,8 @@ export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
+      nombre: restaurante.nombre || '',
+      telefono: restaurante.telefono || '',
       foto_fachada_url: restaurante.foto_fachada_url || '',
       hora_apertura: restaurante.hora_apertura || '09:00:00',
       hora_cierre: restaurante.hora_cierre || '22:00:00',
@@ -87,6 +91,8 @@ export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
     const { error } = await supabase
       .from('restaurantes')
       .update({
+        nombre: formData.nombre,
+        telefono: formData.telefono,
         foto_fachada_url: formData.foto_fachada_url,
         hora_apertura: formData.hora_apertura,
         hora_cierre: formData.hora_cierre,
@@ -113,6 +119,40 @@ export function PerfilView({ restaurante }: { restaurante: Restaurante }) {
 
       <div className="max-w-2xl">
         <form onSubmit={handleSave} className="space-y-6">
+          
+          {/* INFORMACIÓN BÁSICA */}
+          <div className="card p-6">
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+              <Store className="text-orange-500" size={20} />
+              Información Básica
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1">Nombre del Restaurante</label>
+                <input 
+                  type="text" 
+                  required
+                  value={formData.nombre}
+                  onChange={e => setFormData({...formData, nombre: e.target.value})}
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:border-brand outline-none"
+                  placeholder="Ej. Tacos El Paisa"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1">Teléfono (WhatsApp para recibir pedidos)</label>
+                <input 
+                  type="tel" 
+                  required
+                  value={formData.telefono}
+                  onChange={e => setFormData({...formData, telefono: e.target.value})}
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:border-brand outline-none"
+                  placeholder="Ej. 9631234567"
+                />
+                <p className="text-xs text-slate-500 mt-1">Este es el número al que los clientes enviarán sus pedidos directamente.</p>
+              </div>
+            </div>
+          </div>
           
           {/* FOTO DE PORTADA */}
           <div className="card p-6 border-l-4 border-l-brand">

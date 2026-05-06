@@ -18,7 +18,6 @@ interface Restaurante {
 export function PublicLandingPage() {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [loading, setLoading] = useState(true)
-  const [botPhone, setBotPhone] = useState('529631550244')
 
   useEffect(() => {
     async function load() {
@@ -28,17 +27,7 @@ export function PublicLandingPage() {
         .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias')
         .order('nombre')
       
-      // Fetch app config para el número del bot
-      const { data: configData } = await supabase
-        .from('app_config')
-        .select('contacto')
-        .eq('id', 'default')
-        .single()
-        
-      if (configData?.contacto?.whatsapp) {
-        setBotPhone(configData.contacto.whatsapp.replace(/\D/g, ''))
-      }
-      
+
       if (error) console.error("Error fetching restaurants:", error)
       if (data) setRestaurantes(data)
       setLoading(false)
@@ -187,14 +176,13 @@ export function PublicLandingPage() {
                     )}
                   </div>
                   
-                  <a 
-                    href={`https://wa.me/${botPhone}?text=${encodeURIComponent(`Hola, quiero pedir del menú de *${rest.nombre}*:\n\n`)}`}
-                    target="_blank" rel="noreferrer"
+                  <Link 
+                    to={`/menu/${rest.id}`}
                     className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-50 text-slate-700 font-semibold rounded-xl hover:bg-orange-50 hover:text-orange-600 transition-colors border border-slate-200 hover:border-orange-200"
                   >
                     Ver Menú y Pedir
                     <ArrowRight className="w-4 h-4" />
-                  </a>
+                  </Link>
                 </div>
               </motion.div>
             ))}
