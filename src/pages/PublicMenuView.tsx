@@ -40,10 +40,11 @@ export function PublicMenuView() {
   const [activeTab, setActiveTab] = useState<'menu' | 'combos' | 'promos'>('menu')
 
   // Estado del carrito y drawer
-  const [carrito, setCarrito] = useState<{item: CartItem, cantidad: number}[]>([])
+  const [carrito, setCarrito] = useState<{item: CartItem & { foto_url?: string }, cantidad: number}[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [clienteNombre, setClienteNombre] = useState('')
   const [clienteTel, setClienteTel] = useState('')
+  const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
 
   useEffect(() => {
@@ -82,6 +83,14 @@ export function PublicMenuView() {
         const validPromos = (prms || []).filter(p => !p.fecha_fin || new Date(p.fecha_fin) >= new Date())
         setPromos(validPromos)
         setLoading(false)
+
+        // Bug #3: auto-select best available tab
+        const hasItems = (prods || []).length > 0
+        const hasCombos = (cmbs || []).length > 0
+        const hasValidPromos = validPromos.length > 0
+        if (!hasItems && hasCombos) setActiveTab('combos')
+        else if (!hasItems && !hasCombos && hasValidPromos) setActiveTab('promos')
+        else setActiveTab('menu')
       }
     }
     
@@ -101,7 +110,7 @@ export function PublicMenuView() {
     }
   }, [id])
 
-  const addToCart = (product: CartItem) => {
+  const addToCart = (product: CartItem & { foto_url?: string }) => {
     setCarrito(prev => {
       const exist = prev.find(p => p.item.id === product.id && p.item.tipo === product.tipo)
       if (exist) {
@@ -130,13 +139,25 @@ export function PublicMenuView() {
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
 
-  const handlePedir = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Bug #5: reset fields when closing cart without ordering
+  const closeCart = () => {
+    setIsCartOpen(false)
+    setTelError(false)
+  }
+
+  const handlePedir = async () => {
     if (!restaurante || carrito.length === 0) return
-    if (!clienteNombre.trim() || !clienteTel.trim()) {
-      alert("Por favor ingresa tu nombre y WhatsApp para continuar.")
+    if (!clienteNombre.trim()) {
+      alert('Por favor ingresa tu nombre para continuar.')
       return
     }
+    // Bug #1: proper phone validation
+    const telLimpio = clienteTel.replace(/\D/g, '')
+    if (telLimpio.length < 10) {
+      setTelError(true)
+      return
+    }
+    setTelError(false)
 
     setProcesando(true)
     const ticketId = Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -147,22 +168,23 @@ export function PublicMenuView() {
 
     try {
       await supabase.from('pedidos').insert([{
-        cliente_tel: clienteTel,
-        cliente_nombre: clienteNombre,
+        cliente_tel: telLimpio,
+        cliente_nombre: clienteNombre.trim(),
         restaurante: restaurante.nombre,
         descripcion: pedidoDetalles,
         estado: 'asignado',
         wb_message_id: ticketId
       }])
-    } catch (err) { console.warn("Intercepción db fallida:", err) }
+    } catch (err) { console.warn('Intercepción db fallida:', err) }
 
-    const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Total a pagar: $${subtotal.toFixed(2)}*\n\n_(Ticket Web: #${ticketId})_`
-    const telefonoDestino = restaurante.telefono || "529631234567"
-    const waUrl = `https://wa.me/${telefonoDestino.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje)}`
+    const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Total a pagar: $${subtotal.toFixed(2)}*\n\n_(Ticket Web: #${ticketId})_`
+    const waUrl = `https://wa.me/${telLimpio}?text=${encodeURIComponent(mensaje)}`
     
     setProcesando(false)
     setIsCartOpen(false)
     setCarrito([])
+    setClienteNombre('')
+    setClienteTel('')
     window.open(waUrl, '_blank')
   }
 
@@ -365,7 +387,7 @@ export function PublicMenuView() {
                       </h3>
                       <div className="grid gap-4">
                         {catItems.map(item => {
-                          const cartItem: CartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' }
+                          const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
                           const cant = getCantidad(item.id, 'item')
                           return (
                             <div key={item.id} className="bg-white p-4 rounded-3xl border border-slate-50 hover:border-orange-100 transition-all flex gap-6 items-center group shadow-sm hover:shadow-md">
@@ -409,11 +431,19 @@ export function PublicMenuView() {
               </div>
             )}
 
+            {/* Empty state for menu tab */}
+            {activeTab === 'menu' && items.length === 0 && !loading && (
+              <div className="text-center py-16 text-slate-400">
+                <Store size={40} className="mx-auto mb-3 opacity-30" />
+                <p className="font-bold">Este restaurante aún no tiene platillos publicados</p>
+              </div>
+            )}
+
             {/* COMBOS TAB */}
             {activeTab === 'combos' && (
               <div className="grid gap-6">
                 {combos.map(combo => {
-                  const cartItem: CartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' }
+                  const cartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' as const, foto_url: combo.foto_url || undefined }
                   const cant = getCantidad(combo.id, 'combo')
                   return (
                     <div key={combo.id} className="bg-white p-5 rounded-[2rem] border border-orange-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative">
@@ -455,7 +485,7 @@ export function PublicMenuView() {
             {activeTab === 'promos' && (
               <div className="grid gap-6">
                 {promos.map(promo => {
-                  const cartItem: CartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' }
+                  const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined }
                   const cant = getCantidad(promo.id, 'promo')
                   return (
                     <div key={promo.id} className="bg-white p-5 rounded-[2rem] border border-red-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative overflow-hidden">
@@ -511,11 +541,13 @@ export function PublicMenuView() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="absolute top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col"
             >
-              <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-                <h2 className="text-2xl font-bold flex items-center gap-3">
-                  Tu Carrito <span className="text-sm font-black bg-orange-500 text-white px-2 py-0.5 rounded-md">{cartCount}</span>
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                <h2 className="text-xl font-black flex items-center gap-3">
+                  Tu Carrito <span className="text-sm font-black bg-orange-500 text-white px-2.5 py-0.5 rounded-lg">{cartCount}</span>
                 </h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-white rounded-xl transition-colors"><X size={24} /></button>
+                <button onClick={closeCart} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-500">
+                  <X size={22} />
+                </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 space-y-6">
@@ -527,19 +559,25 @@ export function PublicMenuView() {
                   </div>
                 ) : (
                   carrito.map(p => (
-                    <div key={p.item.id + p.item.tipo} className="flex gap-4 items-center animate-in fade-in slide-in-from-right-4">
-                      <div className="w-16 h-16 rounded-xl bg-slate-50 overflow-hidden shrink-0 border border-slate-100 flex items-center justify-center">
-                        <Store size={24} className="text-slate-200" />
+                    <div key={p.item.id + p.item.tipo} className="flex gap-3 items-center">
+                      {/* Bug #4: show product image if available */}
+                      <div className="w-14 h-14 rounded-xl bg-slate-50 overflow-hidden shrink-0 border border-slate-100 flex items-center justify-center">
+                        {p.item.foto_url ? (
+                          <img src={p.item.foto_url} className="w-full h-full object-cover" alt={p.item.nombre} />
+                        ) : (
+                          <Store size={20} className="text-slate-300" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className="font-bold text-slate-800 text-sm truncate">{p.item.nombre}</h4>
-                          <span className="font-black text-orange-600 text-sm">${(p.item.precio * p.cantidad).toFixed(2)}</span>
+                          <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{p.item.nombre}</h4>
+                          <span className="font-black text-orange-600 text-sm shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
                         </div>
-                        <div className="flex items-center gap-3 mt-2">
-                          <button onClick={() => removeFromCart(p.item.id, p.item.tipo)} className="p-1.5 bg-slate-50 hover:bg-orange-50 rounded-lg text-slate-400 hover:text-orange-600 transition-colors"><Minus size={14} /></button>
-                          <span className="font-bold text-sm w-4 text-center">{p.cantidad}</span>
-                          <button onClick={() => addToCart(p.item)} className="p-1.5 bg-slate-50 hover:bg-orange-50 rounded-lg text-slate-400 hover:text-orange-600 transition-colors"><Plus size={14} /></button>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <button onClick={() => removeFromCart(p.item.id, p.item.tipo)} className="p-1.5 bg-slate-100 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"><Minus size={13} /></button>
+                          <span className="font-black text-sm w-5 text-center">{p.cantidad}</span>
+                          <button onClick={() => addToCart(p.item)} className="p-1.5 bg-slate-100 hover:bg-orange-50 rounded-lg text-slate-400 hover:text-orange-500 transition-colors"><Plus size={13} /></button>
+                          <span className="text-[11px] text-slate-400 ml-1">${p.item.precio.toFixed(2)} c/u</span>
                         </div>
                       </div>
                     </div>
@@ -548,29 +586,42 @@ export function PublicMenuView() {
               </div>
 
               {carrito.length > 0 && (
-                <div className="p-8 bg-slate-50 border-t border-slate-100 space-y-6">
-                  <div className="space-y-4">
+                <div className="p-6 bg-white border-t border-slate-100 space-y-4">
+                  <div className="space-y-3">
                     <input 
-                      type="text" placeholder="Tu Nombre completo" value={clienteNombre} onChange={e=>setClienteNombre(e.target.value)}
-                      className="w-full p-4 rounded-2xl border border-slate-200 focus:border-orange-500 outline-none text-sm bg-white shadow-sm"
+                      type="text" 
+                      placeholder="Tu nombre completo *"
+                      value={clienteNombre} 
+                      onChange={e => setClienteNombre(e.target.value)}
+                      className="w-full p-3.5 rounded-2xl border border-slate-200 focus:border-orange-500 outline-none text-sm bg-slate-50"
                     />
-                    <input 
-                      type="tel" placeholder="WhatsApp (10 dígitos)" value={clienteTel} onChange={e=>setClienteTel(e.target.value)}
-                      className="w-full p-4 rounded-2xl border border-slate-200 focus:border-orange-500 outline-none text-sm bg-white shadow-sm"
-                    />
+                    <div>
+                      <input 
+                        type="tel" 
+                        placeholder="WhatsApp (10 dígitos) *"
+                        value={clienteTel} 
+                        onChange={e => { setClienteTel(e.target.value); setTelError(false) }}
+                        className={`w-full p-3.5 rounded-2xl border outline-none text-sm bg-slate-50 transition-colors ${
+                          telError 
+                            ? 'border-red-400 focus:border-red-500 bg-red-50' 
+                            : 'border-slate-200 focus:border-orange-500'
+                        }`}
+                      />
+                      {telError && <p className="text-red-500 text-xs mt-1 ml-1">Ingresa un número válido de 10 dígitos</p>}
+                    </div>
                   </div>
                   
-                  <div className="pt-4 border-t border-slate-200">
-                    <div className="flex justify-between items-center text-slate-900 font-black text-2xl mb-4">
+                  <div className="pt-3 border-t border-slate-100">
+                    <div className="flex justify-between items-center text-slate-900 font-black text-xl mb-4">
                       <span>Total</span>
-                      <span>${subtotal.toFixed(2)}</span>
+                      <span className="text-orange-600">${subtotal.toFixed(2)}</span>
                     </div>
                     <button 
                       onClick={handlePedir}
                       disabled={procesando}
-                      className="w-full bg-orange-500 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-100 transition-all flex items-center justify-center gap-3 active:scale-95"
+                      className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-black py-4 rounded-2xl shadow-lg shadow-orange-100 transition-all flex items-center justify-center gap-3 active:scale-95"
                     >
-                      {procesando ? <Loader2 className="animate-spin" /> : <MessageCircle />}
+                      {procesando ? <Loader2 className="animate-spin" size={20} /> : <MessageCircle size={20} />}
                       {procesando ? 'Procesando...' : 'Confirmar por WhatsApp'}
                     </button>
                   </div>
