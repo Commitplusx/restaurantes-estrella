@@ -184,43 +184,74 @@ export function PublicMenuView() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-orange-100">
 
-      {/* TOPBAR — solo con nombre, sin imagen fondo */}
-      <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-4 px-6 md:px-10 flex items-center gap-4 shadow-sm">
+      {/* TOPBAR */}
+      <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-3 px-4 md:px-10 flex items-center gap-3 shadow-sm">
         <Link 
           to="/"
-          className="p-2.5 bg-slate-100 hover:bg-orange-500 hover:text-white text-slate-500 rounded-xl transition-all"
+          className="p-2 bg-slate-100 hover:bg-orange-500 hover:text-white text-slate-500 rounded-xl transition-all shrink-0"
         >
           <ChevronLeft size={20} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-black text-slate-900 truncate">{restaurante.nombre}</h1>
-          <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-            <MapPin size={12} /> {restaurante.direccion || 'Comitán, Chiapas'}
+          <h1 className="text-base md:text-lg font-black text-slate-900 truncate">{restaurante.nombre}</h1>
+          <p className="text-[11px] text-slate-400 font-medium hidden sm:flex items-center gap-1">
+            <MapPin size={11} /> {restaurante.direccion || 'Comitán, Chiapas'}
           </p>
         </div>
-        {/* Botón carrito en header (desktop) */}
+        {/* Carrito: visible en header en todo momento */}
         <button
           onClick={() => setIsCartOpen(true)}
-          className="hidden md:flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-orange-100 hover:bg-orange-600 transition-all relative"
+          className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-orange-100 hover:bg-orange-600 transition-all relative text-sm"
         >
-          <ShoppingBag size={18} />
-          Carrito
+          <ShoppingBag size={16} />
+          <span className="hidden sm:inline">Carrito</span>
           {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-slate-900 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+            <span className="bg-slate-900 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full ml-0.5">
               {cartCount}
             </span>
           )}
         </button>
       </header>
 
-      <div className="max-w-[1400px] mx-auto p-6 md:p-12">
-        <div className="flex flex-col lg:flex-row gap-12">
+      <div className="max-w-[1400px] mx-auto px-4 py-4 md:p-12">
+
+        {/* INFO DEL RESTAURANTE — compacto en móvil, sidebar en desktop */}
+
+        {/* MOBILE: tarjeta horizontal compacta */}
+        <div className="lg:hidden mb-4">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 flex items-center gap-3">
+            {/* Foto pequeña */}
+            <div className="w-14 h-14 rounded-xl overflow-hidden bg-orange-50 shrink-0 flex items-center justify-center">
+              {restaurante.foto_fachada_url ? (
+                <img src={restaurante.foto_fachada_url} className="w-full h-full object-contain" alt={restaurante.nombre} />
+              ) : (
+                <Store size={22} className="text-orange-300" />
+              )}
+            </div>
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-slate-900 text-sm truncate">{restaurante.nombre}</p>
+              <p className="text-[11px] text-slate-400 truncate">{restaurante.direccion || 'Comitán, Chiapas'}</p>
+              <p className="text-[11px] text-orange-500 font-bold">
+                {restaurante.hora_apertura?.slice(0,5)} – {restaurante.hora_cierre?.slice(0,5)}
+              </p>
+            </div>
+            {/* Categorias */}
+            {restaurante.categorias?.[0] && (
+              <span className="text-[9px] font-black uppercase tracking-wider bg-orange-50 text-orange-500 px-2 py-1 rounded-full border border-orange-100 shrink-0">
+                {restaurante.categorias[0]}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-8">
           
-          {/* SIDEBAR INFO — foto del restaurante aquí */}
-          <div className="lg:w-1/3">
-            <div className="sticky top-28 space-y-6">
+          {/* SIDEBAR INFO — solo visible en desktop */}
+          <div className="hidden lg:block lg:w-1/3">
+            <div className="sticky top-24 space-y-6">
               <div className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm">
-                {/* Foto del restaurante en el sidebar — sin zoom exagerado */}
+                {/* Foto del restaurante */}
                 <div className="h-48 w-full bg-slate-100 overflow-hidden flex items-center justify-center">
                   {restaurante.foto_fachada_url ? (
                     <img 
@@ -236,7 +267,6 @@ export function PublicMenuView() {
                 </div>
 
                 <div className="p-8">
-                  {/* Categorías del restaurante */}
                   {restaurante.categorias && restaurante.categorias.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-6">
                       {restaurante.categorias.map(cat => (
@@ -279,11 +309,11 @@ export function PublicMenuView() {
           </div>
 
           {/* MAIN MENU */}
-          <div className="lg:w-2/3">
+          <div className="w-full lg:w-2/3">
             
             {/* TABS DE NAVEGACIÓN */}
             {(combos.length > 0 || promos.length > 0) && (
-              <div className="flex gap-2 mb-10 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm w-fit">
+              <div className="flex gap-2 mb-6 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm w-fit max-w-full overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('menu')}
                   className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
@@ -556,7 +586,7 @@ export function PublicMenuView() {
         <div className="fixed bottom-6 left-0 right-0 z-50 px-6 md:hidden">
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black shadow-2xl flex items-center justify-between px-6"
+            className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black shadow-2xl flex items-center justify-between px-6"
           >
             <div className="flex items-center gap-3">
               <ShoppingBag />
