@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
-import { 
-  Store, 
-  Plus, 
-  Minus, 
-  ShoppingBag, 
-  MessageCircle, 
-  AlertCircle, 
-  Loader2, 
-  Star, 
+import {
+  Store,
+  Plus,
+  Minus,
+  ShoppingBag,
+  MessageCircle,
+  AlertCircle,
+  Loader2,
+  Star,
   Flame,
   Clock,
   MapPin,
@@ -31,32 +31,32 @@ export type CartItem = {
 export function PublicMenuView() {
   const { id } = useParams()
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
-  
+
   const [categorias, setCategorias] = useState<MenuCategoria[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
   const [combos, setCombos] = useState<MenuCombo[]>([])
   const [promos, setPromos] = useState<MenuPromocion[]>([])
-  
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'menu' | 'combos' | 'promos'>('menu')
 
   // Estado del carrito y drawer
-  const [carrito, setCarrito] = useState<{item: CartItem & { foto_url?: string }, cantidad: number}[]>([])
+  const [carrito, setCarrito] = useState<{ item: CartItem & { foto_url?: string }, cantidad: number }[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [clienteNombre, setClienteNombre] = useState('')
   const [clienteTel, setClienteTel] = useState('')
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
-  const [toastMsg, setToastMsg] = useState<{title: string, message?: string, type?: 'success'|'error'} | null>(null)
-  
+  const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' } | null>(null)
+
   // Estado para validación de cupones
   const [validandoCupon, setValidandoCupon] = useState(false)
   const [cuponValido, setCuponValido] = useState(false)
   const [descuento, setDescuento] = useState(0)
 
-  const showToast = (title: string, message?: string, type: 'success'|'error' = 'success') => {
+  const showToast = (title: string, message?: string, type: 'success' | 'error' = 'success') => {
     setToastMsg({ title, message, type })
     setTimeout(() => setToastMsg(null), 3500)
   }
@@ -64,10 +64,10 @@ export function PublicMenuView() {
   const validarCuponBtn = async () => {
     if (!cuponCliente.trim()) return
     setValidandoCupon(true)
-    
+
     try {
       const { data, error } = await supabase.rpc('validar_cupon_publico', { p_codigo: cuponCliente })
-      
+
       if (error || !data?.ok) {
         showToast('Cupón Inválido', data?.error || 'El cupón no es válido o ya expiró', 'error')
         setCuponValido(false)
@@ -89,7 +89,7 @@ export function PublicMenuView() {
 
     async function load() {
       if (!id) return
-      
+
       const { data: rest, error: restError } = await supabase
         .from('restaurantes')
         .select('*')
@@ -106,7 +106,7 @@ export function PublicMenuView() {
 
       if (isMounted) setRestaurante(rest)
 
-      const [ { data: cats }, { data: prods }, { data: cmbs }, { data: prms } ] = await Promise.all([
+      const [{ data: cats }, { data: prods }, { data: cmbs }, { data: prms }] = await Promise.all([
         supabase.from('menu_categorias').select('*').eq('restaurante_id', id).eq('activa', true).order('orden'),
         supabase.from('menu_items').select('*').eq('restaurante_id', id).eq('disponible', true).order('orden'),
         supabase.from('menu_combos').select('*').eq('restaurante_id', id).eq('disponible', true),
@@ -130,7 +130,7 @@ export function PublicMenuView() {
         else setActiveTab('menu')
       }
     }
-    
+
     load()
 
     return () => {
@@ -166,7 +166,7 @@ export function PublicMenuView() {
 
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
-  
+
   const total = Math.max(0, subtotal - descuento)
 
   // Bug #5: reset fields when closing cart without ordering
@@ -209,11 +209,11 @@ export function PublicMenuView() {
 
     const textoCupon = cuponValido ? `\n🎁 *Cupón aplicado:* ${cuponCliente.trim()} (-$${descuento.toFixed(2)})` : cuponCliente.trim() ? `\n🎟️ *Cupón a canjear:* ${cuponCliente.trim()}` : ''
     const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Subtotal:* $${subtotal.toFixed(2)}${textoCupon}\n*Total a pagar: $${total.toFixed(2)}*\n\n_(Ticket Web: #${ticketId})_`
-    
-    // Bug fix: Enviar mensaje al restaurante, no al cliente
+
+    // se envia el mensaje al restaurante
     const numeroRestaurante = restaurante.telefono ? restaurante.telefono.replace(/\D/g, '') : ''
     const waUrl = `https://wa.me/${numeroRestaurante}?text=${encodeURIComponent(mensaje)}`
-    
+
     setProcesando(false)
     setIsCartOpen(false)
     setCarrito([])
@@ -245,7 +245,7 @@ export function PublicMenuView() {
 
       {/* TOPBAR */}
       <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-3 px-4 md:px-10 flex items-center gap-3 shadow-sm">
-        <Link 
+        <Link
           to="/"
           className="p-2 bg-slate-100 hover:bg-orange-500 hover:text-white text-slate-500 rounded-xl transition-all shrink-0"
         >
@@ -292,7 +292,7 @@ export function PublicMenuView() {
               <p className="font-black text-slate-900 text-sm truncate">{restaurante.nombre}</p>
               <p className="text-[11px] text-slate-400 truncate">{restaurante.direccion || 'Comitán, Chiapas'}</p>
               <p className="text-[11px] text-orange-500 font-bold">
-                {restaurante.hora_apertura?.slice(0,5)} – {restaurante.hora_cierre?.slice(0,5)}
+                {restaurante.hora_apertura?.slice(0, 5)} – {restaurante.hora_cierre?.slice(0, 5)}
               </p>
             </div>
             {/* Categorias */}
@@ -305,7 +305,7 @@ export function PublicMenuView() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          
+
           {/* SIDEBAR INFO — solo visible en desktop */}
           <div className="hidden lg:block lg:w-1/3">
             <div className="sticky top-24 space-y-6">
@@ -313,10 +313,10 @@ export function PublicMenuView() {
                 {/* Foto del restaurante */}
                 <div className="h-48 w-full bg-slate-100 overflow-hidden flex items-center justify-center">
                   {restaurante.foto_fachada_url ? (
-                    <img 
-                      src={restaurante.foto_fachada_url} 
-                      className="w-full h-full object-contain" 
-                      alt={restaurante.nombre} 
+                    <img
+                      src={restaurante.foto_fachada_url}
+                      className="w-full h-full object-contain"
+                      alt={restaurante.nombre}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
@@ -341,7 +341,7 @@ export function PublicMenuView() {
                       <div className="p-3 bg-orange-50 rounded-xl text-orange-500"><Clock size={18} /></div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-black uppercase">Horario</p>
-                        <p className="font-bold text-sm text-slate-700">{restaurante.hora_apertura?.slice(0,5)} - {restaurante.hora_cierre?.slice(0,5)}</p>
+                        <p className="font-bold text-sm text-slate-700">{restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -354,7 +354,7 @@ export function PublicMenuView() {
                   </div>
 
                   <div className="mt-8 pt-8 border-t border-slate-50">
-                    <button 
+                    <button
                       onClick={() => setIsCartOpen(true)}
                       className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-orange-500 transition-all shadow-xl shadow-slate-100"
                     >
@@ -369,28 +369,26 @@ export function PublicMenuView() {
 
           {/* MAIN MENU */}
           <div className="w-full lg:w-2/3">
-            
+
             {/* TABS DE NAVEGACIÓN */}
             {(combos.length > 0 || promos.length > 0) && (
               <div className="flex gap-2 mb-6 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm w-fit max-w-full overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('menu')}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                    activeTab === 'menu'
-                      ? 'bg-slate-900 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-700'
-                  }`}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'menu'
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-700'
+                    }`}
                 >
                   🍽️ Menú
                 </button>
                 {combos.length > 0 && (
                   <button
                     onClick={() => setActiveTab('combos')}
-                    className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                      activeTab === 'combos'
-                        ? 'bg-slate-900 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-700'
-                    }`}
+                    className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'combos'
+                      ? 'bg-slate-900 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-700'
+                      }`}
                   >
                     ⭐ Combos
                   </button>
@@ -398,11 +396,10 @@ export function PublicMenuView() {
                 {promos.length > 0 && (
                   <button
                     onClick={() => setActiveTab('promos')}
-                    className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                      activeTab === 'promos'
-                        ? 'bg-orange-500 text-white shadow-md shadow-orange-100'
-                        : 'text-slate-400 hover:text-slate-700'
-                    }`}
+                    className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'promos'
+                      ? 'bg-orange-500 text-white shadow-md shadow-orange-100'
+                      : 'text-slate-400 hover:text-slate-700'
+                      }`}
                   >
                     🔥 Promos
                   </button>
@@ -417,8 +414,8 @@ export function PublicMenuView() {
                   const catItems = items.filter(i => i.categoria_id === cat.id)
                   if (catItems.length === 0) return null
                   return (
-                    <motion.div 
-                      key={cat.id} 
+                    <motion.div
+                      key={cat.id}
                       className="mb-12"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -436,7 +433,7 @@ export function PublicMenuView() {
                             <div key={item.id} className="bg-white p-4 rounded-3xl border border-slate-50 hover:border-orange-100 transition-all flex gap-6 items-center group shadow-sm hover:shadow-md">
                               <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden bg-slate-50 shrink-0">
                                 {item.foto_url ? (
-                                  <img src={item.foto_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={item.nombre} />
+                                  <img src={item.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={item.nombre} />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-slate-200"><Store size={32} /></div>
                                 )}
@@ -455,7 +452,7 @@ export function PublicMenuView() {
                                       <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-orange-500 rounded-lg text-white"><Plus size={14} /></button>
                                     </div>
                                   ) : (
-                                    <button 
+                                    <button
                                       onClick={() => addToCart(cartItem)}
                                       className="bg-slate-900 hover:bg-orange-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center gap-2"
                                     >
@@ -489,8 +486,8 @@ export function PublicMenuView() {
                   const cartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' as const, foto_url: combo.foto_url || undefined }
                   const cant = getCantidad(combo.id, 'combo')
                   return (
-                    <motion.div 
-                      key={combo.id} 
+                    <motion.div
+                      key={combo.id}
                       className="bg-white p-5 rounded-[2rem] border border-orange-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative"
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -498,7 +495,7 @@ export function PublicMenuView() {
                     >
                       <div className="w-full md:w-36 h-36 rounded-2xl overflow-hidden bg-slate-50 shrink-0">
                         {combo.foto_url ? (
-                          <img src={combo.foto_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={combo.nombre} />
+                          <img src={combo.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={combo.nombre} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-slate-200"><Star size={40} /></div>
                         )}
@@ -537,8 +534,8 @@ export function PublicMenuView() {
                   const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined }
                   const cant = getCantidad(promo.id, 'promo')
                   return (
-                    <motion.div 
-                      key={promo.id} 
+                    <motion.div
+                      key={promo.id}
                       className="bg-white p-5 rounded-[2rem] border border-red-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative overflow-hidden"
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -547,7 +544,7 @@ export function PublicMenuView() {
                       <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-widest">Oferta</div>
                       <div className="w-full md:w-36 h-36 rounded-2xl overflow-hidden bg-slate-50 shrink-0">
                         {promo.foto_url ? (
-                          <img src={promo.foto_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={promo.titulo} />
+                          <img src={promo.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={promo.titulo} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-slate-200"><Flame size={40} /></div>
                         )}
@@ -583,12 +580,12 @@ export function PublicMenuView() {
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 z-[100] transition-opacity duration-500">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
-              onClick={() => setIsCartOpen(false)} 
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsCartOpen(false)}
             />
-            <motion.div 
+            <motion.div
               initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="absolute top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col"
@@ -640,24 +637,23 @@ export function PublicMenuView() {
               {carrito.length > 0 && (
                 <div className="p-6 bg-white border-t border-slate-100 space-y-4">
                   <div className="space-y-3">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Tu nombre completo *"
-                      value={clienteNombre} 
+                      value={clienteNombre}
                       onChange={e => setClienteNombre(e.target.value)}
                       className="w-full p-3.5 rounded-2xl border border-slate-200 focus:border-orange-500 outline-none text-sm bg-slate-50"
                     />
                     <div>
-                      <input 
-                        type="tel" 
+                      <input
+                        type="tel"
                         placeholder="WhatsApp (10 dígitos) *"
-                        value={clienteTel} 
+                        value={clienteTel}
                         onChange={e => { setClienteTel(e.target.value); setTelError(false) }}
-                        className={`w-full p-3.5 rounded-2xl border outline-none text-sm bg-slate-50 transition-colors ${
-                          telError 
-                            ? 'border-red-400 focus:border-red-500 bg-red-50' 
-                            : 'border-slate-200 focus:border-orange-500'
-                        }`}
+                        className={`w-full p-3.5 rounded-2xl border outline-none text-sm bg-slate-50 transition-colors ${telError
+                          ? 'border-red-400 focus:border-red-500 bg-red-50'
+                          : 'border-slate-200 focus:border-orange-500'
+                          }`}
                       />
                       {telError && <p className="text-red-500 text-xs mt-1 ml-1">Ingresa un número válido de 10 dígitos</p>}
                     </div>
@@ -668,10 +664,10 @@ export function PublicMenuView() {
                         <Ticket size={16} className={`${cuponValido ? 'text-green-500' : 'text-orange-400'}`} />
                       </div>
                       <div className="flex gap-2">
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           placeholder="¿Tienes cupón? Ingrésalo"
-                          value={cuponCliente} 
+                          value={cuponCliente}
                           onChange={e => {
                             setCuponCliente(e.target.value.toUpperCase());
                             if (cuponValido) { setCuponValido(false); setDescuento(0); }
@@ -679,7 +675,7 @@ export function PublicMenuView() {
                           disabled={validandoCupon}
                           className={`w-full pl-9 p-3.5 rounded-2xl border outline-none text-sm uppercase placeholder:normal-case font-mono transition-colors ${cuponValido ? 'border-green-400 bg-green-50/50 text-green-700' : 'border-orange-100 focus:border-orange-500 bg-orange-50/30'}`}
                         />
-                        <button 
+                        <button
                           onClick={validarCuponBtn}
                           disabled={!cuponCliente || validandoCupon || cuponValido}
                           className="bg-slate-900 text-white px-4 rounded-xl font-bold text-sm disabled:opacity-50 transition-colors hover:bg-orange-600 flex items-center gap-2 shrink-0"
@@ -692,7 +688,7 @@ export function PublicMenuView() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="pt-3 border-t border-slate-100">
                     <div className="flex justify-between items-center text-slate-500 mb-2 text-sm font-bold">
                       <span>Subtotal</span>
@@ -700,7 +696,7 @@ export function PublicMenuView() {
                     </div>
                     {descuento > 0 && (
                       <div className="flex justify-between items-center text-green-600 mb-3 text-sm font-bold">
-                        <span className="flex items-center gap-1"><Ticket size={14}/> Descuento</span>
+                        <span className="flex items-center gap-1"><Ticket size={14} /> Descuento</span>
                         <span>-${descuento.toFixed(2)}</span>
                       </div>
                     )}
@@ -708,7 +704,7 @@ export function PublicMenuView() {
                       <span>Total</span>
                       <span className="text-orange-600">${total.toFixed(2)}</span>
                     </div>
-                    <button 
+                    <button
                       onClick={handlePedir}
                       disabled={procesando}
                       className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-black py-4 rounded-2xl shadow-lg shadow-orange-100 transition-all flex items-center justify-center gap-3 active:scale-95"
@@ -727,7 +723,7 @@ export function PublicMenuView() {
       {/* MOBILE FLOATING CART BUTTON */}
       {carrito.length > 0 && !isCartOpen && (
         <div className="fixed bottom-6 left-0 right-0 z-50 px-6 md:hidden">
-          <button 
+          <button
             onClick={() => setIsCartOpen(true)}
             className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black shadow-2xl flex items-center justify-between px-6"
           >
@@ -749,9 +745,8 @@ export function PublicMenuView() {
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             className="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 z-[200]"
           >
-            <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl shadow-slate-200/50 border font-medium ${
-              toastMsg.type === 'error' ? 'bg-red-50 border-red-100 text-red-800' : 'bg-slate-900 border-slate-800 text-white'
-            }`}>
+            <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl shadow-slate-200/50 border font-medium ${toastMsg.type === 'error' ? 'bg-red-50 border-red-100 text-red-800' : 'bg-slate-900 border-slate-800 text-white'
+              }`}>
               {toastMsg.type === 'error' ? <AlertCircle size={20} className="text-red-500" /> : <CheckCircle2 size={20} className="text-emerald-400" />}
               <div>
                 <p className="text-sm font-bold">{toastMsg.title}</p>

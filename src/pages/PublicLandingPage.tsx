@@ -17,22 +17,53 @@ interface Restaurante {
 export function PublicLandingPage() {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const PAGE_SIZE = 12 // Cargamos de 12 en 12
+
+  async function loadRestaurants(pageIndex: number) {
+    if (pageIndex === 0) setLoading(true)
+    else setLoadingMore(true)
+
+    const { data, error } = await supabase
+      .from('restaurantes')
+      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias')
+      .eq('activo', true)
+      .order('nombre')
+      .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
+    
+    if (error) {
+      console.error("Error fetching restaurants:", error)
+    }
+    
+    if (data) {
+      if (data.length < PAGE_SIZE) setHasMore(false)
+      if (pageIndex === 0) {
+        setRestaurantes(data)
+      } else {
+        // Evitamos duplicados por si acaso
+        setRestaurantes(prev => {
+          const newIds = data.map(d => d.id)
+          return [...prev.filter(p => !newIds.includes(p.id)), ...data]
+        })
+      }
+    }
+    
+    setLoading(false)
+    setLoadingMore(false)
+  }
 
   useEffect(() => {
-    async function load() {
-      const { data, error } = await supabase
-        .from('restaurantes')
-        .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias')
-        .eq('activo', true)
-        .order('nombre')
-      
-      if (error) console.error("Error fetching restaurants:", error)
-      if (data) setRestaurantes(data)
-      setLoading(false)
-    }
-    load()
+    loadRestaurants(0)
   }, [])
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1
+    setPage(nextPage)
+    loadRestaurants(nextPage)
+  }
 
   const filteredRestaurants = useMemo(() => 
     restaurantes.filter(r => 
@@ -148,6 +179,7 @@ export function PublicLandingPage() {
                     <img 
                       src={res.foto_fachada_url} 
                       alt={res.nombre} 
+                      loading="lazy"
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                     />
                   ) : (
@@ -194,6 +226,19 @@ export function PublicLandingPage() {
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+
+        {/* Load More Button */}
+        {hasMore && !loading && filteredRestaurants.length > 0 && (
+          <div className="flex justify-center mt-4 pb-12">
+            <button 
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold shadow-xl shadow-slate-200 hover:bg-orange-500 hover:shadow-orange-200 transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              {loadingMore ? 'Cargando...' : 'Cargar más restaurantes'}
+            </button>
           </div>
         )}
       </main>
