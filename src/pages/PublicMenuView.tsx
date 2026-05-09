@@ -133,17 +133,8 @@ export function PublicMenuView() {
     
     load()
 
-    const channel = supabase.channel(`public-menu-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `restaurante_id=eq.${id}` }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categorias', filter: `restaurante_id=eq.${id}` }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_combos', filter: `restaurante_id=eq.${id}` }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_promociones', filter: `restaurante_id=eq.${id}` }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes', filter: `id=eq.${id}` }, () => load())
-      .subscribe()
-
     return () => {
       isMounted = false
-      supabase.removeChannel(channel)
     }
   }, [id])
 
@@ -218,7 +209,10 @@ export function PublicMenuView() {
 
     const textoCupon = cuponValido ? `\n🎁 *Cupón aplicado:* ${cuponCliente.trim()} (-$${descuento.toFixed(2)})` : cuponCliente.trim() ? `\n🎟️ *Cupón a canjear:* ${cuponCliente.trim()}` : ''
     const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}* y quiero hacer el siguiente pedido:\n\n${pedidoDetalles}\n\n*Subtotal:* $${subtotal.toFixed(2)}${textoCupon}\n*Total a pagar: $${total.toFixed(2)}*\n\n_(Ticket Web: #${ticketId})_`
-    const waUrl = `https://wa.me/${telLimpio}?text=${encodeURIComponent(mensaje)}`
+    
+    // Bug fix: Enviar mensaje al restaurante, no al cliente
+    const numeroRestaurante = restaurante.telefono ? restaurante.telefono.replace(/\D/g, '') : ''
+    const waUrl = `https://wa.me/${numeroRestaurante}?text=${encodeURIComponent(mensaje)}`
     
     setProcesando(false)
     setIsCartOpen(false)
