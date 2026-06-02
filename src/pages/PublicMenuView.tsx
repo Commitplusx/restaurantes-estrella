@@ -21,11 +21,19 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
+export type OpcionSeleccionada = {
+  grupo: string;
+  opcion: string;
+  precio_extra: number;
+}
+
 export type CartItem = {
   id: string;
   nombre: string;
   precio: number;
   tipo: 'item' | 'combo' | 'promo';
+  opcionesSeleccionadas?: OpcionSeleccionada[];
+  cartItemId: string;
 }
 
 export function PublicMenuView() {
@@ -55,6 +63,10 @@ export function PublicMenuView() {
   const [validandoCupon, setValidandoCupon] = useState(false)
   const [cuponValido, setCuponValido] = useState(false)
   const [descuento, setDescuento] = useState(0)
+
+  // Estado del modal de opciones de producto
+  const [selectedItemForOptions, setSelectedItemForOptions] = useState<MenuItem | null>(null)
+  const [selectedOptionsState, setSelectedOptionsState] = useState<Record<string, Record<string, boolean>>>({})
 
   const showToast = (title: string, message?: string, type: 'success' | 'error' = 'success') => {
     setToastMsg({ title, message, type })
@@ -107,7 +119,7 @@ export function PublicMenuView() {
       if (isMounted) setRestaurante(rest)
 
       const [{ data: cats }, { data: prods }, { data: cmbs }, { data: prms }] = await Promise.all([
-        supabase.from('menu_categorias').select('*').eq('restaurante_id', id).eq('activa', true).order('orden'),
+        supabase.from('menu_categorias').select('*').eq('restaurante_id', id).order('orden'),
         supabase.from('menu_items').select('*').eq('restaurante_id', id).eq('disponible', true).order('orden'),
         supabase.from('menu_combos').select('*').eq('restaurante_id', id).eq('disponible', true),
         supabase.from('menu_promociones').select('*').eq('restaurante_id', id).eq('activa', true)
@@ -140,28 +152,28 @@ export function PublicMenuView() {
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
     setCarrito(prev => {
-      const exist = prev.find(p => p.item.id === product.id && p.item.tipo === product.tipo)
+      const exist = prev.find(p => p.item.cartItemId === product.cartItemId)
       if (exist) {
-        return prev.map(p => p.item.id === product.id && p.item.tipo === product.tipo ? { ...p, cantidad: p.cantidad + 1 } : p)
+        return prev.map(p => p.item.cartItemId === product.cartItemId ? { ...p, cantidad: p.cantidad + 1 } : p)
       }
       return [...prev, { item: product, cantidad: 1 }]
     })
   }
 
-  const removeFromCart = (productId: string, tipo: 'item' | 'combo' | 'promo') => {
+  const removeFromCart = (cartItemId: string) => {
     setCarrito(prev => {
-      const exist = prev.find(p => p.item.id === productId && p.item.tipo === tipo)
+      const exist = prev.find(p => p.item.cartItemId === cartItemId)
       if (exist && exist.cantidad === 1) {
-        return prev.filter(p => !(p.item.id === productId && p.item.tipo === tipo))
+        return prev.filter(p => p.item.cartItemId !== cartItemId)
       }
       return prev
-        .map(p => p.item.id === productId && p.item.tipo === tipo ? { ...p, cantidad: p.cantidad - 1 } : p)
+        .map(p => p.item.cartItemId === cartItemId ? { ...p, cantidad: p.cantidad - 1 } : p)
         .filter(p => p.cantidad > 0)
     })
   }
 
-  const getCantidad = (productId: string, tipo: 'item' | 'combo' | 'promo') => {
-    return carrito.find(p => p.item.id === productId && p.item.tipo === tipo)?.cantidad || 0
+  const getCantidadTotal = (productId: string, tipo: 'item' | 'combo' | 'promo') => {
+    return carrito.filter(p => p.item.id === productId && p.item.tipo === tipo).reduce((sum, p) => sum + p.cantidad, 0)
   }
 
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
@@ -193,7 +205,11 @@ export function PublicMenuView() {
     const ticketId = Math.random().toString(36).substring(2, 8).toUpperCase()
     const pedidoDetalles = carrito.map(p => {
       const tag = p.item.tipo === 'combo' ? '[COMBO] ' : p.item.tipo === 'promo' ? '[PROMO] ' : ''
-      return `${p.cantidad}x ${tag}${p.item.nombre} ($${(p.item.precio * p.cantidad).toFixed(2)})`
+      let optionsStr = ''
+      if (p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0) {
+        optionsStr = '\n  └ ' + p.item.opcionesSeleccionadas.map(o => `+ ${o.opcion}`).join(', ')
+      }
+      return `${p.cantidad}x ${tag}${p.item.nombre} ($${(p.item.precio * p.cantidad).toFixed(2)})${optionsStr}`
     }).join('\n')
 
     try {
@@ -428,10 +444,17 @@ export function PublicMenuView() {
                       <div className="grid gap-4">
                         {catItems.map(item => {
                           const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
-                          const cant = getCantidad(item.id, 'item')
+                          const cantTotal = getCantidadTotal(item.id, 'item')
                           return (
                             <div key={item.id} className="bg-white p-4 rounded-3xl border border-slate-50 hover:border-orange-100 transition-all flex gap-6 items-center group shadow-sm hover:shadow-md">
-                              <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden bg-slate-50 shrink-0">
+                              <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden bg-slate-50 shrink-0 cursor-pointer" onClick={() => {
+                                if (item.opciones && item.opciones.length > 0) {
+                                  setSelectedItemForOptions(item)
+                                  setSelectedOptionsState({})
+                                } else {
+                                  addToCart({ ...cartItem, cartItemId: item.id })
+                                }
+                              }}>
                                 {item.foto_url ? (
                                   <img src={item.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={item.nombre} />
                                 ) : (
@@ -439,21 +462,38 @@ export function PublicMenuView() {
                                 )}
                               </div>
                               <div className="flex-1">
-                                <div className="flex justify-between items-start mb-1">
+                                <div className="flex justify-between items-start mb-1 cursor-pointer" onClick={() => {
+                                  if (item.opciones && item.opciones.length > 0) {
+                                    setSelectedItemForOptions(item)
+                                    setSelectedOptionsState({})
+                                  } else {
+                                    addToCart({ ...cartItem, cartItemId: item.id })
+                                  }
+                                }}>
                                   <h4 className="font-bold text-slate-900 text-lg">{item.nombre}</h4>
                                   <span className="text-orange-600 font-black text-lg">${item.precio.toFixed(2)}</span>
                                 </div>
                                 <p className="text-slate-400 text-xs md:text-sm mb-4 line-clamp-2 leading-relaxed">{item.descripcion}</p>
                                 <div className="flex justify-between items-center">
-                                  {cant > 0 ? (
+                                  {item.opciones && item.opciones.length > 0 ? (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedItemForOptions(item)
+                                        setSelectedOptionsState({})
+                                      }}
+                                      className="bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-bold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center gap-2"
+                                    >
+                                      Opciones {cantTotal > 0 && <span className="bg-orange-500 text-white px-1.5 py-0.5 rounded-md text-[10px]">{cantTotal}</span>}
+                                    </button>
+                                  ) : cantTotal > 0 ? (
                                     <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-2 py-1 border border-slate-100">
-                                      <button onClick={() => removeFromCart(item.id, 'item')} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-orange-600"><Minus size={14} /></button>
-                                      <span className="font-bold text-sm w-4 text-center">{cant}</span>
-                                      <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-orange-500 rounded-lg text-white"><Plus size={14} /></button>
+                                      <button onClick={() => removeFromCart(item.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-orange-600"><Minus size={14} /></button>
+                                      <span className="font-bold text-sm w-4 text-center">{cantTotal}</span>
+                                      <button onClick={() => addToCart({ ...cartItem, cartItemId: item.id })} className="p-1.5 bg-orange-500 rounded-lg text-white"><Plus size={14} /></button>
                                     </div>
                                   ) : (
                                     <button
-                                      onClick={() => addToCart(cartItem)}
+                                      onClick={() => addToCart({ ...cartItem, cartItemId: item.id })}
                                       className="bg-slate-900 hover:bg-orange-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center gap-2"
                                     >
                                       <Plus size={16} /> Añadir
@@ -483,8 +523,8 @@ export function PublicMenuView() {
             {activeTab === 'combos' && (
               <div className="grid gap-6">
                 {combos.map(combo => {
-                  const cartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' as const, foto_url: combo.foto_url || undefined }
-                  const cant = getCantidad(combo.id, 'combo')
+                  const cartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' as const, foto_url: combo.foto_url || undefined, cartItemId: combo.id }
+                  const cantTotal = getCantidadTotal(combo.id, 'combo')
                   return (
                     <motion.div
                       key={combo.id}
@@ -509,10 +549,10 @@ export function PublicMenuView() {
                         <div className="flex items-center justify-between mt-2 w-full">
                           <span className="text-orange-600 font-black text-2xl">${combo.precio.toFixed(2)}</span>
                           <div>
-                            {cant > 0 ? (
+                            {cantTotal > 0 ? (
                               <div className="flex items-center gap-3 bg-slate-100 rounded-xl px-2 py-1">
-                                <button onClick={() => removeFromCart(combo.id, 'combo')} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-orange-600"><Minus size={14} /></button>
-                                <span className="font-bold text-sm w-4 text-center">{cant}</span>
+                                <button onClick={() => removeFromCart(combo.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-orange-600"><Minus size={14} /></button>
+                                <span className="font-bold text-sm w-4 text-center">{cantTotal}</span>
                                 <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-orange-500 rounded-lg text-white"><Plus size={14} /></button>
                               </div>
                             ) : (
@@ -531,8 +571,8 @@ export function PublicMenuView() {
             {activeTab === 'promos' && (
               <div className="grid gap-6">
                 {promos.map(promo => {
-                  const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined }
-                  const cant = getCantidad(promo.id, 'promo')
+                  const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined, cartItemId: promo.id }
+                  const cantTotal = getCantidadTotal(promo.id, 'promo')
                   return (
                     <motion.div
                       key={promo.id}
@@ -555,10 +595,10 @@ export function PublicMenuView() {
                         <div className="flex items-center justify-between mt-2 w-full">
                           <span className="text-red-500 font-black text-2xl">${promo.precio_especial?.toFixed(2)}</span>
                           <div>
-                            {cant > 0 ? (
+                            {cantTotal > 0 ? (
                               <div className="flex items-center gap-3 bg-slate-100 rounded-xl px-2 py-1">
-                                <button onClick={() => removeFromCart(promo.id, 'promo')} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-red-600"><Minus size={14} /></button>
-                                <span className="font-bold text-sm w-4 text-center">{cant}</span>
+                                <button onClick={() => removeFromCart(promo.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-red-600"><Minus size={14} /></button>
+                                <span className="font-bold text-sm w-4 text-center">{cantTotal}</span>
                                 <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-red-500 rounded-lg text-white"><Plus size={14} /></button>
                               </div>
                             ) : (
@@ -622,8 +662,13 @@ export function PublicMenuView() {
                           <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{p.item.nombre}</h4>
                           <span className="font-black text-orange-600 text-sm shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
                         </div>
+                        {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
+                          <div className="text-[11px] text-slate-500 mb-1 leading-tight">
+                            {p.item.opcionesSeleccionadas.map(o => o.opcion).join(', ')}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-1.5">
-                          <button onClick={() => removeFromCart(p.item.id, p.item.tipo)} className="p-1.5 bg-slate-100 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"><Minus size={13} /></button>
+                          <button onClick={() => removeFromCart(p.item.cartItemId)} className="p-1.5 bg-slate-100 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"><Minus size={13} /></button>
                           <span className="font-black text-sm w-5 text-center">{p.cantidad}</span>
                           <button onClick={() => addToCart(p.item)} className="p-1.5 bg-slate-100 hover:bg-orange-50 rounded-lg text-slate-400 hover:text-orange-500 transition-colors"><Plus size={13} /></button>
                           <span className="text-[11px] text-slate-400 ml-1">${p.item.precio.toFixed(2)} c/u</span>
@@ -735,6 +780,158 @@ export function PublicMenuView() {
           </button>
         </div>
       )}
+
+      {/* MODAL DE OPCIONES DE PRODUCTO */}
+      <AnimatePresence>
+        {selectedItemForOptions && (
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setSelectedItemForOptions(null)}
+            />
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="relative w-full sm:max-w-lg bg-white sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+            >
+              <div className="relative w-full h-48 bg-slate-100 shrink-0">
+                {selectedItemForOptions.foto_url ? (
+                  <img src={selectedItemForOptions.foto_url} className="w-full h-full object-cover" alt={selectedItemForOptions.nombre} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-300"><Store size={48} /></div>
+                )}
+                <button onClick={() => setSelectedItemForOptions(null)} className="absolute top-4 right-4 p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 shrink-0 border-b border-slate-100">
+                <h3 className="text-2xl font-black text-slate-900">{selectedItemForOptions.nombre}</h3>
+                <p className="text-slate-500 text-sm mt-1">{selectedItemForOptions.descripcion}</p>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {(selectedItemForOptions.opciones || []).map((grupo, gIdx) => {
+                  const seleccionados = selectedOptionsState[grupo.titulo] || {};
+                  const countSelected = Object.values(seleccionados).filter(Boolean).length;
+                  
+                  return (
+                    <div key={gIdx}>
+                      <div className="flex justify-between items-baseline mb-3">
+                        <h4 className="font-bold text-slate-800 text-lg">{grupo.titulo}</h4>
+                        {grupo.requerido && countSelected === 0 ? (
+                          <span className="text-[10px] font-black uppercase tracking-widest bg-red-50 text-red-500 px-2 py-1 rounded-md">Requerido</span>
+                        ) : grupo.maximo_selecciones > 1 ? (
+                          <span className="text-[11px] text-slate-400 font-bold">Máx {grupo.maximo_selecciones}</span>
+                        ) : null}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {grupo.opciones.map((opc, oIdx) => {
+                          const isSelected = !!seleccionados[opc.nombre];
+                          
+                          const toggleOpcion = () => {
+                            setSelectedOptionsState(prev => {
+                              const groupState = { ...(prev[grupo.titulo] || {}) };
+                              if (grupo.maximo_selecciones === 1) {
+                                // Radio behavior
+                                return { ...prev, [grupo.titulo]: { [opc.nombre]: true } }
+                              } else {
+                                // Checkbox behavior
+                                if (isSelected) {
+                                  delete groupState[opc.nombre];
+                                } else {
+                                  if (Object.values(groupState).filter(Boolean).length >= grupo.maximo_selecciones) return prev; // Limit reached
+                                  groupState[opc.nombre] = true;
+                                }
+                                return { ...prev, [grupo.titulo]: groupState }
+                              }
+                            });
+                          };
+
+                          return (
+                            <label key={oIdx} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-orange-500 bg-orange-50/30' : 'border-slate-200 hover:border-slate-300'}`}>
+                              <div className="flex items-center gap-3">
+                                <div className="relative flex items-center justify-center">
+                                  <input 
+                                    type={grupo.maximo_selecciones === 1 ? 'radio' : 'checkbox'} 
+                                    checked={isSelected}
+                                    onChange={toggleOpcion}
+                                    className="w-5 h-5 accent-orange-500 cursor-pointer"
+                                  />
+                                </div>
+                                <span className={`text-sm font-bold ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>{opc.nombre}</span>
+                              </div>
+                              {opc.precio_extra > 0 && <span className="text-sm font-bold text-slate-500">+${(opc.precio_extra).toFixed(2)}</span>}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              
+              <div className="p-6 border-t border-slate-100 bg-white shrink-0">
+                <button
+                  onClick={() => {
+                    // Validar requeridos
+                    const faltanRequeridos = (selectedItemForOptions.opciones || []).some(g => {
+                      if (!g.requerido) return false;
+                      const sel = selectedOptionsState[g.titulo] || {};
+                      return Object.values(sel).filter(Boolean).length === 0;
+                    });
+
+                    if (faltanRequeridos) {
+                      showToast('Faltan opciones', 'Por favor selecciona las opciones requeridas', 'error');
+                      return;
+                    }
+
+                    // Calcular precio total y armar opciones
+                    let precioExtra = 0;
+                    const opcionesSel: OpcionSeleccionada[] = [];
+                    
+                    (selectedItemForOptions.opciones || []).forEach(g => {
+                      g.opciones.forEach(o => {
+                        if (selectedOptionsState[g.titulo]?.[o.nombre]) {
+                          precioExtra += o.precio_extra;
+                          opcionesSel.push({ grupo: g.titulo, opcion: o.nombre, precio_extra: o.precio_extra });
+                        }
+                      });
+                    });
+
+                    const hashId = selectedItemForOptions.id + '_' + opcionesSel.map(o => o.opcion).sort().join('_');
+                    
+                    const itemToAdd: CartItem = {
+                      id: selectedItemForOptions.id,
+                      cartItemId: hashId,
+                      nombre: selectedItemForOptions.nombre,
+                      precio: selectedItemForOptions.precio + precioExtra,
+                      tipo: 'item',
+                      opcionesSeleccionadas: opcionesSel
+                    };
+                    
+                    addToCart({ ...itemToAdd, foto_url: selectedItemForOptions.foto_url || undefined });
+                    setSelectedItemForOptions(null);
+                    showToast('Agregado', `${selectedItemForOptions.nombre} añadido al carrito`);
+                  }}
+                  className="w-full bg-slate-900 hover:bg-orange-500 text-white font-black py-4 rounded-2xl shadow-lg transition-colors flex items-center justify-between px-6"
+                >
+                  <span>Añadir al Carrito</span>
+                  <span>${(
+                    selectedItemForOptions.precio + 
+                    (selectedItemForOptions.opciones || []).reduce((sum, g) => {
+                      return sum + g.opciones.reduce((s2, o) => {
+                        return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? o.precio_extra : 0);
+                      }, 0);
+                    }, 0)
+                  ).toFixed(2)}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* TOAST NOTIFICATION */}
       <AnimatePresence>

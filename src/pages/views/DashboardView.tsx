@@ -1,11 +1,32 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
-import { Activity, Utensils, Package, Tag, Loader2 } from 'lucide-react'
+import { Activity, Utensils, Package, Tag, Loader2, Power } from 'lucide-react'
 
 export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   const [stats, setStats] = useState({ platillos: 0, combos: 0, promos: 0 })
   const [loading, setLoading] = useState(true)
+  const [isActive, setIsActive] = useState(restaurante.activo)
+  const [toggling, setToggling] = useState(false)
+
+  const toggleStatus = async () => {
+    if(toggling) return;
+    setToggling(true)
+    const newStatus = !isActive;
+    
+    const { error } = await supabase
+      .from('restaurantes')
+      .update({ activo: newStatus })
+      .eq('id', restaurante.id)
+      
+    if (!error) {
+      setIsActive(newStatus)
+    } else {
+      console.error(error)
+      alert("Error al cambiar estado operativo")
+    }
+    setToggling(false)
+  }
 
   useEffect(() => {
     async function loadStats() {
@@ -31,9 +52,32 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
 
   return (
     <div className="pb-24">
-      <div className="mb-10">
-        <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-3 tracking-tight">¡Hola, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">{restaurante.nombre}</span>! 👋</h1>
-        <p className="text-slate-500 text-sm md:text-base font-medium">Bienvenido a tu panel de control. Aquí tienes el resumen de tu menú digital.</p>
+      <div className="mb-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-3 tracking-tight">¡Hola, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">{restaurante.nombre}</span>! 👋</h1>
+          <p className="text-slate-500 text-sm md:text-base font-medium">Bienvenido a tu panel de control. Aquí tienes el resumen de tu menú digital.</p>
+        </div>
+
+        {/* Master Switch */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 shrink-0">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isActive ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
+            <Power size={24} className={toggling ? 'animate-pulse' : ''} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Estado Operativo</p>
+            <p className={`text-sm font-bold ${isActive ? 'text-emerald-600' : 'text-red-600'}`}>
+              {isActive ? 'Abierto (Visible)' : 'Pausado (Oculto)'}
+            </p>
+          </div>
+          
+          <button 
+            onClick={toggleStatus}
+            disabled={toggling}
+            className={`ml-2 relative w-14 h-8 rounded-full transition-colors cursor-pointer ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}
+          >
+            <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform shadow-md ${isActive ? 'translate-x-6' : 'translate-x-0'} ${toggling ? 'opacity-50' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {loading ? (

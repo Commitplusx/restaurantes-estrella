@@ -32,6 +32,18 @@ export interface MenuCategoria {
   activa: boolean
 }
 
+export interface OpcionItem {
+  nombre: string
+  precio_extra: number
+}
+
+export interface OpcionGrupo {
+  titulo: string
+  requerido: boolean
+  maximo_selecciones: number
+  opciones: OpcionItem[]
+}
+
 export interface MenuItem {
   id: string
   restaurante_id: string
@@ -43,6 +55,7 @@ export interface MenuItem {
   disponible: boolean
   es_popular: boolean
   orden: number
+  opciones?: OpcionGrupo[]
 }
 
 export interface MenuCombo {
@@ -69,12 +82,54 @@ export interface MenuPromocion {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Sube una imagen al bucket menu-fotos y retorna la URL pública */
+/** Helper para comprimir imágenes antes de subir */
+async function compressImage(file: File, maxWidth: number = 800): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(file);
+
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) return resolve(file);
+        const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+          type: 'image/webp',
+          lastModified: Date.now(),
+        });
+        resolve(compressedFile);
+      }, 'image/webp', 0.8); // 80% calidad, formato WebP
+    };
+    img.onerror = (error) => reject(error);
+  });
+}
+
+/** Sube una imagen al bucket menu-fotos comprimiéndola primero y retorna la URL pública */
 export async function subirFoto(file: File, path: string): Promise<string | null> {
-  const { error } = await supabase.storage.from('menu-fotos').upload(path, file, { upsert: true })
-  if (error) { console.error('Error subiendo foto:', error); return null }
-  const { data } = supabase.storage.from('menu-fotos').getPublicUrl(path)
-  return data.publicUrl
+  try {
+    const compressedFile = await compressImage(file);
+    const finalPath = path.replace(/\.[^/.]+$/, "") + ".webp"; // Aseguramos que termine en .webp
+
+    const { error } = await supabase.storage.from('menu-fotos').upload(finalPath, compressedFile, { upsert: true })
+    if (error) { console.error('Error subiendo foto:', error); return null }
+    const { data } = supabase.storage.from('menu-fotos').getPublicUrl(finalPath)
+    return data.publicUrl
+  } catch(err) {
+    console.error('Error comprimiendo/subiendo foto:', err)
+    return null;
+  }
 }
 
 /** Obtiene el restaurante vinculado al usuario autenticado */

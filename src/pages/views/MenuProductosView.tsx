@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Image as ImageIcon, X, Loader2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, X, Loader2, Utensils } from 'lucide-react'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuItem, MenuCategoria } from '../../lib/supabase'
 
@@ -13,6 +14,8 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
   const [editingItem, setEditingItem] = useState<Partial<MenuItem>>({})
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null)
+  const [errorModal, setErrorModal] = useState<string | null>(null)
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -27,7 +30,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     if (url) {
       setEditingItem({...editingItem, foto_url: url})
     } else {
-      alert('Hubo un error al subir la foto. Intenta de nuevo.')
+      setErrorModal('Hubo un error al subir la foto. Intenta de nuevo.')
     }
     setUploadingImage(false)
   }
@@ -76,10 +79,10 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     
     if (payload.id) {
       const { error } = await supabase.from('menu_items').update(payload).eq('id', payload.id)
-      if (error) { alert('Error al guardar: ' + error.message); setSaving(false); return }
+      if (error) { setErrorModal('Error al guardar: ' + error.message); setSaving(false); return }
     } else {
       const { error } = await supabase.from('menu_items').insert(payload)
-      if (error) { alert('Error al crear: ' + error.message); setSaving(false); return }
+      if (error) { setErrorModal('Error al crear: ' + error.message); setSaving(false); return }
     }
     
     await loadData()
@@ -88,9 +91,14 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Seguro que deseas eliminar este platillo?')) return
-    await supabase.from('menu_items').delete().eq('id', id)
+    setItemToDelete(id)
+  }
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return
+    await supabase.from('menu_items').delete().eq('id', itemToDelete)
     await loadData()
+    setItemToDelete(null)
   }
 
   const toggleDisponible = async (item: MenuItem) => {
@@ -107,62 +115,84 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
 
   return (
     <div className="pb-24">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
         <div>
-          <h1 className="text-2xl font-black m-0">Platillos</h1>
-          <p className="text-muted m-0">Gestiona tu menú principal.</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-2 tracking-tight">Platillos</h1>
+          <p className="text-slate-500 font-medium">Gestiona tu menú principal.</p>
         </div>
-        <button className="btn btn-primary w-full sm:w-auto" onClick={() => handleOpenModal()}>
-          <Plus size={18} /> Agregar Platillo
+        <button 
+          className="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-orange-500 text-white font-bold rounded-2xl shadow-xl shadow-slate-200 hover:shadow-orange-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group" 
+          onClick={() => handleOpenModal()}
+        >
+          <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
+          Agregar Platillo
         </button>
       </div>
 
       {categorias.length === 0 && items.length === 0 ? (
-        <div className="card text-center py-12 px-4">
-          <h3 className="text-xl font-bold">Aún no tienes platillos</h3>
-          <p className="text-muted mb-6">Agrega tu primer producto para empezar a vender.</p>
-          <button className="btn btn-primary" onClick={() => handleOpenModal()}>Crear Platillo</button>
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm text-center py-20 px-6">
+          <div className="w-20 h-20 bg-orange-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6">
+            <Utensils className="text-orange-300" size={32} />
+          </div>
+          <h3 className="text-2xl font-black text-slate-800 mb-2">Aún no tienes platillos</h3>
+          <p className="text-slate-500 font-medium mb-8">Agrega tu primer producto para empezar a vender.</p>
+          <button 
+            className="px-8 py-3.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg shadow-orange-500/30 transition-all active:scale-[0.98]" 
+            onClick={() => handleOpenModal()}
+          >
+            Crear Platillo
+          </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-10">
           {categorias.map(cat => {
             const catItems = items.filter(i => i.categoria_id === cat.id)
             return (
-              <div key={cat.id}>
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <span>{cat.emoji}</span> {cat.nombre}
+              <div key={cat.id} className="relative">
+                <h3 className="text-xl font-black mb-5 flex items-center gap-3 text-slate-800">
+                  <span className="p-2 bg-slate-100 rounded-xl text-lg">{cat.emoji}</span> 
+                  {cat.nombre}
                 </h3>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {catItems.length === 0 && <p className="text-muted text-sm">No hay platillos en esta categoría.</p>}
+                  {catItems.length === 0 && <p className="text-slate-400 text-sm italic py-4">No hay platillos en esta categoría.</p>}
                   {catItems.map(item => (
-                    <div key={item.id} className="card flex items-center gap-4 p-4 hover:border-orange-500/30 transition-colors">
-                      <div className="w-20 h-20 rounded-xl bg-surface2 shrink-0 flex items-center justify-center overflow-hidden border border-border">
+                    <div key={item.id} className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-200 transition-all p-4 flex gap-5 group">
+                      
+                      <div className="w-24 h-24 rounded-2xl bg-slate-50 shrink-0 flex items-center justify-center overflow-hidden border border-slate-100">
                         {item.foto_url ? (
-                          <img src={item.foto_url} alt={item.nombre} className="w-full h-full object-cover" />
+                          <img src={item.foto_url} alt={item.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                         ) : (
-                          <ImageIcon size={24} className="text-muted" />
+                          <ImageIcon size={28} className="text-slate-300" />
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="m-0 text-base font-bold truncate">{item.nombre}</h4>
-                          {item.es_popular && <span className="badge badge-orange">Popular</span>}
+                      
+                      <div className="flex-1 flex flex-col justify-center min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="m-0 text-base font-bold text-slate-800 truncate">{item.nombre}</h4>
+                          {item.es_popular && <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 text-[9px] font-black uppercase tracking-wider">Popular</span>}
                         </div>
-                        <p className="m-1 text-sm text-muted line-clamp-2 leading-tight">
+                        <p className="text-xs text-slate-500 line-clamp-2 leading-snug mb-2 font-medium">
                           {item.descripcion}
                         </p>
-                        <p className="m-0 font-black text-brand">${Number(item.precio).toFixed(2)}</p>
+                        <p className="m-0 font-black text-emerald-500 text-lg">${Number(item.precio).toFixed(2)}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-3 h-full justify-between">
+                      
+                      <div className="flex flex-col items-end gap-3 justify-between shrink-0 pl-2 border-l border-slate-50">
                         <label className="toggle">
                           <input type="checkbox" checked={item.disponible} onChange={() => toggleDisponible(item)} />
                           <span className="toggle-slider"></span>
                         </label>
-                        <div className="flex gap-2">
-                          <button className="btn btn-ghost p-2" onClick={() => handleOpenModal(item)}><Edit2 size={16} /></button>
-                          <button className="btn btn-danger p-2" onClick={() => handleDelete(item.id)}><Trash2 size={16} /></button>
+                        <div className="flex flex-col sm:flex-row gap-1">
+                          <button className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" onClick={() => handleOpenModal(item)}>
+                            <Edit2 size={16} />
+                          </button>
+                          <button className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" onClick={() => handleDelete(item.id)}>
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
+                      
                     </div>
                   ))}
                 </div>
@@ -174,45 +204,53 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
 
       {/* Modal CRUD */}
       {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold m-0">{editingItem.id ? 'Editar Platillo' : 'Nuevo Platillo'}</h2>
-              <button className="btn btn-ghost p-1 rounded-full border-0" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-xl sm:rounded-[2.5rem] rounded-t-[2.5rem] max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-8">
+            
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+                {editingItem.id ? 'Editar Platillo' : 'Nuevo Platillo'}
+              </h2>
+              <button className="p-2 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors" onClick={() => setIsModalOpen(false)}>
                 <X size={20} />
               </button>
             </div>
             
-            <form onSubmit={handleSave} className="flex flex-col gap-4">
-              <div className="field">
-                <label>Nombre del platillo *</label>
-                <input required type="text" value={editingItem.nombre || ''} onChange={e => setEditingItem({...editingItem, nombre: e.target.value})} placeholder="Ej. Hamburguesa Doble" />
+            <form onSubmit={handleSave} className="flex flex-col gap-5">
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nombre del platillo *</label>
+                <input required type="text" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.nombre || ''} onChange={e => setEditingItem({...editingItem, nombre: e.target.value})} placeholder="Ej. Hamburguesa Doble" />
               </div>
               
-              <div className="field">
-                <label>Descripción</label>
-                <textarea value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Ingredientes, preparación..." />
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Descripción</label>
+                <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium min-h-[100px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Ingredientes, preparación..." />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="field">
-                  <label>Precio ($) *</label>
-                  <input required type="number" step="0.01" min="0" value={editingItem.precio || 0} onChange={e => setEditingItem({...editingItem, precio: parseFloat(e.target.value)})} />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Precio ($) *</label>
+                  <input required type="number" step="0.01" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.precio || 0} onChange={e => setEditingItem({...editingItem, precio: parseFloat(e.target.value)})} />
                 </div>
-                <div className="field">
-                  <label>Categoría</label>
-                  <select value={editingItem.categoria_id || ''} onChange={e => setEditingItem({...editingItem, categoria_id: e.target.value})}>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Categoría</label>
+                  <select className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.categoria_id || ''} onChange={e => setEditingItem({...editingItem, categoria_id: e.target.value})}>
                     {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                     {categorias.length === 0 && <option value="">Automática</option>}
                   </select>
                 </div>
               </div>
 
-              <div className="field">
-                <label>Foto del Platillo (Opcional)</label>
-                <div className="flex items-center gap-4">
-                  {editingItem.foto_url && (
-                    <img src={editingItem.foto_url} alt="Vista previa" className="w-16 h-16 rounded-xl object-cover bg-slate-100 shrink-0" />
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Foto del Platillo (Opcional)</label>
+                <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
+                  {editingItem.foto_url ? (
+                    <img src={editingItem.foto_url} alt="Vista previa" className="w-16 h-16 rounded-xl object-cover shadow-sm shrink-0" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
+                      <ImageIcon size={24} className="text-slate-400" />
+                    </div>
                   )}
                   <div className="flex-1">
                     <input 
@@ -220,23 +258,114 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
                       accept="image/*"
                       onChange={handleImageUpload}
                       disabled={uploadingImage}
-                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 cursor-pointer transition-colors"
+                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-wider file:bg-orange-100 file:text-orange-600 hover:file:bg-orange-200 cursor-pointer transition-colors"
                     />
-                    {uploadingImage && <p className="text-xs text-orange-500 mt-2 font-bold flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Subiendo imagen...</p>}
+                    {uploadingImage && <p className="text-xs text-orange-500 mt-2 font-bold flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Comprimiendo y subiendo...</p>}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 mt-2">
-                <input type="checkbox" id="pop" checked={editingItem.es_popular || false} onChange={e => setEditingItem({...editingItem, es_popular: e.target.checked})} className="w-auto" />
-                <label htmlFor="pop" className="m-0 cursor-pointer text-sm">Marcar como "Popular"</label>
+              <div className="flex items-center gap-3 mt-4 bg-orange-50 p-4 rounded-xl">
+                <input type="checkbox" id="pop" checked={editingItem.es_popular || false} onChange={e => setEditingItem({...editingItem, es_popular: e.target.checked})} className="w-5 h-5 accent-orange-500 rounded cursor-pointer" />
+                <label htmlFor="pop" className="m-0 cursor-pointer text-sm font-bold text-orange-900">Destacar como "Más Popular"</label>
               </div>
 
-              <button type="submit" className="btn btn-primary mt-4 py-3" disabled={saving}>
+              {/* Opciones y Modificadores */}
+              <div className="mt-6 border-t border-slate-100 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-black text-slate-800">Opciones y Extras</h3>
+                  <button type="button" onClick={() => setEditingItem({
+                    ...editingItem,
+                    opciones: [...(editingItem.opciones || []), { titulo: '', requerido: false, maximo_selecciones: 1, opciones: [] }]
+                  })} className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-1">
+                    <Plus size={14} /> Añadir Grupo
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {(editingItem.opciones || []).map((grupo, gIndex) => (
+                    <div key={gIndex} className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1 space-y-3">
+                          <input type="text" placeholder="Ej. Elige tu tamaño" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold" value={grupo.titulo} onChange={e => {
+                            const newOpciones = [...(editingItem.opciones || [])];
+                            newOpciones[gIndex].titulo = e.target.value;
+                            setEditingItem({ ...editingItem, opciones: newOpciones });
+                          }} />
+                          <div className="flex gap-4 text-sm items-center">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={grupo.requerido} onChange={e => {
+                                const newOpciones = [...(editingItem.opciones || [])];
+                                newOpciones[gIndex].requerido = e.target.checked;
+                                setEditingItem({ ...editingItem, opciones: newOpciones });
+                              }} className="accent-orange-500" />
+                              <span className="font-medium text-slate-600">Obligatorio</span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <span className="font-medium text-slate-600">Max selecciones:</span>
+                              <input type="number" min="1" className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-center" value={grupo.maximo_selecciones} onChange={e => {
+                                const newOpciones = [...(editingItem.opciones || [])];
+                                newOpciones[gIndex].maximo_selecciones = parseInt(e.target.value) || 1;
+                                setEditingItem({ ...editingItem, opciones: newOpciones });
+                              }} />
+                            </label>
+                          </div>
+                        </div>
+                        <button type="button" onClick={() => {
+                          const newOpciones = [...(editingItem.opciones || [])];
+                          newOpciones.splice(gIndex, 1);
+                          setEditingItem({ ...editingItem, opciones: newOpciones });
+                        }} className="p-1.5 text-slate-400 hover:text-red-500 ml-2">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 pl-4 border-l-2 border-orange-200">
+                        {grupo.opciones.map((opc, oIndex) => (
+                          <div key={oIndex} className="flex gap-2 items-center">
+                            <input type="text" placeholder="Ej. Grande" className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm" value={opc.nombre} onChange={e => {
+                              const newOpciones = [...(editingItem.opciones || [])];
+                              newOpciones[gIndex].opciones[oIndex].nombre = e.target.value;
+                              setEditingItem({ ...editingItem, opciones: newOpciones });
+                            }} />
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-400 text-sm">+$</span>
+                              <input type="number" min="0" placeholder="0" className="w-20 px-3 py-1.5 border border-slate-200 rounded-lg text-sm" value={opc.precio_extra} onChange={e => {
+                                const newOpciones = [...(editingItem.opciones || [])];
+                                newOpciones[gIndex].opciones[oIndex].precio_extra = parseFloat(e.target.value) || 0;
+                                setEditingItem({ ...editingItem, opciones: newOpciones });
+                              }} />
+                            </div>
+                            <button type="button" onClick={() => {
+                              const newOpciones = [...(editingItem.opciones || [])];
+                              newOpciones[gIndex].opciones.splice(oIndex, 1);
+                              setEditingItem({ ...editingItem, opciones: newOpciones });
+                            }} className="p-1.5 text-slate-400 hover:text-red-500">
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => {
+                          const newOpciones = [...(editingItem.opciones || [])];
+                          newOpciones[gIndex].opciones.push({ nombre: '', precio_extra: 0 });
+                          setEditingItem({ ...editingItem, opciones: newOpciones });
+                        }} className="text-xs font-bold text-orange-500 hover:text-orange-600 mt-2 flex items-center gap-1">
+                          <Plus size={12} /> Añadir opción
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(!editingItem.opciones || editingItem.opciones.length === 0) && (
+                    <p className="text-sm text-slate-400 italic">No hay opciones extra configuradas para este platillo.</p>
+                  )}
+                </div>
+              </div>
+
+              <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-orange-500 shadow-xl shadow-slate-900/20 hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
                 {saving ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Guardando...
+                    <Loader2 size={20} className="animate-spin" />
+                    Guardando Platillo...
                   </>
                 ) : 'Guardar Platillo'}
               </button>
@@ -244,6 +373,25 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
           </div>
         </div>
       )}
+
+      <ConfirmDialog 
+        isOpen={!!itemToDelete} 
+        title="Eliminar Platillo" 
+        message="¿Estás seguro de que deseas eliminar este platillo? Esta acción no se puede deshacer." 
+        onConfirm={confirmDelete} 
+        onCancel={() => setItemToDelete(null)} 
+      />
+
+      <ConfirmDialog 
+        isOpen={!!errorModal} 
+        title="Oops, algo salió mal" 
+        message={errorModal || ''} 
+        onConfirm={() => setErrorModal(null)} 
+        onCancel={() => setErrorModal(null)} 
+        confirmText="Entendido" 
+        showCancel={false}
+        isDanger={false}
+      />
     </div>
   )
 }
