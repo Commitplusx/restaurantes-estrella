@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, X, Loader2, Tag } from 'lucide-react'
+import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { BottomSheet } from '../../components/BottomSheet'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuPromocion } from '../../lib/supabase'
 
@@ -100,7 +101,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
           <p className="text-slate-500 font-medium">Ofertas temporales para atraer clientes.</p>
         </div>
         <button 
-          className="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-xl shadow-slate-200 hover:shadow-blue-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group" 
+          className="w-full sm:w-auto px-6 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-2xl shadow-lg shadow-[#FF7A6A]/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group" 
           onClick={() => handleOpenModal()}
         >
           <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
@@ -109,14 +110,14 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
       </div>
 
       {promos.length === 0 ? (
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm text-center py-20 px-6">
-          <div className="w-20 h-20 bg-blue-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6">
-            <Tag className="text-blue-400" size={32} />
+        <div className="bg-white rounded-[32px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] text-center py-20 px-6">
+          <div className="w-20 h-20 bg-[#FFF0EE] rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <Tag className="text-[#FF7A6A]" size={32} />
           </div>
           <h3 className="text-2xl font-black text-slate-800 mb-2">Sin Promociones</h3>
           <p className="text-slate-500 font-medium mb-8 max-w-sm mx-auto">Aumenta tus ventas lanzando una promoción especial (ej. 2x1 los Jueves).</p>
           <button 
-            className="px-8 py-3.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all active:scale-[0.98]" 
+            className="px-8 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-xl shadow-lg shadow-[#FF7A6A]/30 transition-all active:scale-[0.98]" 
             onClick={() => handleOpenModal()}
           >
             Crear Promoción
@@ -125,43 +126,43 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {promos.map(promo => (
-            <div key={promo.id} className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-200 transition-all p-5 flex flex-col sm:flex-row gap-5 group relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-indigo-500"></div>
+            <div key={promo.id} className="bg-white rounded-[24px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-lg hover:shadow-[#FF7A6A]/10 transition-all p-5 flex flex-col sm:flex-row gap-4 group relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-[#FF7A6A] to-[#FFA08A]"></div>
               
-              <div className="w-full sm:w-32 h-40 sm:h-32 rounded-2xl bg-slate-50 shrink-0 flex items-center justify-center overflow-hidden border border-slate-100">
+              <div className="w-full sm:w-32 h-40 sm:h-32 rounded-[16px] bg-[#FFF0EE] shrink-0 flex items-center justify-center overflow-hidden border border-slate-50">
                 {promo.foto_url ? (
                   <img src={promo.foto_url} alt={promo.titulo} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 ) : (
-                  <ImageIcon size={32} className="text-slate-300" />
+                  <ImageIcon size={32} className="text-[#FF7A6A]/40" />
                 )}
               </div>
               
               <div className="flex-1 flex flex-col justify-center min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-black uppercase tracking-wider shrink-0">PROMO</span>
+                  <span className="px-2 py-0.5 rounded-full bg-[#FFF0EE] text-[#FF7A6A] text-[9px] font-black uppercase tracking-wider shrink-0">PROMO</span>
                   <h3 className="m-0 text-lg font-black text-slate-800 tracking-tight truncate">{promo.titulo}</h3>
                 </div>
-                <p className="m-0 mb-3 text-sm text-slate-500 font-medium line-clamp-2">{promo.descripcion}</p>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-auto">
-                  <p className="m-0 font-black text-red-500 text-xl">${Number(promo.precio_especial).toFixed(2)}</p>
+                <p className="m-0 mb-auto text-sm text-slate-500 font-medium line-clamp-2">{promo.descripcion}</p>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-3">
+                  <p className="m-0 font-black text-[#FF7A6A] text-xl">${Number(promo.precio_especial).toFixed(2)}</p>
                   {promo.fecha_fin && (
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-600 text-[10px] font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FFF0EE] text-[#FF7A6A] text-[10px] font-bold uppercase tracking-wider border border-[#FFF0EE]">
                       <Calendar size={12} /> Válido hasta {new Date(promo.fecha_fin).toLocaleDateString()}
                     </span>
                   )}
                 </div>
               </div>
               
-              <div className="flex sm:flex-col items-center sm:items-end justify-between border-t border-slate-100 sm:border-0 pt-4 sm:pt-0 mt-4 sm:mt-0 sm:pl-2 sm:border-l shrink-0">
+              <div className="flex sm:flex-col items-center sm:items-end justify-between border-t border-slate-100 sm:border-0 pt-4 sm:pt-0 mt-4 sm:mt-0 sm:pl-4 sm:border-l shrink-0">
                 <label className="toggle">
                   <input type="checkbox" checked={promo.activa} onChange={() => toggleActiva(promo)} />
                   <span className="toggle-slider"></span>
                 </label>
                 <div className="flex flex-row gap-1">
-                  <button className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" onClick={() => handleOpenModal(promo)}>
+                  <button className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleOpenModal(promo)}>
                     <Edit2 size={16} />
                   </button>
-                  <button className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" onClick={() => handleDelete(promo.id)}>
+                  <button className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleDelete(promo.id)}>
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -171,76 +172,67 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
         </div>
       )}
 
-      {/* Modal CRUD */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-xl sm:rounded-[2.5rem] rounded-t-[2.5rem] max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-8">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                {editingItem.id ? 'Editar Promoción' : 'Nueva Promoción'}
-              </h2>
-              <button className="p-2 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors" onClick={() => setIsModalOpen(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSave} className="flex flex-col gap-5">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Título de la promoción *</label>
-                <input required type="text" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.titulo || ''} onChange={e => setEditingItem({...editingItem, titulo: e.target.value})} placeholder="Ej. 2x1 en Hamburguesas" />
-              </div>
-              
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Descripción</label>
-                <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium min-h-[80px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Válido solo en consumo en restaurante..." />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Precio Especial ($) *</label>
-                  <input required type="number" step="0.01" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.precio_especial || 0} onChange={e => setEditingItem({...editingItem, precio_especial: parseFloat(e.target.value)})} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Fecha Límite (Opcional)</label>
-                  <input type="date" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.fecha_fin || ''} onChange={e => setEditingItem({...editingItem, fecha_fin: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Foto de la Promoción (Opcional)</label>
-                <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
-                  {editingItem.foto_url ? (
-                    <img src={editingItem.foto_url} alt="Vista previa" className="w-16 h-16 rounded-xl object-cover shadow-sm shrink-0" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
-                      <ImageIcon size={24} className="text-slate-400" />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={uploadingImage}
-                      className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-wider file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer transition-colors"
-                    />
-                    {uploadingImage && <p className="text-xs text-blue-500 mt-2 font-bold flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Comprimiendo y subiendo...</p>}
-                  </div>
-                </div>
-              </div>
-
-              <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Guardando Promoción...
-                  </>
-                ) : 'Guardar Promoción'}
-              </button>
-            </form>
+      {/* Modal CRUD (BottomSheet) */}
+      <BottomSheet 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        title={editingItem.id ? 'Editar Promoción' : 'Nueva Promoción'}
+      >
+        <form onSubmit={handleSave} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Título de la promoción *</label>
+            <input required type="text" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.titulo || ''} onChange={e => setEditingItem({...editingItem, titulo: e.target.value})} placeholder="Ej. 2x1 en Hamburguesas" />
           </div>
-        </div>
-      )}
+          
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Descripción</label>
+            <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium min-h-[80px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Válido solo en consumo en restaurante..." />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Precio Especial ($) *</label>
+              <input required type="number" step="0.01" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.precio_especial || 0} onChange={e => setEditingItem({...editingItem, precio_especial: parseFloat(e.target.value)})} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Fecha Límite (Opcional)</label>
+              <input type="date" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.fecha_fin || ''} onChange={e => setEditingItem({...editingItem, fecha_fin: e.target.value})} />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Foto de la Promoción (Opcional)</label>
+            <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
+              {editingItem.foto_url ? (
+                <img src={editingItem.foto_url} alt="Vista previa" className="w-16 h-16 rounded-xl object-cover shadow-sm shrink-0" />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
+                  <ImageIcon size={24} className="text-slate-400" />
+                </div>
+              )}
+              <div className="flex-1">
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-wider file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer transition-colors"
+                />
+                {uploadingImage && <p className="text-xs text-blue-500 mt-2 font-bold flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Comprimiendo y subiendo...</p>}
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
+            {saving ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Guardando Promoción...
+              </>
+            ) : 'Guardar Promoción'}
+          </button>
+        </form>
+      </BottomSheet>
 
       <ConfirmDialog 
         isOpen={!!itemToDelete} 

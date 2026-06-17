@@ -132,14 +132,36 @@ export async function subirFoto(file: File, path: string): Promise<string | null
   }
 }
 
-/** Obtiene el restaurante vinculado al usuario autenticado */
 export async function getMyRestaurante(): Promise<Restaurante | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
+  
   const { data } = await supabase
     .from('restaurantes')
     .select('id, nombre, telefono, direccion, activo, foto_fachada_url, hora_apertura, hora_cierre, categorias')
     .eq('admin_id', user.id)
     .maybeSingle()
-  return data ?? null
+    
+  if (data) return data
+  
+  // Si no tiene restaurante (es su primer login con el número), el sistema le inserta lo demás
+  const nuevoRestaurante = {
+    admin_id: user.id,
+    nombre: 'Mi Negocio',
+    telefono: user.phone || '',
+    activo: true
+  }
+  
+  const { data: inserted, error: insertError } = await supabase
+    .from('restaurantes')
+    .insert(nuevoRestaurante)
+    .select('id, nombre, telefono, direccion, activo, foto_fachada_url, hora_apertura, hora_cierre, categorias')
+    .single()
+    
+  if (insertError) {
+    console.error('Error auto-creando restaurante:', insertError)
+    return null
+  }
+  
+  return inserted
 }

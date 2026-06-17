@@ -51,95 +51,141 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   }, [restaurante.id])
 
   return (
-    <div className="pb-24">
-      <div className="mb-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+    <div className="pb-8 flex flex-col gap-8">
+      
+      {/* ── Encabezado & Master Switch ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-3 tracking-tight">¡Hola, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">{restaurante.nombre}</span>! 👋</h1>
-          <p className="text-slate-500 text-sm md:text-base font-medium">Bienvenido a tu panel de control. Aquí tienes el resumen de tu menú digital.</p>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+            ¡Hola, <span className="text-[#FF7A6A]">{restaurante.nombre}</span>! 👋
+          </h1>
+          <p className="text-slate-500 text-sm font-medium mt-1">
+            Información General y métricas de tu negocio
+          </p>
         </div>
 
-        {/* Master Switch */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 shrink-0">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isActive ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>
-            <Power size={24} className={toggling ? 'animate-pulse' : ''} />
+        {/* Tarjeta de Estado Operativo */}
+        <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-slate-100">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${isActive ? 'bg-[#FF7A6A] text-white shadow-md shadow-[#FF7A6A]/30' : 'bg-slate-100 text-slate-400'}`}>
+            <Power size={22} className={toggling ? 'animate-pulse' : ''} />
           </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Estado Operativo</p>
-            <p className={`text-sm font-bold ${isActive ? 'text-emerald-600' : 'text-red-600'}`}>
-              {isActive ? 'Abierto (Visible)' : 'Pausado (Oculto)'}
+          <div className="pr-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado</p>
+            <p className={`text-sm font-black ${isActive ? 'text-[#FF7A6A]' : 'text-slate-500'}`}>
+              {isActive ? 'Local Abierto' : 'Pausado'}
             </p>
           </div>
           
           <button 
             onClick={toggleStatus}
             disabled={toggling}
-            className={`ml-2 relative w-14 h-8 rounded-full transition-colors cursor-pointer ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}
+            className={`relative w-14 h-8 rounded-full transition-all duration-300 cursor-pointer ${isActive ? 'bg-[#FF7A6A]' : 'bg-slate-200'}`}
           >
-            <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform shadow-md ${isActive ? 'translate-x-6' : 'translate-x-0'} ${toggling ? 'opacity-50' : ''}`} />
+            <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? 'left-7' : 'left-1'} ${toggling ? 'scale-75 opacity-70' : 'scale-100'}`} />
           </button>
         </div>
       </div>
 
+      {/* ── Tarjetas de Métricas (Top Row) ── */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 size={40} className="animate-spin text-orange-500" />
+        <div className="flex justify-center py-24">
+          <Loader2 size={44} className="animate-spin text-[#FF7A6A]" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5 group hover:shadow-lg hover:shadow-orange-500/10 hover:border-orange-100 transition-all">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100/50 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Utensils size={28} className="text-orange-500" />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-sm">
             <div>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1">Platillos</p>
-              <h3 className="text-4xl font-black text-slate-800 tracking-tight">{stats.platillos}</h3>
+              <p className="text-sm font-bold text-slate-600 mb-2">Platillos</p>
+              <h3 className="text-4xl font-black text-[#FF7A6A]">{stats.platillos}</h3>
+            </div>
+            <div className="text-[#FF7A6A]/30">
+              <Utensils size={48} strokeWidth={1.5} />
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5 group hover:shadow-lg hover:shadow-emerald-500/10 hover:border-emerald-100 transition-all">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Package size={28} className="text-emerald-500" />
-            </div>
+          <div className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-sm">
             <div>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1">Paquetes</p>
-              <h3 className="text-4xl font-black text-slate-800 tracking-tight">{stats.combos}</h3>
+              <p className="text-sm font-bold text-slate-600 mb-2">Combos Armados</p>
+              <h3 className="text-4xl font-black text-[#FF7A6A]">{stats.combos}</h3>
+            </div>
+            <div className="text-[#FF7A6A]/30">
+              <Package size={48} strokeWidth={1.5} />
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5 group hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-100 transition-all">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100/50 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Tag size={28} className="text-blue-500" />
-            </div>
+          <div className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-sm">
             <div>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1">Promociones</p>
-              <h3 className="text-4xl font-black text-slate-800 tracking-tight">{stats.promos}</h3>
+              <p className="text-sm font-bold text-slate-600 mb-2">Promociones</p>
+              <h3 className="text-4xl font-black text-[#FF7A6A]">{stats.promos}</h3>
+            </div>
+            <div className="text-[#FF7A6A]/30">
+              <Tag size={48} strokeWidth={1.5} />
             </div>
           </div>
-
         </div>
       )}
 
-      <div className="mt-10 p-8 rounded-[2rem] bg-gradient-to-br from-slate-900 to-slate-800 shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl -mr-20 -mt-20 transition-all group-hover:bg-orange-500/30"></div>
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-xl">
-              <Activity size={24} className="text-orange-400" />
+      {/* ── Grid Inferior (Gráfico & Menú Público) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+        
+        {/* Left Column: Fake Bar Chart */}
+        <div className="lg:col-span-2 bg-white rounded-[24px] border border-slate-100 p-6 flex flex-col shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h3 className="text-lg font-black text-slate-800">Estadísticas del Menú</h3>
+              <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Actividad</p>
             </div>
-            <h3 className="text-xl font-black text-white">Menú público en vivo</h3>
+            <div className="flex bg-[#F2F2F2] rounded-full p-1">
+              <button className="bg-[#FF7A6A] text-white rounded-full px-4 py-1 text-xs font-bold shadow-sm">Mensual</button>
+              <button className="text-slate-500 bg-transparent rounded-full px-4 py-1 text-xs font-bold">Anual</button>
+            </div>
           </div>
-          <p className="text-slate-300 text-sm md:text-base mb-8 leading-relaxed max-w-2xl">
-            Tu menú está visible para todos los clientes en la app principal. 
-            Cualquier cambio que realices aquí (precios, fotos, combos) se actualizará instantáneamente para todos tus clientes.
-          </p>
-          <button 
-            className="px-8 py-3.5 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-xl shadow-lg shadow-orange-500/30 transition-all flex items-center gap-2" 
-            onClick={() => window.open(`/menu/${restaurante.id}`, '_blank')}
-          >
-            Ver cómo lo ve el cliente
-          </button>
+          
+          <div className="flex items-end justify-between h-[200px] gap-2 md:gap-4 mt-auto pt-4 border-t border-slate-50">
+            {[40, 60, 30, 80, 50, 45, 90, 60, 70, 55, 100, 75].map((val, i) => (
+              <div key={i} className={`w-full rounded-t-lg transition-all duration-300 hover:opacity-80 ${i === 10 ? 'bg-[#FF7A6A]' : 'bg-[#FFF0EE]'}`} style={{ height: `${val}%` }} />
+            ))}
+          </div>
         </div>
+
+        {/* Right Column: Public Menu Widget */}
+        <div className="bg-white rounded-[24px] border border-slate-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col">
+          <div className="bg-[#FFF0EE] text-[#FF7A6A] rounded-2xl py-3 text-center font-black text-sm mb-6">
+            Menú Público en Vivo
+          </div>
+          
+          <div className="flex flex-col gap-5 flex-1">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm">Enlace activo</h4>
+                <p className="text-xs font-medium text-slate-400 mt-0.5">Visible en app y web</p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-[#FFF0EE] text-[#FF7A6A] flex items-center justify-center">
+                <Activity size={14} />
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm">Sincronización</h4>
+                <p className="text-xs font-medium text-slate-400 mt-0.5">Automática vía bot</p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-[#FFF0EE] text-[#FF7A6A] flex items-center justify-center">
+                <Activity size={14} />
+              </div>
+            </div>
+
+            <div className="mt-auto pt-4">
+              <button 
+                className="w-full bg-[#F8F9FA] hover:bg-[#F0F2F5] text-slate-700 font-bold py-3.5 rounded-2xl transition-colors text-sm border border-slate-200"
+                onClick={() => window.open(`/menu/${restaurante.id}`, '_blank')}
+              >
+                Ver menú del cliente
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   )

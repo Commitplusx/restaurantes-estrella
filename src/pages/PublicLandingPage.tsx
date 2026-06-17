@@ -12,6 +12,7 @@ interface Restaurante {
   hora_apertura?: string
   hora_cierre?: string
   categorias?: string[]
+  slug?: string
 }
 
 export function PublicLandingPage() {
@@ -29,7 +30,7 @@ export function PublicLandingPage() {
 
     const { data, error } = await supabase
       .from('restaurantes')
-      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias')
+      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias, slug')
       .eq('activo', true)
       .order('nombre')
       .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
@@ -87,47 +88,47 @@ export function PublicLandingPage() {
     <div className="min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-orange-100">
 
       {/* Navbar */}
-      <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-5 px-6 md:px-10 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-200">
+      <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-4 px-4 md:px-10 flex justify-between items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-200">
             <Store className="w-4 h-4 text-white" />
           </div>
-          <span className="font-black text-xl text-slate-800 tracking-tighter">
+          <span className="font-black text-lg md:text-xl text-slate-800 tracking-tighter truncate">
             Estrella<span className="text-orange-500">Delivery</span>
           </span>
         </div>
-        <Link to="/login" className="text-sm font-bold text-white transition-all bg-slate-900 hover:bg-orange-500 hover:shadow-lg hover:shadow-orange-200 px-5 py-2.5 rounded-xl flex items-center gap-2">
-          Acceso Socios <ArrowRight size={16} />
+        <Link to="/login" className="text-xs md:text-sm font-bold text-white transition-all bg-slate-900 hover:bg-orange-500 hover:shadow-lg hover:shadow-orange-200 px-3 py-2 md:px-5 md:py-2.5 rounded-xl flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+          Acceso Socios <ArrowRight size={14} className="md:w-4 md:h-4" />
         </Link>
       </header>
 
-      <main className="p-6 md:p-12 max-w-[1400px] mx-auto min-h-screen">
+      <main className="p-4 md:p-12 max-w-[1400px] mx-auto min-h-screen">
 
         {/* Hero Section */}
-        <div className="relative rounded-[2.5rem] bg-slate-900 h-[360px] overflow-hidden mb-12 flex items-center px-8 md:px-12">
+        <div className="relative rounded-[2rem] md:rounded-[2.5rem] bg-slate-900 h-[260px] md:h-[360px] overflow-hidden mb-8 md:mb-12 flex items-center px-6 md:px-12">
           <img 
             src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=1200" 
             className="absolute inset-0 w-full h-full object-cover opacity-40"
             alt="Hero Estrella Delivery"
           />
           {/* Gradient overlay con color de marca */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/40 to-transparent" />
-          <div className="relative z-10 max-w-xl">
-            <span className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full mb-4 inline-block shadow-lg shadow-orange-500/30">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/50 to-transparent" />
+          <div className="relative z-10 max-w-xl w-full">
+            <span className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full mb-3 md:mb-4 inline-block shadow-lg shadow-orange-500/30">
               ⭐ Estrella Delivery
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 md:mb-6 leading-tight">
               Tus favoritos, <br/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400">
                 donde quieras.
               </span>
             </h1>
-            <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
                 type="text" 
                 placeholder="¿Qué restaurante buscas hoy?"
-                className="w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl py-4 pl-12 pr-6 text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                className="w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-300 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -170,7 +171,7 @@ export function PublicLandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
             {filteredRestaurants.map((res) => (
               <Link 
-                to={`/menu/${res.id}`}
+                to={`/menu/${res.slug || res.id}`}
                 key={res.id} 
                 className="group cursor-pointer bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:border-orange-100 hover:shadow-2xl hover:shadow-orange-500/5 transition-all duration-500 flex flex-col"
               >

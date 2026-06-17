@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
-import { Save, Store, Clock, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Save, Store, Clock, Image as ImageIcon, Loader2, Lock, AlertCircle } from 'lucide-react'
 
 // Categorías comunes para restaurantes
 const CATEGORIAS_COMUNES = [
@@ -25,6 +25,11 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+
+  // Estado para la contraseña
+  const [newPassword, setNewPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordMsg, setPasswordMsg] = useState({ type: '', text: '' })
 
   // Actualizar el estado si el prop cambia
   useEffect(() => {
@@ -76,6 +81,28 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
       setUploadingImage(false)
     }
   }
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setPasswordMsg({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' });
+      return;
+    }
+    setChangingPassword(true);
+    setPasswordMsg({ type: '', text: '' });
+    
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      setPasswordMsg({ type: 'error', text: error.message });
+    } else {
+      setPasswordMsg({ type: 'success', text: 'Contraseña actualizada exitosamente' });
+      setNewPassword('');
+    }
+    setChangingPassword(false);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -286,6 +313,44 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
           </div>
 
         </form>
+        
+        {/* SEGURIDAD - Cambiar Contraseña */}
+        <div className="mt-8 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+          <h2 className="text-xl font-black flex items-center gap-3 mb-6 text-slate-800">
+            <div className="p-2 bg-red-50 rounded-xl"><Lock className="text-red-500" size={20} /></div>
+            Seguridad
+          </h2>
+          <form onSubmit={handlePasswordChange} className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="password"
+                placeholder="Nueva Contraseña (min. 6 caracteres)"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:border-[#FF7A6A] focus:ring-4 focus:ring-[#FF7A6A]/10 outline-none transition-all font-medium text-slate-800 tracking-widest"
+              />
+            </div>
+            <button 
+              type="submit" 
+              disabled={changingPassword}
+              className={`px-8 py-3.5 rounded-2xl font-bold text-white transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                passwordMsg.type === 'success' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30' : 'bg-slate-900 hover:bg-slate-800 shadow-lg shadow-slate-900/20'
+              }`}
+            >
+              {changingPassword ? <Loader2 className="animate-spin" size={18} /> : 'Actualizar'}
+            </button>
+          </form>
+          {passwordMsg.text && (
+            <div className={`mt-4 p-3 rounded-xl flex items-center gap-2 text-sm font-semibold ${
+              passwordMsg.type === 'error' ? 'bg-[#FFF0EE] text-red-500 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+            }`}>
+              <AlertCircle size={18} className="shrink-0" />
+              {passwordMsg.text}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
