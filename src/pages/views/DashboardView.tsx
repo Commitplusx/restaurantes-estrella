@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
-import { Activity, Utensils, Package, Tag, Loader2, Power, QrCode, Download } from 'lucide-react'
+import { Utensils, Package, Tag, Loader2, Power, Download } from 'lucide-react'
 import QRCode from 'qrcode'
 
 export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
