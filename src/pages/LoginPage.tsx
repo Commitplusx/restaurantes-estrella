@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-import { Store, Lock, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
+import { Lock, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
 
 export function LoginPage() {
   const [phone, setPhone] = useState('')
@@ -10,16 +10,6 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 30 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 25 } }
-  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,111 +35,108 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mesh-bg flex items-center justify-center min-h-screen p-4 overflow-hidden relative">
-      
-      {/* Elementos decorativos flotantes de fondo */}
-      <motion.div 
-        animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }} 
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-1/4 left-1/4 w-64 h-64 bg-[#FF7A6A]/20 rounded-full blur-3xl pointer-events-none"
-      />
-      <motion.div 
-        animate={{ y: [0, 30, 0], rotate: [0, -5, 0] }} 
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-        className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-[#FF6B5B]/20 rounded-full blur-3xl pointer-events-none"
-      />
+    <div className="flex min-h-screen bg-white">
+      {/* Mitad Izquierda - Imagen (Oculta en móviles) */}
+      <div className="hidden lg:flex w-1/2 relative bg-[#F73220] overflow-hidden items-center justify-center">
+        <img 
+          src="/login-cover.jpg" 
+          alt="Restaurante Estrella Delivery" 
+          className="absolute inset-0 w-full h-full object-contain object-center scale-105"
+        />
+        {/* Capa oscura ultra sutil para que los blancos de la imagen resalten más */}
+        <div className="absolute inset-0 bg-black/5"></div>
 
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="w-full max-w-[400px] z-10"
-      >
-        {/* Logo y Encabezado */}
-        <motion.div variants={itemVariants} className="text-center mb-8">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#FFA08A] to-[#FF6B5B] flex items-center justify-center mx-auto mb-5 shadow-[0_8px_32px_rgba(255,107,91,0.4)] relative">
-            <div className="absolute inset-0 bg-white/20 rounded-3xl backdrop-blur-[2px]" />
-            <Store size={36} color="white" className="relative z-10" />
+        {/* Efecto de difuminado (fade) hacia el formulario blanco */}
+        <div className="absolute inset-y-0 right-0 w-48 bg-gradient-to-r from-transparent via-white/80 to-white z-10 pointer-events-none"></div>
+      </div>
+
+      {/* Mitad Derecha - Formulario Limpio */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 sm:p-12 xl:p-24 relative bg-white">
+        
+        {/* Resplandor sutil color corporativo en la esquina */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-[#FF3B2F]/5 rounded-full blur-[100px]"></div>
+        </div>
+
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="w-full max-w-[420px] relative z-10"
+        >
+          <div className="mb-12">
+            <h1 className="text-[40px] leading-tight font-black text-zinc-900 tracking-tight mb-3">
+              Portal<br/><span className="text-[#FF3B2F]">Negocios.</span>
+            </h1>
+            <p className="text-zinc-500 font-medium text-lg">
+              Controla tus pedidos y menú en tiempo real.
+            </p>
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
-            Portal Negocios
-          </h1>
-          <p className="text-slate-600 font-medium">
-            Estrella Delivery — Panel de Control
-          </p>
-        </motion.div>
 
-        {/* Tarjeta Glassmorphism */}
-        <motion.div variants={itemVariants} className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 relative overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.04)] border border-white">
-          {/* Brillo diagonal interno */}
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/40 to-transparent pointer-events-none" />
-          
-          <form onSubmit={handleLogin} className="flex flex-col gap-5 relative z-10">
-            <motion.div variants={itemVariants} className="field flex flex-col gap-1.5">
-              <label className="text-sm font-bold text-slate-700">Número de Teléfono</label>
+          <form onSubmit={handleLogin} className="flex flex-col gap-6">
+            <div className="field flex flex-col gap-2">
+              <label className="text-sm font-bold text-zinc-800 uppercase tracking-wider">Número de Teléfono</label>
               <div className="relative group">
                 <input
                   type="tel" 
                   value={phone} 
                   onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="123 456 7890" 
+                  placeholder="Ej. 963 153 9156" 
                   required
-                  className="w-full pl-4 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:border-[#FF7A6A] focus:ring-4 focus:ring-[#FF7A6A]/10 outline-none transition-all font-medium text-slate-800"
+                  className="w-full pl-5 pr-5 py-4 bg-zinc-50 border-2 border-zinc-200 rounded-2xl focus:border-[#FF3B2F] focus:bg-white outline-none transition-all font-semibold text-zinc-800 text-lg placeholder:font-medium placeholder:text-zinc-400"
                 />
               </div>
-            </motion.div>
+            </div>
             
-            <motion.div variants={itemVariants} className="field flex flex-col gap-1.5">
-              <label className="text-sm font-bold text-slate-700">Contraseña</label>
+            <div className="field flex flex-col gap-2">
+              <label className="text-sm font-bold text-zinc-800 uppercase tracking-wider">Contraseña</label>
               <div className="relative group">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#FF7A6A] transition-colors" />
+                <Lock size={22} className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-[#FF3B2F] transition-colors" />
                 <input
                   type="password" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" 
                   required 
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:border-[#FF7A6A] focus:ring-4 focus:ring-[#FF7A6A]/10 outline-none transition-all font-medium text-slate-800 tracking-widest"
+                  className="w-full pl-14 pr-5 py-4 bg-zinc-50 border-2 border-zinc-200 rounded-2xl focus:border-[#FF3B2F] focus:bg-white outline-none transition-all font-black text-zinc-800 tracking-widest text-lg placeholder:tracking-normal placeholder:font-medium placeholder:text-zinc-400"
                 />
               </div>
-            </motion.div>
+            </div>
 
             {error && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="flex items-center gap-2 text-red-500 text-sm font-semibold bg-[#FFF0EE] p-3 rounded-xl border border-red-100">
-                <AlertCircle size={18} className="shrink-0" />
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="flex items-center gap-3 text-[#D92D20] text-sm font-bold bg-[#FEF3F2] p-4 rounded-xl border border-[#FDA29B]">
+                <AlertCircle size={20} className="shrink-0" />
                 {error}
               </motion.div>
             )}
 
             <motion.button 
-              variants={itemVariants}
-              whileTap={{ scale: 0.97 }}
+              whileTap={{ scale: 0.98 }}
               type="submit" 
-              className={`w-full py-4 text-base font-bold rounded-2xl text-white transition-all shadow-lg flex items-center justify-center gap-2 mt-2 ${success ? 'bg-emerald-500 shadow-emerald-500/30' : 'bg-[#FF7A6A] hover:bg-[#ff6250] shadow-[#FF7A6A]/30'}`}
+              className={`w-full py-4 text-lg font-bold rounded-2xl text-white transition-all flex items-center justify-center gap-2 mt-4 ${success ? 'bg-zinc-900' : 'bg-[#FF3B2F] hover:bg-[#E6352A] shadow-[0_8px_30px_rgba(255,59,47,0.3)] hover:shadow-[0_8px_40px_rgba(255,59,47,0.4)]'}`}
               disabled={loading || success} 
             >
               {success ? (
                 <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center gap-2">
-                  <CheckCircle2 size={22} />
-                  ¡Bienvenido!
+                  <CheckCircle2 size={24} />
+                  ¡Adelante!
                 </motion.div>
               ) : loading ? (
                 <>
-                  <Loader2 size={22} className="animate-spin" />
-                  Conectando...
+                  <Loader2 size={24} className="animate-spin" />
+                  Verificando...
                 </>
               ) : (
-                'Acceder al Portal'
+                'Iniciar Sesión'
               )}
             </motion.button>
           </form>
-        </motion.div>
 
-        <motion.p variants={itemVariants} className="text-center text-slate-500 text-sm mt-8 font-medium">
-          ¿Problemas de acceso? <br/>Contacta a soporte de Estrella Delivery.
-        </motion.p>
-      </motion.div>
+          <p className="text-center text-zinc-400 text-sm mt-12 font-medium">
+            ¿Problemas de acceso? Solicita soporte en WhatsApp.
+          </p>
+        </motion.div>
+      </div>
     </div>
   )
 }
-
