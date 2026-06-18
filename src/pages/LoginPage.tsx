@@ -64,6 +64,29 @@ export function LoginPage() {
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="w-full max-w-[420px] relative z-10"
         >
+          {/* 🌟 IMAGEN EXCLUSIVA PARA MÓVIL 🌟 */}
+          <div className="lg:hidden w-full flex justify-center mb-8 relative">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 150 }}
+              className="relative w-[300px] h-[300px] flex items-center justify-center -mt-6"
+            >
+              {/* Resplandor corporativo detrás */}
+              <div className="absolute inset-0 bg-[#FF3B2F]/10 rounded-full blur-[50px]"></div>
+              
+              <img 
+                src="/login-cover.png" 
+                alt="Estrella Delivery Aliados" 
+                className="w-full h-full object-cover relative z-10 mix-blend-darken"
+                style={{
+                  /* Esto hace que los bordes de la foto se desvanezcan hacia transparente de forma suave */
+                  maskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)',
+                  WebkitMaskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)'
+                }}
+              />
+            </motion.div>
+          </div>
           <div className="mb-12">
             <h1 className="text-[40px] leading-tight font-black text-zinc-900 tracking-tight mb-3">
               Bienvenido,<br/><span className="text-[#FF3B2F]">Aliado.</span>
