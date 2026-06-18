@@ -65,21 +65,29 @@ export function LoginPage() {
           className="w-full max-w-[420px] relative z-10"
         >
           {/* 🌟 IMAGEN EXCLUSIVA PARA MÓVIL 🌟 */}
-          <div className="lg:hidden w-full flex justify-center mb-8 relative">
+          <div className="lg:hidden w-full flex justify-center -mb-24 relative">
             <motion.div 
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 150 }}
-              className="relative w-[300px] h-[300px] flex items-center justify-center -mt-6"
+              className="relative w-[300px] h-[300px] flex items-center justify-center mt-16"
             >
-              {/* Resplandor corporativo detrás */}
-              <div className="absolute inset-0 bg-[#FF3B2F]/10 rounded-full blur-[50px]"></div>
+              {/* Resplandor corporativo detrás - Animado con pulso */}
+              <motion.div 
+                animate={{ scale: [1, 1.15, 1], opacity: [0.1, 0.25, 0.1] }}
+                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                className="absolute inset-0 bg-[#FF3B2F] rounded-full blur-[50px]"
+                style={{ willChange: 'transform, opacity' }}
+              ></motion.div>
               
-              <img 
+              <motion.img 
                 src="/login-cover.png" 
                 alt="Estrella Delivery Aliados" 
-                className="w-full h-full object-cover relative z-10 mix-blend-darken"
+                animate={{ y: [0, -12, 0] }}
+                transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+                className="w-full h-full object-cover relative z-10"
                 style={{
+                  willChange: 'transform',
                   /* Esto hace que los bordes de la foto se desvanezcan hacia transparente de forma suave */
                   maskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)',
                   WebkitMaskImage: 'radial-gradient(circle at center, black 45%, transparent 75%)'
