@@ -263,7 +263,7 @@ export function PublicMenuView() {
       <AlertCircle className="w-16 h-16 text-red-400 mb-4" />
       <h2 className="text-2xl font-bold text-slate-800 mb-2">Restaurante no disponible</h2>
       <p className="text-slate-500 mb-6">{error || 'El menú que buscas no existe o fue desactivado.'}</p>
-      <Link to="/" className="bg-[#FF7A6A] text-white px-8 py-3 rounded-[24px] font-bold shadow-lg shadow-orange-200">Volver al Directorio</Link>
+      <Link to="/" className="bg-[#FF7A6A] text-white px-8 py-3 rounded-[24px] font-bold shadow-lg shadow-orange-200">Volver al Inicio</Link>
     </div>
   )
 

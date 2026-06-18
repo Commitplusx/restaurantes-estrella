@@ -221,7 +221,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
                 </div>
 
                 <p className="text-xs text-slate-500">
-                  Esta es la foto que los clientes verán en el directorio público. Usa una foto atractiva de tu fachada o tu mejor platillo.
+                  Esta es la foto que los clientes verán en tu perfil. Usa una foto atractiva de tu fachada o tu mejor platillo.
                 </p>
               </div>
             </div>

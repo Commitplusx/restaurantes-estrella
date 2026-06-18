@@ -66,7 +66,7 @@ export function LoginPage() {
         >
           <div className="mb-12">
             <h1 className="text-[40px] leading-tight font-black text-zinc-900 tracking-tight mb-3">
-              Portal<br/><span className="text-[#FF3B2F]">Negocios.</span>
+              Bienvenido,<br/><span className="text-[#FF3B2F]">Aliado.</span>
             </h1>
             <p className="text-zinc-500 font-medium text-lg">
               Controla tus pedidos y menú en tiempo real.
