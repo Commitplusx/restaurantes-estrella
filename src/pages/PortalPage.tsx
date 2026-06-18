@@ -4,6 +4,8 @@ import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Suspense, lazy } from 'react'
+import { driver } from 'driver.js'
+import 'driver.js/dist/driver.css'
 
 const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })))
 const MenuProductosView = lazy(() => import('./views/MenuProductosView').then(m => ({ default: m.MenuProductosView })))
@@ -26,6 +28,31 @@ export function PortalPage() {
     setLoading(false)
   }
 
+  useEffect(() => {
+    if (restaurante && !localStorage.getItem('onboarding_b2b_done')) {
+      const driverObj = driver({
+        showProgress: true,
+        doneBtnText: '¡Entendido!',
+        nextBtnText: 'Siguiente',
+        prevBtnText: 'Atrás',
+        steps: [
+          { popover: { title: '¡Bienvenido a tu Panel!', description: 'Aquí podrás gestionar todo lo relacionado con tu menú en la app. Te daremos un recorrido rápido por las opciones.' } },
+          { element: '#tour-dashboard', popover: { title: 'Panel Principal', description: 'Aquí encontrarás el link a tu Menú Digital y el código QR que puedes imprimir para tus mesas.' } },
+          { element: '#tour-platillos', popover: { title: 'Tus Platillos', description: 'Desde aquí agregarás tu menú, precios y fotos. Los cambios se reflejan al instante.' } },
+          { element: '#tour-combos', popover: { title: 'Combos', description: 'Crea paquetes combinando varios productos para vender más.' } },
+          { element: '#tour-promos', popover: { title: 'Promociones', description: 'Lanza ofertas especiales por tiempo limitado.' } },
+          { element: '#tour-perfil', popover: { title: 'Tu Perfil', description: 'Finalmente, configura tus horarios y datos de tu negocio. ¡Comienza a llenar tu menú ahora mismo!' } }
+        ],
+        onDestroyStarted: () => {
+          localStorage.setItem('onboarding_b2b_done', 'true');
+          driverObj.destroy();
+        }
+      });
+      // Pequeño timeout para asegurar que el DOM esté renderizado (especialmente en móvil)
+      setTimeout(() => driverObj.drive(), 500);
+    }
+  }, [restaurante])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
   }
@@ -33,7 +60,7 @@ export function PortalPage() {
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
       <Loader2 size={44} className="animate-spin text-orange-500" />
-      <span className="text-slate-400 font-medium animate-pulse">Cargando tu portal...</span>
+      <span className="text-slate-400 font-medium animate-pulse">Cargando tu panel...</span>
     </div>
   )
 
@@ -61,6 +88,7 @@ export function PortalPage() {
           </div>
 
           <NavButton 
+            id="tour-dashboard"
             active={activeTab === 'dashboard'} icon={<LayoutDashboard size={20}/>} label="Dashboard" 
             onClick={() => setActiveTab('dashboard')} 
           />
@@ -70,14 +98,17 @@ export function PortalPage() {
           </div>
           
           <NavButton 
+            id="tour-platillos"
             active={activeTab === 'productos'} icon={<Utensils size={20}/>} label="Platillos" 
             onClick={() => setActiveTab('productos')} 
           />
           <NavButton 
+            id="tour-combos"
             active={activeTab === 'combos'} icon={<Package size={20}/>} label="Combos / Paquetes" 
             onClick={() => setActiveTab('combos')} 
           />
           <NavButton 
+            id="tour-promos"
             active={activeTab === 'promos'} icon={<Tag size={20}/>} label="Promociones" 
             onClick={() => setActiveTab('promos')} 
           />
@@ -87,6 +118,7 @@ export function PortalPage() {
           </div>
           
           <NavButton 
+            id="tour-perfil"
             active={activeTab === 'perfil'} icon={<Store size={20}/>} label="Perfil del Negocio" 
             onClick={() => setActiveTab('perfil')} 
           />
@@ -109,7 +141,7 @@ export function PortalPage() {
             </div>
             <div>
               <p className="text-sm font-bold text-white leading-tight">Cerrar sesión</p>
-              <p className="text-[11px] text-white/70 mt-0.5">Salir del portal</p>
+              <p className="text-[11px] text-white/70 mt-0.5">Salir del panel</p>
             </div>
           </button>
         </aside>
@@ -129,7 +161,7 @@ export function PortalPage() {
             <div className="flex items-center gap-4">
               <div className="hidden sm:flex flex-col items-end">
                 <span className="text-sm font-bold text-slate-800">{restaurante.nombre}</span>
-                <span className="text-[10px] font-bold text-[#FF7A6A] uppercase tracking-widest">Portal Conectado</span>
+                <span className="text-[10px] font-bold text-[#FF7A6A] uppercase tracking-widest">Panel Conectado</span>
               </div>
               <div className="w-12 h-12 rounded-[16px] bg-[#FFF0EE] flex items-center justify-center text-[#FF7A6A]">
                 <Store size={22} />
@@ -166,19 +198,20 @@ export function PortalPage() {
         </div>
       {/* ── Bottom Nav (Mobile) ── */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex justify-between">
-        <MobileNavBtn active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => setActiveTab('dashboard')} />
-        <MobileNavBtn active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => setActiveTab('productos')} />
-        <MobileNavBtn active={activeTab === 'combos'} icon={<Package size={22}/>} label="Combos" onClick={() => setActiveTab('combos')} />
-        <MobileNavBtn active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />
-        <MobileNavBtn active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
+        <MobileNavBtn id="tour-dashboard" active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => setActiveTab('dashboard')} />
+        <MobileNavBtn id="tour-platillos" active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => setActiveTab('productos')} />
+        <MobileNavBtn id="tour-combos" active={activeTab === 'combos'} icon={<Package size={22}/>} label="Combos" onClick={() => setActiveTab('combos')} />
+        <MobileNavBtn id="tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />
+        <MobileNavBtn id="tour-perfil" active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
       </div>
     </div>
   )
 }
 
-function NavButton({ active, icon, label, onClick }: { active: boolean, icon: React.ReactNode, label: string, onClick: () => void }) {
+function NavButton({ id, active, icon, label, onClick }: { id?: string, active: boolean, icon: React.ReactNode, label: string, onClick: () => void }) {
   return (
     <button 
+      id={id}
       onClick={onClick}
       className={`relative flex items-center gap-3 w-full px-4 py-3 rounded-[16px] transition-all duration-200 overflow-hidden ${active ? 'bg-white/20 shadow-[0_4px_12px_rgba(0,0,0,0.05)]' : 'hover:bg-white/10'}`}
     >
@@ -192,9 +225,10 @@ function NavButton({ active, icon, label, onClick }: { active: boolean, icon: Re
   )
 }
 
-function MobileNavBtn({ active, icon, label, onClick }: { active: boolean, icon: React.ReactNode, label: string, onClick: () => void }) {
+function MobileNavBtn({ id, active, icon, label, onClick }: { id?: string, active: boolean, icon: React.ReactNode, label: string, onClick: () => void }) {
   return (
     <button 
+      id={id}
       onClick={onClick}
       className="flex-1 flex flex-col items-center justify-center gap-1.5 py-1 transition-all"
     >

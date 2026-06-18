@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
-import { Activity, Utensils, Package, Tag, Loader2, Power } from 'lucide-react'
+import { Activity, Utensils, Package, Tag, Loader2, Power, QrCode, Download } from 'lucide-react'
+import QRCode from 'qrcode'
 
 export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   const [stats, setStats] = useState({ platillos: 0, combos: 0, promos: 0 })
   const [loading, setLoading] = useState(true)
   const [isActive, setIsActive] = useState(restaurante.activo)
   const [toggling, setToggling] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string>('')
 
   const toggleStatus = async () => {
     if(toggling) return;
@@ -27,6 +29,40 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
     }
     setToggling(false)
   }
+
+  const handleDownloadQR = () => {
+    if (!qrDataUrl) {
+      alert("El QR aún se está generando");
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = qrDataUrl;
+    link.download = `QR_${restaurante.nombre.replace(/\s+/g, '_')}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    async function generateQR() {
+      try {
+        const url = `https://www.app-estrella.shop/menu/${restaurante.id}`;
+        const dataUrl = await QRCode.toDataURL(url, {
+          width: 800,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#ffffff',
+          },
+          errorCorrectionLevel: 'H',
+        });
+        setQrDataUrl(dataUrl);
+      } catch (err) {
+        console.error('Error generando QR:', err);
+      }
+    }
+    generateQR();
+  }, [restaurante.id]);
 
   useEffect(() => {
     async function loadStats() {
@@ -151,36 +187,40 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
         {/* Right Column: Public Menu Widget */}
         <div className="bg-white rounded-[24px] border border-slate-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col">
           <div className="bg-[#FFF0EE] text-[#FF7A6A] rounded-2xl py-3 text-center font-black text-sm mb-6">
-            Menú Público en Vivo
+            Código QR de tu Menú
           </div>
           
-          <div className="flex flex-col gap-5 flex-1">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm">Enlace activo</h4>
-                <p className="text-xs font-medium text-slate-400 mt-0.5">Visible en app y web</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-[#FFF0EE] text-[#FF7A6A] flex items-center justify-center">
-                <Activity size={14} />
-              </div>
+          <div className="flex flex-col items-center flex-1">
+            <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-100 mb-4 flex items-center justify-center min-h-[144px] min-w-[144px]">
+              {qrDataUrl ? (
+                <img 
+                  src={qrDataUrl} 
+                  alt="QR Code" 
+                  className="w-32 h-32 rounded-xl"
+                />
+              ) : (
+                <Loader2 className="animate-spin text-slate-300 w-8 h-8" />
+              )}
             </div>
+            
+            <p className="text-sm font-medium text-slate-500 text-center mb-6 px-4">
+              Tus clientes pueden escanear este código desde sus mesas para ver tu menú en sus celulares.
+            </p>
 
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm">Sincronización</h4>
-                <p className="text-xs font-medium text-slate-400 mt-0.5">Automática vía bot</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-[#FFF0EE] text-[#FF7A6A] flex items-center justify-center">
-                <Activity size={14} />
-              </div>
-            </div>
-
-            <div className="mt-auto pt-4">
+            <div className="mt-auto w-full flex flex-col gap-3">
+              <button 
+                onClick={handleDownloadQR}
+                className="w-full bg-[#FF7A6A] hover:bg-[#ff6755] text-white font-bold py-3.5 rounded-2xl transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <Download size={18} />
+                Descargar QR HD
+              </button>
+              
               <button 
                 className="w-full bg-[#F8F9FA] hover:bg-[#F0F2F5] text-slate-700 font-bold py-3.5 rounded-2xl transition-colors text-sm border border-slate-200"
                 onClick={() => window.open(`/menu/${restaurante.id}`, '_blank')}
               >
-                Ver menú del cliente
+                Ver enlace del menú
               </button>
             </div>
           </div>
