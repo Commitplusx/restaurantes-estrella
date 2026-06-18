@@ -17,13 +17,6 @@ export function PortalPage() {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'productos' | 'combos' | 'promos' | 'perfil'>('dashboard')
   const [loading, setLoading] = useState(true)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
   useEffect(() => {
     loadRestaurante()
@@ -37,6 +30,8 @@ export function PortalPage() {
 
   useEffect(() => {
     if (restaurante && !localStorage.getItem('onboarding_b2b_done')) {
+        const getTarget = (id: string) => () => document.querySelector(window.innerWidth < 1024 ? `#mobile-tour-${id}` : `#desktop-tour-${id}`) as Element;
+
         const driverObj = driver({
           animate: true,
           showProgress: true,
@@ -45,11 +40,11 @@ export function PortalPage() {
           prevBtnText: 'Atrás',
           steps: [
             { element: '#tour-welcome', popover: { title: '¡Bienvenido a tu Panel!', description: 'Aquí podrás gestionar todo lo relacionado con tu menú en la app. Te daremos un recorrido rápido por las opciones.' } },
-            { element: '#tour-dashboard', popover: { title: 'Panel Principal', description: 'Aquí encontrarás el link a tu Menú Digital y el código QR que puedes imprimir para tus mesas.' } },
-            { element: '#tour-platillos', popover: { title: 'Tus Platillos', description: 'Desde aquí agregarás tu menú, precios y fotos. Los cambios se reflejan al instante.' } },
-            { element: '#tour-combos', popover: { title: 'Combos', description: 'Crea paquetes combinando varios productos para vender más.' } },
-            { element: '#tour-promos', popover: { title: 'Promociones', description: 'Lanza ofertas especiales por tiempo limitado.' } },
-            { element: '#tour-perfil', popover: { title: 'Tu Perfil', description: 'Finalmente, configura tus horarios y datos de tu negocio. ¡Comienza a llenar tu menú ahora mismo!' } }
+            { element: getTarget('dashboard'), popover: { title: 'Panel Principal', description: 'Aquí encontrarás el link a tu Menú Digital y el código QR que puedes imprimir para tus mesas.' } },
+            { element: getTarget('platillos'), popover: { title: 'Tus Platillos', description: 'Desde aquí agregarás tu menú, precios y fotos. Los cambios se reflejan al instante.' } },
+            { element: getTarget('combos'), popover: { title: 'Combos', description: 'Crea paquetes combinando varios productos para vender más.' } },
+            { element: getTarget('promos'), popover: { title: 'Promociones', description: 'Lanza ofertas especiales por tiempo limitado.' } },
+            { element: getTarget('perfil'), popover: { title: 'Tu Perfil', description: 'Finalmente, configura tus horarios y datos de tu negocio. ¡Comienza a llenar tu menú ahora mismo!' } }
           ],
         onDestroyStarted: () => {
           localStorage.setItem('onboarding_b2b_done', 'true');
@@ -89,50 +84,49 @@ export function PortalPage() {
     <div className="flex flex-col lg:flex-row h-[100dvh] bg-white text-slate-900 font-sans selection:bg-orange-100 overflow-hidden w-full max-w-[100vw]">
       
       {/* ── Sidebar (Desktop) ── */}
-      {!isMobile && (
-        <aside className="flex flex-col w-[260px] xl:w-[280px] bg-gradient-to-b from-[#FFA08A] to-[#FF6B5B] p-5 xl:p-6 gap-2 z-10 text-white relative shadow-[4px_0_24px_rgba(255,107,91,0.2)] overflow-y-auto custom-scrollbar h-full">
-            
-            <div className="mb-8 mt-2 flex items-center justify-between">
-              <h1 className="text-2xl font-black tracking-tight">{restaurante.nombre.split(' ')[0]}.</h1>
-            </div>
+      <aside className="hidden lg:flex flex-col w-[260px] xl:w-[280px] bg-gradient-to-b from-[#FFA08A] to-[#FF6B5B] p-5 xl:p-6 gap-2 z-10 text-white relative shadow-[4px_0_24px_rgba(255,107,91,0.2)] overflow-y-auto custom-scrollbar h-full">
+          
+          <div className="mb-8 mt-2 flex items-center justify-between">
+            <h1 className="text-2xl font-black tracking-tight">{restaurante.nombre.split(' ')[0]}.</h1>
+          </div>
 
-            <NavButton 
-              id="tour-dashboard"
-              active={activeTab === 'dashboard'} icon={<LayoutDashboard size={20}/>} label="Dashboard" 
-              onClick={() => setActiveTab('dashboard')} 
-            />
-            
-            <div className="text-[10px] font-black text-white/50 mt-6 mb-2 ml-4 uppercase tracking-widest">
-              Gestión de Menú
-            </div>
-            
-            <NavButton 
-              id="tour-platillos"
-              active={activeTab === 'productos'} icon={<Utensils size={20}/>} label="Platillos" 
-              onClick={() => setActiveTab('productos')} 
-            />
-            <NavButton 
-              id="tour-combos"
-              active={activeTab === 'combos'} icon={<Package size={20}/>} label="Combos / Paquetes" 
-              onClick={() => setActiveTab('combos')} 
-            />
-            <NavButton 
-              id="tour-promos"
-              active={activeTab === 'promos'} icon={<Tag size={20}/>} label="Promociones" 
-              onClick={() => setActiveTab('promos')} 
-            />
-            
-            <div className="text-[10px] font-black text-white/50 mt-6 mb-2 ml-4 uppercase tracking-widest">
-              Ajustes
-            </div>
-            
-            <NavButton 
-              id="tour-perfil"
-              active={activeTab === 'perfil'} icon={<Store size={20}/>} label="Perfil del Negocio" 
-              onClick={() => setActiveTab('perfil')} 
-            />
-            
-            <div className="flex-1" />
+          <NavButton 
+            id="desktop-tour-dashboard"
+            active={activeTab === 'dashboard'} icon={<LayoutDashboard size={20}/>} label="Dashboard" 
+            onClick={() => setActiveTab('dashboard')} 
+          />
+          
+          <div className="text-[10px] font-black text-white/50 mt-6 mb-2 ml-4 uppercase tracking-widest">
+            Gestión de Menú
+          </div>
+          
+          <NavButton 
+            id="desktop-tour-platillos"
+            active={activeTab === 'productos'} icon={<Utensils size={20}/>} label="Platillos" 
+            onClick={() => setActiveTab('productos')} 
+          />
+          <NavButton 
+            id="desktop-tour-combos"
+            active={activeTab === 'combos'} icon={<Package size={20}/>} label="Combos / Paquetes" 
+            onClick={() => setActiveTab('combos')} 
+          />
+          <NavButton 
+            id="desktop-tour-promos"
+            active={activeTab === 'promos'} icon={<Tag size={20}/>} label="Promociones" 
+            onClick={() => setActiveTab('promos')} 
+          />
+          
+          <div className="text-[10px] font-black text-white/50 mt-6 mb-2 ml-4 uppercase tracking-widest">
+            Ajustes
+          </div>
+          
+          <NavButton 
+            id="desktop-tour-perfil"
+            active={activeTab === 'perfil'} icon={<Store size={20}/>} label="Perfil del Negocio" 
+            onClick={() => setActiveTab('perfil')} 
+          />
+          
+          <div className="flex-1" />
 
           {/* Ilustración Decorativa Premium - Socio Estrella */}
           <div className="mb-4 p-5 rounded-3xl bg-white/10 border border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.05)] flex flex-col items-center text-center relative overflow-hidden backdrop-blur-md">
@@ -154,7 +148,6 @@ export function PortalPage() {
             </div>
           </button>
         </aside>
-      )}
 
       {/* ── Main Content Area ── */}
         <div className="flex-1 flex flex-col relative w-full overflow-hidden h-full">
@@ -207,15 +200,13 @@ export function PortalPage() {
           </main>
         </div>
       {/* ── Bottom Nav (Mobile) ── */}
-      {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex justify-between">
-          <MobileNavBtn id="tour-dashboard" active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => setActiveTab('dashboard')} />
-          <MobileNavBtn id="tour-platillos" active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => setActiveTab('productos')} />
-          <MobileNavBtn id="tour-combos" active={activeTab === 'combos'} icon={<Package size={22}/>} label="Combos" onClick={() => setActiveTab('combos')} />
-          <MobileNavBtn id="tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />
-          <MobileNavBtn id="tour-perfil" active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
-        </div>
-      )}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex justify-between">
+        <MobileNavBtn id="mobile-tour-dashboard" active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => setActiveTab('dashboard')} />
+        <MobileNavBtn id="mobile-tour-platillos" active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => setActiveTab('productos')} />
+        <MobileNavBtn id="mobile-tour-combos" active={activeTab === 'combos'} icon={<Package size={22}/>} label="Combos" onClick={() => setActiveTab('combos')} />
+        <MobileNavBtn id="mobile-tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />
+        <MobileNavBtn id="mobile-tour-perfil" active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
+      </div>
     </div>
   )
 }
