@@ -4,6 +4,21 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuItem, MenuCategoria } from '../../lib/supabase'
+import { motion } from 'framer-motion'
+import type { Variants } from 'framer-motion'
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 }
+  }
+}
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15, scale: 0.98 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 400, damping: 25 } }
+}
 
 export function MenuProductosView({ restaurante }: { restaurante: Restaurante }) {
   const [items, setItems] = useState<MenuItem[]>([])
@@ -109,8 +124,31 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
   }
 
   if (loading) return (
-    <div className="flex justify-center items-center py-20 text-brand">
-      <Loader2 size={32} className="animate-spin" />
+    <div className="pb-24">
+      <div className="mb-10">
+        <div className="shimmer h-10 w-48 mb-3 rounded-xl" />
+        <div className="shimmer h-5 w-64 rounded-lg" />
+      </div>
+      <div className="flex flex-col gap-10">
+        {[1, 2].map(i => (
+          <div key={i}>
+            <div className="shimmer h-8 w-40 mb-5 rounded-xl" />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map(j => (
+                <div key={j} className="h-[130px] bg-white rounded-[24px] border border-slate-100 flex p-4 gap-4 shadow-sm">
+                  <div className="w-24 h-24 rounded-[16px] shimmer shrink-0" />
+                  <div className="flex-1 py-1 flex flex-col">
+                    <div className="shimmer h-5 w-3/4 rounded-lg mb-2" />
+                    <div className="shimmer h-3 w-full rounded-md mb-1.5" />
+                    <div className="shimmer h-3 w-5/6 rounded-md mb-auto" />
+                    <div className="shimmer h-5 w-16 rounded-lg mt-2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 
@@ -121,13 +159,15 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-2 tracking-tight">Platillos</h1>
           <p className="text-slate-500 font-medium">Gestiona tu menú principal.</p>
         </div>
-        <button 
-          className="w-full sm:w-auto px-6 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-2xl shadow-lg shadow-[#FF7A6A]/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group" 
+        <motion.button 
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.95 }}
+          className="w-full sm:w-auto px-6 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-2xl shadow-lg shadow-[#FF7A6A]/30 transition-colors flex items-center justify-center gap-2 group" 
           onClick={() => handleOpenModal()}
         >
           <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
           Agregar Platillo
-        </button>
+        </motion.button>
       </div>
 
       {categorias.length === 0 && items.length === 0 ? (
@@ -137,12 +177,14 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
           </div>
           <h3 className="text-2xl font-black text-slate-800 mb-2">Aún no tienes platillos</h3>
           <p className="text-slate-500 font-medium mb-8">Agrega tu primer producto para empezar a vender.</p>
-          <button 
-            className="px-8 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-xl shadow-lg shadow-[#FF7A6A]/30 transition-all active:scale-[0.98]" 
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-8 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-xl shadow-lg shadow-[#FF7A6A]/30 transition-colors" 
             onClick={() => handleOpenModal()}
           >
             Crear Platillo
-          </button>
+          </motion.button>
         </div>
       ) : (
         <div className="flex flex-col gap-10">
@@ -155,10 +197,10 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
                   {cat.nombre}
                 </h3>
                 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   {catItems.length === 0 && <p className="text-slate-400 text-sm italic py-4">No hay platillos en esta categoría.</p>}
                   {catItems.map(item => (
-                    <div key={item.id} className="bg-white rounded-[24px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-lg hover:shadow-[#FF7A6A]/10 transition-all p-4 flex gap-4 group">
+                    <motion.div variants={itemVariants} key={item.id} className="bg-white rounded-[24px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-lg hover:shadow-[#FF7A6A]/10 transition-shadow p-4 flex gap-4 group">
                       
                       <div className="w-24 h-24 rounded-[16px] bg-[#FFF0EE] shrink-0 flex items-center justify-center overflow-hidden border border-slate-50">
                         {item.foto_url ? (
@@ -185,18 +227,18 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
                           <span className="toggle-slider"></span>
                         </label>
                         <div className="flex flex-col sm:flex-row gap-1">
-                          <button className="p-2 text-slate-400 hover:text-blue-500 hover:bg-[#FFF0EE] rounded-[12px] transition-colors" onClick={() => handleOpenModal(item)}>
+                          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-[12px] transition-colors" onClick={() => handleOpenModal(item)}>
                             <Edit2 size={16} />
-                          </button>
-                          <button className="p-2 text-slate-400 hover:text-red-500 hover:bg-[#FFF0EE] rounded-[12px] transition-colors" onClick={() => handleDelete(item.id)}>
+                          </motion.button>
+                          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-[12px] transition-colors" onClick={() => handleDelete(item.id)}>
                             <Trash2 size={16} />
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                       
-                    </div>
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               </div>
             )
           })}

@@ -1,108 +1,115 @@
 import { useState, useEffect } from 'react'
-
 import { supabase, subirFoto } from '../../lib/supabase'
-import type { Restaurante } from '../../lib/supabase'
-import { Save, Store, Clock, Image as ImageIcon, Loader2, Lock, AlertCircle } from 'lucide-react'
+import type { Restaurante, HorariosRestaurante, HorarioDia } from '../../lib/supabase'
+import { Save, Store, Clock, Image as ImageIcon, Loader2, Lock, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 
-// Categorías comunes para restaurantes
 const CATEGORIAS_COMUNES = [
-  'Hamburguesas', 'Pizzas', 'Sushi', 'Tacos', 'Alitas', 
+  'Hamburguesas', 'Pizzas', 'Sushi', 'Tacos', 'Alitas',
   'Mariscos', 'Postres', 'Desayunos', 'Bebidas', 'Saludable',
   'Comida China', 'Antojitos'
 ]
 
-export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante, onUpdate?: () => void }) {
-  // Estado local para los campos
+const DIAS_SEMANA: { key: keyof HorariosRestaurante; label: string }[] = [
+  { key: 'lunes',     label: 'Lunes' },
+  { key: 'martes',    label: 'Martes' },
+  { key: 'miercoles', label: 'Miércoles' },
+  { key: 'jueves',    label: 'Jueves' },
+  { key: 'viernes',   label: 'Viernes' },
+  { key: 'sabado',    label: 'Sábado' },
+  { key: 'domingo',   label: 'Domingo' },
+]
+
+const DEFAULT_DIA: HorarioDia = { abre: '09:00', cierra: '22:00', activo: false }
+
+function initHorarios(existing?: HorariosRestaurante): HorariosRestaurante {
+  const result: HorariosRestaurante = {}
+  for (const { key } of DIAS_SEMANA) {
+    result[key] = existing?.[key]
+      ? { ...DEFAULT_DIA, ...existing[key] }
+      : { ...DEFAULT_DIA }
+  }
+  return result
+}
+
+function calcularPasosFaltantes(restaurante: Restaurante): string[] {
+  const pasos: string[] = []
+  if (!restaurante.foto_fachada_url) pasos.push('Foto de portada')
+  if (!restaurante.categorias || restaurante.categorias.length === 0) pasos.push('Al menos 1 categoría')
+  const h = restaurante.horarios
+  const tieneHorario = h && DIAS_SEMANA.some(d => h[d.key]?.activo)
+  if (!tieneHorario) pasos.push('Horario de al menos 1 día')
+  return pasos
+}
+
+export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante; onUpdate?: () => void }) {
   const [formData, setFormData] = useState({
     nombre: restaurante.nombre || '',
     telefono: restaurante.telefono || '',
+    descripcion_corta: restaurante.descripcion_corta || '',
     foto_fachada_url: restaurante.foto_fachada_url || '',
-    hora_apertura: restaurante.hora_apertura || '09:00:00',
-    hora_cierre: restaurante.hora_cierre || '22:00:00',
-    categorias: restaurante.categorias || []
+    categorias: restaurante.categorias || [] as string[],
   })
-  
+  const [horarios, setHorarios] = useState<HorariosRestaurante>(() => initHorarios(restaurante.horarios))
+
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
-
-  // Estado para la contraseña
   const [newPassword, setNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
   const [passwordMsg, setPasswordMsg] = useState({ type: '', text: '' })
+  const [showPassword, setShowPassword] = useState(false)
 
-  // Actualizar el estado si el prop cambia
+  // Recalcular si el prop cambia (ej. onUpdate)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
       nombre: restaurante.nombre || '',
       telefono: restaurante.telefono || '',
+      descripcion_corta: restaurante.descripcion_corta || '',
       foto_fachada_url: restaurante.foto_fachada_url || '',
-      hora_apertura: restaurante.hora_apertura || '09:00:00',
-      hora_cierre: restaurante.hora_cierre || '22:00:00',
-      categorias: restaurante.categorias || []
+      categorias: restaurante.categorias || [],
     })
+    setHorarios(initHorarios(restaurante.horarios))
   }, [restaurante])
+
+  const pasosFaltantes = calcularPasosFaltantes({
+    ...restaurante,
+    ...formData,
+    horarios,
+  })
+  const perfilCompleto = pasosFaltantes.length === 0
 
   const toggleCategoria = (cat: string) => {
     setFormData(prev => {
       const current = prev.categorias || []
-      if (current.includes(cat)) {
-        return { ...prev, categorias: current.filter((c: string) => c !== cat) }
-      } else {
-        if (current.length >= 3) return prev // Limitar a 3 categorías
-        return { ...prev, categorias: [...current, cat] }
-      }
+      if (current.includes(cat)) return { ...prev, categorias: current.filter(c => c !== cat) }
+      if (current.length >= 3) return prev
+      return { ...prev, categorias: [...current, cat] }
     })
+  }
+
+  const updateHorario = (dia: keyof HorariosRestaurante, field: keyof HorarioDia, value: string | boolean) => {
+    setHorarios(prev => ({
+      ...prev,
+      [dia]: { ...prev[dia]!, [field]: value }
+    }))
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      if (!e.target.files || e.target.files.length === 0) return
-      
-      const file = e.target.files[0]
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${restaurante.id}-${Math.random()}.${fileExt}`
-      const filePath = `fachadas/${fileName}`
-
+      const file = e.target.files?.[0]
+      if (!file) return
       setUploadingImage(true)
-
+      const fileExt = file.name.split('.').pop()
+      const filePath = `fachadas/${restaurante.id}-${Date.now()}.${fileExt}`
       const url = await subirFoto(file, filePath)
-      
-      if (url) {
-        setFormData(prev => ({ ...prev, foto_fachada_url: url }))
-      } else {
-        throw new Error("No se pudo obtener la URL de la imagen")
-      }
-    } catch (error) {
-      console.error('Error al subir imagen:', error)
-      alert('Hubo un error al subir la imagen. Asegúrate de que pesa menos de 5MB.')
+      if (url) setFormData(prev => ({ ...prev, foto_fachada_url: url }))
+      else alert('Error al subir la imagen. Intenta de nuevo.')
+    } catch {
+      alert('Error al subir la imagen.')
     } finally {
       setUploadingImage(false)
     }
   }
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword.length < 6) {
-      setPasswordMsg({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' });
-      return;
-    }
-    setChangingPassword(true);
-    setPasswordMsg({ type: '', text: '' });
-    
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-
-    if (error) {
-      setPasswordMsg({ type: 'error', text: error.message });
-    } else {
-      setPasswordMsg({ type: 'success', text: 'Contraseña actualizada exitosamente' });
-      setNewPassword('');
-    }
-    setChangingPassword(false);
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -114,10 +121,13 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
       .update({
         nombre: formData.nombre,
         telefono: formData.telefono,
+        descripcion_corta: formData.descripcion_corta,
         foto_fachada_url: formData.foto_fachada_url,
-        hora_apertura: formData.hora_apertura,
-        hora_cierre: formData.hora_cierre,
-        categorias: formData.categorias
+        categorias: formData.categorias,
+        horarios: horarios,
+        // Mantener legados compatibles con PublicMenuView
+        hora_apertura: horarios.lunes?.activo ? horarios.lunes.abre : (horarios.viernes?.activo ? horarios.viernes.abre : null),
+        hora_cierre:   horarios.lunes?.activo ? horarios.lunes.cierra : (horarios.viernes?.activo ? horarios.viernes.cierra : null),
       })
       .eq('id', restaurante.id)
 
@@ -125,166 +135,218 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
     if (!error) {
       setSuccess(true)
       if (onUpdate) onUpdate()
-      setTimeout(() => setSuccess(false), 3000)
+      setTimeout(() => setSuccess(false), 3500)
     } else {
       console.error(error)
-      alert("Hubo un error al guardar los cambios.")
+      alert('Hubo un error al guardar los cambios.')
     }
+  }
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newPassword.length < 6) {
+      setPasswordMsg({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' })
+      return
+    }
+    setChangingPassword(true)
+    setPasswordMsg({ type: '', text: '' })
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) setPasswordMsg({ type: 'error', text: error.message })
+    else { setPasswordMsg({ type: 'success', text: '¡Contraseña actualizada exitosamente!' }); setNewPassword('') }
+    setChangingPassword(false)
   }
 
   return (
     <div className="pb-24">
       <div className="mb-8">
         <h1 className="text-3xl font-black text-slate-800 mb-2">Mi Perfil</h1>
-        <p className="text-muted">Configura la información pública de tu restaurante.</p>
+        <p className="text-slate-500">Configura la información pública de tu restaurante.</p>
+      </div>
+
+      {/* ── Banner de estado de visibilidad ── */}
+      <div className={`mb-8 p-5 rounded-[2rem] border flex items-start gap-4 ${perfilCompleto ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+        <div className={`p-2.5 rounded-xl shrink-0 ${perfilCompleto ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+          {perfilCompleto
+            ? <CheckCircle2 className="text-emerald-600" size={22} />
+            : <AlertCircle className="text-amber-600" size={22} />
+          }
+        </div>
+        <div className="flex-1">
+          <p className={`font-black text-base ${perfilCompleto ? 'text-emerald-800' : 'text-amber-800'}`}>
+            {perfilCompleto ? '¡Tu negocio es visible públicamente!' : 'Tu negocio está oculto del público'}
+          </p>
+          {perfilCompleto
+            ? <p className="text-emerald-700 text-sm mt-1">Los clientes pueden encontrarte en la web. ¡Perfecto!</p>
+            : (
+              <div className="mt-2">
+                <p className="text-amber-700 text-sm mb-2">Completa estos pasos para aparecer en el listado:</p>
+                <ul className="space-y-1">
+                  {pasosFaltantes.map(paso => (
+                    <li key={paso} className="text-amber-700 text-sm font-semibold flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      {paso}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          }
+        </div>
       </div>
 
       <div className="max-w-3xl">
         <form onSubmit={handleSave} className="space-y-8">
-          
+
           {/* INFORMACIÓN BÁSICA */}
           <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+            <h2 className="text-lg font-black flex items-center gap-2 mb-6">
               <Store className="text-orange-500" size={20} />
               Información Básica
             </h2>
-            
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-1">Nombre del Restaurante</label>
-                <input 
-                  type="text" 
-                  required
+                <input
+                  type="text" required
                   value={formData.nombre}
-                  onChange={e => setFormData({...formData, nombre: e.target.value})}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:border-brand outline-none"
+                  onChange={e => setFormData({ ...formData, nombre: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
                   placeholder="Ej. Tacos El Paisa"
                 />
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-1">Teléfono (WhatsApp para recibir pedidos)</label>
-                <input 
-                  type="tel" 
-                  required
+                <input
+                  type="tel" required
                   value={formData.telefono}
-                  onChange={e => setFormData({...formData, telefono: e.target.value})}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:border-brand outline-none"
+                  onChange={e => setFormData({ ...formData, telefono: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
                   placeholder="Ej. 9631234567"
                 />
-                <p className="text-xs text-slate-500 mt-1">Este es el número al que los clientes enviarán sus pedidos directamente.</p>
+                <p className="text-xs text-slate-500 mt-1">Este número recibirá los pedidos por WhatsApp.</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1">Descripción Corta <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <input
+                  type="text"
+                  maxLength={80}
+                  value={formData.descripcion_corta}
+                  onChange={e => setFormData({ ...formData, descripcion_corta: e.target.value })}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
+                  placeholder="Ej. Los mejores tacos de la ciudad desde 2010"
+                />
+                <p className="text-xs text-slate-400 mt-1">{formData.descripcion_corta.length}/80 caracteres</p>
               </div>
             </div>
           </div>
-          
+
           {/* FOTO DE PORTADA */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-orange-400 to-red-500 rounded-l-[2rem]"></div>
-            <h2 className="text-xl font-black flex items-center gap-3 mb-6 text-slate-800">
-              <div className="p-2 bg-orange-50 rounded-xl"><ImageIcon className="text-orange-500" size={20} /></div>
-              Foto de Portada
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <h2 className="text-lg font-black flex items-center gap-2 mb-6">
+              <ImageIcon className="text-orange-500" size={20} />
+              Foto de Portada <span className="text-red-500 text-sm font-black ml-1">*requerida</span>
             </h2>
-            
-            <div className="flex flex-col sm:flex-row gap-8 items-start">
-              <div className="w-full sm:w-56 h-36 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-orange-300 transition-colors">
-                {formData.foto_fachada_url ? (
-                  <img src={formData.foto_fachada_url} alt="Portada" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                ) : (
-                  <Store className="text-slate-300 group-hover:text-orange-200 transition-colors" size={40} />
-                )}
+            <div className="flex flex-col sm:flex-row gap-6 items-start">
+              <div className="w-full sm:w-52 h-36 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                {formData.foto_fachada_url
+                  ? <img src={formData.foto_fachada_url} alt="Portada" className="w-full h-full object-cover" />
+                  : <Store className="text-slate-300" size={40} />
+                }
               </div>
-              
-              <div className="flex-1 w-full space-y-3">
-                <label className="text-sm font-semibold text-slate-700">Sube una foto desde tu dispositivo</label>
-                
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className={`px-5 py-2.5 bg-slate-900 hover:bg-orange-500 text-white text-sm font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-orange-200 ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
-                    {uploadingImage ? <Loader2 className="animate-spin" size={18} /> : <ImageIcon size={18} />}
-                    {uploadingImage ? 'Subiendo...' : 'Seleccionar Foto'}
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={uploadingImage}
-                      className="hidden"
-                    />
-                  </label>
-                  
-                  {formData.foto_fachada_url && (
-                    <button 
-                      type="button"
-                      onClick={() => setFormData({...formData, foto_fachada_url: ''})}
-                      className="text-xs text-red-500 hover:text-red-700 underline font-medium"
-                    >
-                      Quitar foto
-                    </button>
-                  )}
-                </div>
-
-                <p className="text-xs text-slate-500">
-                  Esta es la foto que los clientes verán en tu perfil. Usa una foto atractiva de tu fachada o tu mejor platillo.
-                </p>
+              <div className="flex-1 space-y-3">
+                <label className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all ${uploadingImage ? 'bg-slate-200 text-slate-400 pointer-events-none' : 'bg-slate-900 hover:bg-orange-500 text-white shadow-lg'}`}>
+                  {uploadingImage ? <Loader2 className="animate-spin" size={16} /> : <ImageIcon size={16} />}
+                  {uploadingImage ? 'Subiendo...' : 'Seleccionar Foto'}
+                  <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} className="hidden" />
+                </label>
+                {formData.foto_fachada_url && (
+                  <button type="button" onClick={() => setFormData({ ...formData, foto_fachada_url: '' })} className="block text-xs text-red-500 hover:underline font-semibold">
+                    Quitar foto
+                  </button>
+                )}
+                <p className="text-xs text-slate-500">Usa una foto atractiva de tu fachada o tu mejor platillo. Se comprime automáticamente.</p>
               </div>
             </div>
           </div>
 
-          {/* HORARIOS */}
+          {/* HORARIOS POR DÍA */}
           <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <h2 className="text-xl font-black flex items-center gap-3 mb-6 text-slate-800">
-              <div className="p-2 bg-blue-50 rounded-xl"><Clock className="text-blue-500" size={20} /></div>
-              Horarios de Atención
+            <h2 className="text-lg font-black flex items-center gap-2 mb-2">
+              <Clock className="text-blue-500" size={20} />
+              Horarios de Atención <span className="text-red-500 text-sm font-black ml-1">*requeridos</span>
             </h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-1">Hora de Apertura</label>
-                <input 
-                  type="time" 
-                  required
-                  value={formData.hora_apertura}
-                  onChange={e => setFormData({...formData, hora_apertura: e.target.value})}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-1">Hora de Cierre</label>
-                <input 
-                  type="time" 
-                  required
-                  value={formData.hora_cierre}
-                  onChange={e => setFormData({...formData, hora_cierre: e.target.value})}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:border-blue-500 outline-none"
-                />
-              </div>
+            <p className="text-sm text-slate-500 mb-6">Activa los días que atiendes y configura el horario de cada uno.</p>
+
+            <div className="space-y-3">
+              {DIAS_SEMANA.map(({ key, label }) => {
+                const dia = horarios[key] ?? { ...DEFAULT_DIA }
+                return (
+                  <div key={key} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border transition-all ${dia.activo ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                    {/* Toggle día activo */}
+                    <label className="flex items-center gap-3 min-w-[130px] cursor-pointer select-none">
+                      <div
+                        onClick={() => updateHorario(key, 'activo', !dia.activo)}
+                        className={`relative w-11 h-6 rounded-full transition-all cursor-pointer ${dia.activo ? 'bg-blue-500' : 'bg-slate-300'}`}
+                      >
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${dia.activo ? 'translate-x-5' : ''}`} />
+                      </div>
+                      <span className={`text-sm font-bold ${dia.activo ? 'text-blue-800' : 'text-slate-400'}`}>{label}</span>
+                    </label>
+
+                    {/* Inputs de hora (solo si está activo) */}
+                    {dia.activo ? (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-500">Abre</span>
+                          <input
+                            type="time"
+                            value={dia.abre}
+                            onChange={e => updateHorario(key, 'abre', e.target.value)}
+                            className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-slate-700"
+                          />
+                        </div>
+                        <span className="text-slate-400 font-bold">–</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-500">Cierra</span>
+                          <input
+                            type="time"
+                            value={dia.cierra}
+                            onChange={e => updateHorario(key, 'cierra', e.target.value)}
+                            className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-slate-700"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 font-semibold">Cerrado este día</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-            <p className="text-xs text-slate-500 mt-3">
-              Usamos este horario para mostrar a los clientes si tu negocio está "Abierto Ahora".
-            </p>
           </div>
 
           {/* CATEGORÍAS */}
           <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-black text-slate-800">Categorías</h2>
+              <h2 className="text-lg font-black flex items-center gap-2">
+                <span className="text-orange-500">🏷️</span>
+                Categorías <span className="text-red-500 text-sm font-black ml-1">*requeridas</span>
+              </h2>
               <span className="text-xs font-black px-3 py-1 bg-slate-100 text-slate-500 rounded-full">
                 {formData.categorias?.length || 0} / 3
               </span>
             </div>
-            <p className="text-sm text-slate-600 mb-4">
-              Selecciona hasta 3 categorías que mejor describan tu menú. Esto ayudará a los clientes a encontrarte más rápido.
-            </p>
-            
+            <p className="text-sm text-slate-500 mb-4">Selecciona hasta 3 categorías que mejor describan tu menú.</p>
             <div className="flex flex-wrap gap-2">
               {CATEGORIAS_COMUNES.map(cat => {
-                const isSelected = formData.categorias?.includes(cat);
+                const isSelected = formData.categorias?.includes(cat)
                 return (
                   <button
-                    key={cat}
-                    type="button"
+                    key={cat} type="button"
                     onClick={() => toggleCategoria(cat)}
-                    className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${
-                      isSelected 
-                        ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20 scale-105' 
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300 hover:text-slate-800'
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${isSelected
+                      ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20 scale-105'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300 hover:text-slate-800'
                     }`}
                   >
                     {cat}
@@ -294,29 +356,31 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
             </div>
           </div>
 
-          <div className="pt-6 pb-12">
-            <button 
-              type="submit" 
+          {/* BOTÓN GUARDAR */}
+          <div className="pt-2 pb-4">
+            <button
+              type="submit"
               disabled={saving}
-              className={`w-full px-8 py-4 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${
-                success ? 'bg-emerald-500 shadow-xl shadow-emerald-500/30' : 'bg-slate-900 hover:bg-orange-500 shadow-xl shadow-slate-900/20 hover:shadow-orange-500/30'
-              }`}
+              className={`w-full px-8 py-4 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${success ? 'bg-emerald-500 shadow-xl shadow-emerald-500/30' : 'bg-slate-900 hover:bg-orange-500 shadow-xl shadow-slate-900/20 hover:shadow-orange-500/30'}`}
             >
-              {saving ? (
-                <><Loader2 className="animate-spin" size={20} /> Guardando...</>
-              ) : success ? (
-                <><Save size={20} /> ¡Guardado Exitosamente!</>
-              ) : (
-                <><Save size={20} /> Guardar Cambios</>
-              )}
+              {saving
+                ? <><Loader2 className="animate-spin" size={20} /> Guardando...</>
+                : success
+                  ? <><CheckCircle2 size={20} /> ¡Guardado Exitosamente!</>
+                  : <><Save size={20} /> Guardar Cambios</>
+              }
             </button>
+            {!perfilCompleto && (
+              <p className="text-center text-sm text-amber-600 font-semibold mt-3">
+                ⚠️ Completa los campos marcados para aparecer en el listado público.
+              </p>
+            )}
           </div>
-
         </form>
-        
-        {/* SEGURIDAD - Cambiar Contraseña */}
+
+        {/* SEGURIDAD */}
         <div className="mt-8 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-          <h2 className="text-xl font-black flex items-center gap-3 mb-6 text-slate-800">
+          <h2 className="text-lg font-black flex items-center gap-3 mb-6 text-slate-800">
             <div className="p-2 bg-red-50 rounded-xl"><Lock className="text-red-500" size={20} /></div>
             Seguridad
           </h2>
@@ -324,29 +388,28 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
             <div className="flex-1 relative">
               <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                type="password"
-                placeholder="Nueva Contraseña (min. 6 caracteres)"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Nueva contraseña (mín. 6 caracteres)"
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 required
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:border-[#FF7A6A] focus:ring-4 focus:ring-[#FF7A6A]/10 outline-none transition-all font-medium text-slate-800 tracking-widest"
+                className="w-full pl-11 pr-11 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:border-red-300 focus:ring-4 focus:ring-red-500/10 outline-none transition-all font-medium text-slate-800"
               />
+              <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={changingPassword}
-              className={`px-8 py-3.5 rounded-2xl font-bold text-white transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
-                passwordMsg.type === 'success' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30' : 'bg-slate-900 hover:bg-slate-800 shadow-lg shadow-slate-900/20'
-              }`}
+              className={`px-8 py-3.5 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-2 ${passwordMsg.type === 'success' ? 'bg-emerald-500' : 'bg-slate-900 hover:bg-slate-800'}`}
             >
               {changingPassword ? <Loader2 className="animate-spin" size={18} /> : 'Actualizar'}
             </button>
           </form>
           {passwordMsg.text && (
-            <div className={`mt-4 p-3 rounded-xl flex items-center gap-2 text-sm font-semibold ${
-              passwordMsg.type === 'error' ? 'bg-[#FFF0EE] text-red-500 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-            }`}>
-              <AlertCircle size={18} className="shrink-0" />
+            <div className={`mt-4 p-3 rounded-xl flex items-center gap-2 text-sm font-semibold ${passwordMsg.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+              <AlertCircle size={16} className="shrink-0" />
               {passwordMsg.text}
             </div>
           )}

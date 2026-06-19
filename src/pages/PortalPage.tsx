@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star } from 'lucide-react'
+import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -29,31 +29,90 @@ export function PortalPage() {
   }
 
   useEffect(() => {
-    if (restaurante && !localStorage.getItem('onboarding_b2b_done')) {
-        const getTarget = (id: string) => () => document.querySelector(window.innerWidth < 1024 ? `#mobile-tour-${id}` : `#desktop-tour-${id}`) as Element;
+    if (!restaurante) return
+    // Bug Fix 4: key por restaurante, no global
+    const onboardingKey = `onboarding_b2b_done_${restaurante.id}`
+    if (localStorage.getItem(onboardingKey)) return
 
-        const driverObj = driver({
-          animate: true,
-          showProgress: true,
-          doneBtnText: '¡Entendido!',
-          nextBtnText: 'Siguiente',
-          prevBtnText: 'Atrás',
-          steps: [
-            { element: '#tour-welcome', popover: { title: '¡Bienvenido a tu Panel!', description: 'Aquí podrás gestionar todo lo relacionado con tu menú en la app. Te daremos un recorrido rápido por las opciones.' } },
-            { element: getTarget('dashboard'), popover: { title: 'Panel Principal', description: 'Aquí encontrarás el link a tu Menú Digital y el código QR que puedes imprimir para tus mesas.' } },
-            { element: getTarget('platillos'), popover: { title: 'Tus Platillos', description: 'Desde aquí agregarás tu menú, precios y fotos. Los cambios se reflejan al instante.' } },
-            { element: getTarget('combos'), popover: { title: 'Combos', description: 'Crea paquetes combinando varios productos para vender más.' } },
-            { element: getTarget('promos'), popover: { title: 'Promociones', description: 'Lanza ofertas especiales por tiempo limitado.' } },
-            { element: getTarget('perfil'), popover: { title: 'Tu Perfil', description: 'Finalmente, configura tus horarios y datos de tu negocio. ¡Comienza a llenar tu menú ahora mismo!' } }
-          ],
-        onDestroyStarted: () => {
-          localStorage.setItem('onboarding_b2b_done', 'true');
-          driverObj.destroy();
+    const getTarget = (id: string) => () =>
+      document.querySelector(window.innerWidth < 1024 ? `#mobile-tour-${id}` : `#desktop-tour-${id}`) as Element
+
+    // Bug Fix 3: pasos adaptativos según estado del perfil
+    const perfilIncompleto = !restaurante.perfil_completo
+
+    const stepsBase = [
+      {
+        element: '#tour-welcome',
+        popover: {
+          title: '¡Bienvenido a tu Panel! 🎉',
+          description: perfilIncompleto
+            ? 'Tu negocio aún no es visible en la app. Completa tu perfil primero y luego explora las demás secciones.'
+            : 'Aquí podrás gestionar todo lo relacionado con tu menú en la app. Te damos un recorrido rápido.'
         }
-      });
-      // Pequeño timeout para asegurar que el DOM esté renderizado (especialmente en móvil)
-      setTimeout(() => driverObj.drive(), 500);
-    }
+      },
+      ...(perfilIncompleto ? [
+        {
+          element: getTarget('perfil'),
+          popover: {
+            title: '⚠️ Paso 1: Completa tu Perfil',
+            description: 'Sube una foto de portada, selecciona categorías y configura tus horarios. Hasta que lo hagas, tu negocio NO aparecerá en el directorio público.'
+          }
+        }
+      ] : []),
+      {
+        element: getTarget('dashboard'),
+        popover: {
+          title: 'Panel Principal',
+          description: 'Aquí encontrarás el link a tu Menú Digital y el código QR para imprimir en tus mesas.'
+        }
+      },
+      {
+        element: getTarget('platillos'),
+        popover: {
+          title: 'Tus Platillos',
+          description: 'Agrega tu menú, precios y fotos. Los cambios se reflejan al instante en la app.'
+        }
+      },
+      {
+        element: getTarget('combos'),
+        popover: {
+          title: 'Combos',
+          description: 'Crea paquetes combinando varios productos para incrementar el ticket promedio.'
+        }
+      },
+      {
+        element: getTarget('promos'),
+        popover: {
+          title: 'Promociones',
+          description: 'Lanza ofertas especiales por tiempo limitado y atrae más clientes.'
+        }
+      },
+      ...(!perfilIncompleto ? [
+        {
+          element: getTarget('perfil'),
+          popover: {
+            title: 'Tu Perfil',
+            description: 'Actualiza horarios, foto y datos de tu negocio cuando quieras.'
+          }
+        }
+      ] : [])
+    ]
+
+    const driverObj = driver({
+      animate: true,
+      showProgress: true,
+      doneBtnText: '¡Entendido!',
+      nextBtnText: 'Siguiente →',
+      prevBtnText: '← Atrás',
+      steps: stepsBase,
+      onDestroyStarted: () => {
+        localStorage.setItem(onboardingKey, 'true')
+        driverObj.destroy()
+      }
+    })
+
+    // Timeout para asegurar que el DOM esté listo (especialmente en móvil)
+    setTimeout(() => driverObj.drive(), 600)
   }, [restaurante])
 
   const handleLogout = async () => {
@@ -70,11 +129,28 @@ export function PortalPage() {
   if (!restaurante) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="card text-center max-w-sm w-full">
-          <Store size={48} className="mx-auto text-slate-300 mb-4" />
-          <h2 className="text-xl font-bold text-slate-800">Acceso denegado</h2>
-          <p className="text-slate-500 mt-2 mb-6">Tu cuenta no está vinculada a ningún restaurante activo en nuestro sistema.</p>
-          <button onClick={handleLogout} className="btn btn-ghost w-full">Cerrar sesión</button>
+        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-8 text-center max-w-sm w-full">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-5">
+            <Store size={32} className="text-slate-400" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">Acceso pendiente</h2>
+          <p className="text-slate-500 text-sm leading-relaxed mb-1">
+            Tu cuenta aún no está vinculada a un restaurante en el sistema.
+          </p>
+          <p className="text-slate-400 text-sm leading-relaxed mb-6">
+            Si ya te registraste como aliado, contáctanos por WhatsApp para activar tu acceso.
+          </p>
+          <a
+            href="https://wa.me/529631539156?text=Hola%2C%20quiero%20activar%20mi%20acceso%20como%20aliado"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 mb-3 text-sm"
+          >
+            📲 Contactar por WhatsApp
+          </a>
+          <button onClick={handleLogout} className="w-full py-3 text-slate-400 hover:text-slate-600 font-semibold text-sm transition-colors">
+            Cerrar sesión
+          </button>
         </div>
       </div>
     )
@@ -174,6 +250,40 @@ export function PortalPage() {
 
           <main className="flex-1 px-4 lg:px-8 pb-32 lg:pb-10 overflow-y-auto custom-scrollbar w-full">
             <div className="max-w-5xl mx-auto">
+
+              {/* ── Banner: Perfil Incompleto ── Bug Fix 6: solo en dashboard ── */}
+              {!restaurante.perfil_completo && activeTab === 'dashboard' && (
+                <div className="mb-6 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-[2rem] p-6 flex flex-col sm:flex-row gap-4 items-start">
+                  <div className="p-3 bg-amber-100 rounded-2xl shrink-0">
+                    <AlertCircle className="text-amber-600" size={26} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-black text-amber-900 text-lg leading-tight">Tu negocio está oculto del público</p>
+                    <p className="text-amber-700 text-sm mt-1 mb-3">Completa tu perfil para que los clientes puedan encontrarte en el directorio.</p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${ restaurante.foto_fachada_url ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-amber-200 text-amber-700'}`}>
+                        {restaurante.foto_fachada_url ? <CheckCircle2 size={12}/> : <span className="w-3 h-3 rounded-full border-2 border-amber-400 shrink-0"/>}
+                        Foto de portada
+                      </div>
+                      <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${ restaurante.categorias && restaurante.categorias.length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-amber-200 text-amber-700'}`}>
+                        {restaurante.categorias && restaurante.categorias.length > 0 ? <CheckCircle2 size={12}/> : <span className="w-3 h-3 rounded-full border-2 border-amber-400 shrink-0"/>}
+                        Categorías
+                      </div>
+                      <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${ restaurante.horarios && Object.values(restaurante.horarios).some((d: any) => d?.activo) ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-amber-200 text-amber-700'}`}>
+                        {restaurante.horarios && Object.values(restaurante.horarios).some((d: any) => d?.activo) ? <CheckCircle2 size={12}/> : <span className="w-3 h-3 rounded-full border-2 border-amber-400 shrink-0"/>}
+                        Horarios
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('perfil')}
+                      className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-amber-500/30"
+                    >
+                      Completar Perfil →
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}

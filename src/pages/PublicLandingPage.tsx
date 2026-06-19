@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { Star, Store, ArrowRight, Search, Filter } from 'lucide-react'
+import type { MenuPromocion } from '../lib/supabase'
+import { Store, Search, MapPin, Clock, Ticket } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 
 interface Restaurante {
   id: string
@@ -11,43 +13,62 @@ interface Restaurante {
   foto_fachada_url?: string
   hora_apertura?: string
   hora_cierre?: string
+  horarios?: any
   categorias?: string[]
   slug?: string
 }
 
 export function PublicLandingPage() {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
+  const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingPromos, setLoadingPromos] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
+  const [activeTab, setActiveTab] = useState<'todos' | 'cerca' | 'promos'>('todos')
   const PAGE_SIZE = 12 // Cargamos de 12 en 12
 
   async function loadRestaurants(pageIndex: number) {
     if (pageIndex === 0) setLoading(true)
     else setLoadingMore(true)
 
-    const { data, error } = await supabase
+    // Intentar con filtro perfil_completo (requiere migración SQL ejecutada)
+    let query = supabase
       .from('restaurantes')
-      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, categorias, slug')
+      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
       .eq('activo', true)
+
+    // Solo filtrar por perfil_completo si la columna existe
+    const { data, error } = await query
+      .eq('perfil_completo', true)
       .order('nombre')
       .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
+
+    // Fallback: si la columna no existe aún, mostrar todos los activos
+    const finalData = error
+      ? (await supabase
+          .from('restaurantes')
+          .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
+          .eq('activo', true)
+          .order('nombre')
+          .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
+        ).data
+      : data
     
     if (error) {
       console.error("Error fetching restaurants:", error)
     }
     
-    if (data) {
-      if (data.length < PAGE_SIZE) setHasMore(false)
+    if (finalData) {
+      if (finalData.length < PAGE_SIZE) setHasMore(false)
       if (pageIndex === 0) {
-        setRestaurantes(data)
+        setRestaurantes(finalData)
       } else {
-        // Evitamos duplicados por si acaso
         setRestaurantes(prev => {
-          const newIds = data.map(d => d.id)
-          return [...prev.filter(p => !newIds.includes(p.id)), ...data]
+          const newIds = finalData.map(d => d.id)
+          return [...prev.filter(p => !newIds.includes(p.id)), ...finalData]
         })
       }
     }
@@ -56,8 +77,23 @@ export function PublicLandingPage() {
     setLoadingMore(false)
   }
 
+  async function loadPromos() {
+    setLoadingPromos(true)
+    const { data } = await supabase
+      .from('menu_promociones')
+      .select('*, restaurantes(id, nombre, slug, foto_fachada_url)')
+      .eq('activa', true)
+      
+    if (data) {
+      const validPromos = data.filter(p => !p.fecha_fin || new Date(p.fecha_fin) >= new Date())
+      setPromosGlobales(validPromos as any)
+    }
+    setLoadingPromos(false)
+  }
+
   useEffect(() => {
     loadRestaurants(0)
+    loadPromos()
   }, [])
 
   const handleLoadMore = () => {
@@ -73,165 +109,249 @@ export function PublicLandingPage() {
     ),
   [search, restaurantes]);
 
-  const estaAbierto = (apertura?: string, cierre?: string) => {
-    if (!apertura || !cierre) return false;
+  const estaAbierto = (res: Restaurante) => {
+    if (res.horarios) {
+      const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
+      const hoy = new Date()
+      const diaString = dias[hoy.getDay()]
+      const horarioHoy = res.horarios[diaString]
+      if (horarioHoy && horarioHoy.activo) {
+        const horaLocal = hoy.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        if (horarioHoy.abre <= horarioHoy.cierra) {
+          return horaLocal >= horarioHoy.abre && horaLocal <= horarioHoy.cierra
+        } else {
+          return horaLocal >= horarioHoy.abre || horaLocal <= horarioHoy.cierra
+        }
+      }
+      return false
+    }
+
+    if (!res.hora_apertura || !res.hora_cierre) return false;
     const ahora = new Date();
     const horaLocal = ahora.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    if (apertura <= cierre) {
-      return horaLocal >= apertura && horaLocal <= cierre;
+    if (res.hora_apertura <= res.hora_cierre) {
+      return horaLocal >= res.hora_apertura && horaLocal <= res.hora_cierre;
     } else {
-      return horaLocal >= apertura || horaLocal <= cierre;
+      return horaLocal >= res.hora_apertura || horaLocal <= res.hora_cierre;
     }
   }
 
-  return (
-    <div className="min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-orange-100">
+  // Cerca de ti: Los ordenamos para que los abiertos salgan primero
+  const restaurantesCerca = useMemo(() => {
+    return [...filteredRestaurants].sort((a, b) => {
+      const aAbierto = estaAbierto(a) ? 1 : 0;
+      const bAbierto = estaAbierto(b) ? 1 : 0;
+      return bAbierto - aAbierto;
+    })
+  }, [filteredRestaurants]);
 
-      {/* Navbar */}
-      <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-4 px-4 md:px-10 flex justify-between items-center gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-200">
+  const filteredPromos = useMemo(() => 
+    promosGlobales.filter(p => 
+      p.titulo.toLowerCase().includes(search.toLowerCase()) || 
+      (p.restaurantes?.nombre || '').toLowerCase().includes(search.toLowerCase())
+    ),
+  [search, promosGlobales]);
+
+  return (
+    <div className="min-h-screen bg-[#F6F6F9] text-slate-900 selection:bg-orange-100 font-sans pb-20">
+
+      {/* Navbar Minimalista */}
+      <header className="sticky top-0 bg-[#F6F6F9]/80 backdrop-blur-xl z-50 py-4 px-6 md:px-12 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-200">
             <Store className="w-4 h-4 text-white" />
           </div>
-          <span className="font-black text-lg md:text-xl text-slate-800 tracking-tighter truncate">
-            Estrella<span className="text-orange-500">Delivery</span>
+          <span className="font-bold text-xl text-slate-800 tracking-tight">
+            Estrella
           </span>
         </div>
-        <Link to="/login" className="text-xs md:text-sm font-bold text-white transition-all bg-slate-900 hover:bg-orange-500 hover:shadow-lg hover:shadow-orange-200 px-3 py-2 md:px-5 md:py-2.5 rounded-xl flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          Acceso Socios <ArrowRight size={14} className="md:w-4 md:h-4" />
+        <Link to="/login" className="text-sm font-bold text-slate-400 hover:text-orange-500 transition-colors">
+          Acceso Socios
         </Link>
       </header>
 
-      <main className="p-4 md:p-12 max-w-[1400px] mx-auto min-h-screen">
+      <main className="px-6 md:px-12 max-w-[1400px] mx-auto mt-6">
 
-        {/* Hero Section */}
-        <div className="relative rounded-[2rem] md:rounded-[2.5rem] bg-slate-900 h-[260px] md:h-[360px] overflow-hidden mb-8 md:mb-12 flex items-center px-6 md:px-12">
-          <img 
-            src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=1200" 
-            className="absolute inset-0 w-full h-full object-cover opacity-40"
-            alt="Hero Estrella Delivery"
-          />
-          {/* Gradient overlay con color de marca */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/50 to-transparent" />
-          <div className="relative z-10 max-w-xl w-full">
-            <span className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full mb-3 md:mb-4 inline-block shadow-lg shadow-orange-500/30">
-              ⭐ Estrella Delivery
-            </span>
-            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 md:mb-6 leading-tight">
-              Tus favoritos, <br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400">
-                donde quieras.
-              </span>
-            </h1>
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                type="text" 
-                placeholder="¿Qué restaurante buscas hoy?"
-                className="w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-300 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+        {/* Hero Section (Clean Dribbble Style) */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="mb-10 max-w-2xl"
+        >
+          <h1 className="text-[40px] md:text-6xl font-extrabold text-slate-900 mb-8 leading-[1.15] tracking-tight">
+            Tus favoritos, <br/>
+            donde quieras.
+          </h1>
+          
+          <div className="relative w-full max-w-md shadow-sm rounded-full bg-white group hover:shadow-md transition-shadow">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={20} />
+            <input 
+              type="text" 
+              placeholder="¿Qué buscas hoy?"
+              className="w-full bg-transparent border-none rounded-full py-4 pl-14 pr-6 text-[17px] text-slate-900 placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-orange-500/10 transition-all font-semibold"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </motion.div>
+
+        {/* Section Header / Floating Tabs */}
+        <div className="flex flex-wrap gap-3 mb-6 pb-2 pt-2">
+          <button 
+            onClick={() => setActiveTab('todos')}
+            className={`px-6 py-3 rounded-full text-[15px] font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'todos' ? 'bg-white text-slate-900 shadow-[0_4px_20px_rgb(0,0,0,0.08)] scale-105 border border-transparent' : 'bg-slate-200/50 text-slate-500 hover:bg-slate-200 border border-transparent'}`}
+          >
+            <Store size={18} /> Todos los comercios
+          </button>
+          <button 
+            onClick={() => setActiveTab('cerca')}
+            className={`px-6 py-3 rounded-full text-[15px] font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'cerca' ? 'bg-white text-slate-900 shadow-[0_4px_20px_rgb(0,0,0,0.08)] scale-105 border border-transparent' : 'bg-slate-200/50 text-slate-500 hover:bg-slate-200 border border-transparent'}`}
+          >
+            <MapPin size={18} /> Cerca de ti
+          </button>
+          <button 
+            onClick={() => setActiveTab('promos')}
+            className={`px-6 py-3 rounded-full text-[15px] font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'promos' ? 'bg-[#FA4A0C] text-white shadow-[0_4px_20px_rgba(250,74,12,0.3)] scale-105 border border-transparent' : 'bg-[#FA4A0C]/10 text-[#FA4A0C] hover:bg-[#FA4A0C]/20 border border-transparent'}`}
+          >
+            <Ticket size={18} /> Promociones
+          </button>
+        </div>
+
+        {/* Main Content Area */}
+        {activeTab === 'promos' ? (
+          loadingPromos ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="bg-white rounded-[32px] p-4 flex gap-4 items-center shadow-sm">
+                  <div className="w-28 h-28 rounded-[24px] bg-slate-200 animate-pulse shrink-0" />
+                  <div className="flex-1">
+                    <div className="w-3/4 h-5 bg-slate-200 animate-pulse rounded-md mb-2" />
+                    <div className="w-full h-4 bg-slate-200 animate-pulse rounded-md mb-3" />
+                    <div className="w-1/2 h-6 bg-slate-200 animate-pulse rounded-md" />
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        </div>
-
-        {/* Section Header */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Comercios Asociados</h2>
-            <p className="text-slate-500 text-sm mt-1">
-              Descubre lo mejor de Comitán · {restaurantes.length} disponibles
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 rounded-xl bg-white border border-slate-100 text-sm font-bold text-orange-500 shadow-sm">
-              Todos
-            </button>
-            <button className="px-4 py-2 rounded-xl bg-white border border-slate-100 text-sm font-bold text-slate-400 hover:border-orange-400 transition-all">
-              <Filter size={16} />
-            </button>
-          </div>
-        </div>
-
-        {/* Restaurants Grid */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[1,2,3,4,5,6].map(i => (
-              <div key={i} className="bg-white rounded-[2rem] h-72 animate-pulse border border-slate-100 shadow-sm" />
-            ))}
-          </div>
-        ) : filteredRestaurants.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
-            <Store className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-slate-700">Sin resultados</h3>
-            <p className="text-slate-500">Prueba con otra búsqueda o categoría.</p>
-          </div>
+          ) : filteredPromos.length === 0 ? (
+            <div className="text-center py-20 mt-10">
+              <Ticket className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-slate-700">Sin promociones</h3>
+              <p className="text-slate-500 mt-2">No encontramos promociones activas por ahora.</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10 pb-12">
+              {filteredPromos.map((promo, index) => (
+                <motion.div
+                  key={promo.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
+                >
+                  <Link 
+                    to={`/menu/${promo.restaurantes?.slug || promo.restaurantes?.id}?tab=promos`}
+                    className="bg-white/80 backdrop-blur-sm p-4 rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(250,74,12,0.15)] hover:-translate-y-1 transition-all flex gap-5 items-center group border border-white hover:border-[#FA4A0C]/30 relative overflow-hidden h-full"
+                  >
+                    <div className="w-28 h-28 rounded-[24px] overflow-hidden bg-slate-50 shrink-0 relative">
+                      {promo.foto_url ? (
+                        <img src={promo.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" alt={promo.titulo} />
+                      ) : promo.restaurantes?.foto_fachada_url ? (
+                        <img src={promo.restaurantes.foto_fachada_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" alt={promo.restaurantes?.nombre} />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-orange-50 text-orange-300"><Ticket size={32} /></div>
+                      )}
+                      <div className="absolute top-2 left-2 bg-[#FA4A0C] text-white text-[10px] font-black uppercase px-2 py-1 rounded-full shadow-md">
+                        Promo
+                      </div>
+                    </div>
+                    <div className="flex-1 py-1 flex flex-col h-full">
+                      <p className="text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1 line-clamp-1 uppercase tracking-wider"><Store size={10}/> {promo.restaurantes?.nombre}</p>
+                      <h4 className="font-extrabold text-slate-900 text-[16px] leading-tight mb-2 line-clamp-2">{promo.titulo}</h4>
+                      <div className="flex items-center gap-2 mt-auto">
+                        <span className="text-[#FA4A0C] font-black text-[22px] tracking-tight">${promo.precio_especial?.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          )
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
-            {filteredRestaurants.map((res) => (
-              <Link 
-                to={`/menu/${res.slug || res.id}`}
-                key={res.id} 
-                className="group cursor-pointer bg-white rounded-[2rem] border border-slate-100 overflow-hidden hover:border-orange-100 hover:shadow-2xl hover:shadow-orange-500/5 transition-all duration-500 flex flex-col"
-              >
-                <div className="relative h-52 overflow-hidden bg-slate-100">
-                  {res.foto_fachada_url ? (
-                    <img 
-                      src={res.foto_fachada_url} 
-                      alt={res.nombre} 
-                      loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
-                      <Store className="w-12 h-12 text-orange-200" />
-                    </div>
-                  )}
-                  
-                  {/* Badge Abierto/Cerrado */}
-                  <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/20 ${estaAbierto(res.hora_apertura, res.hora_cierre) ? 'bg-green-500 text-white' : 'bg-slate-800/90 text-white'}`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${estaAbierto(res.hora_apertura, res.hora_cierre) ? 'bg-white animate-pulse' : 'bg-red-400'}`} />
-                    {estaAbierto(res.hora_apertura, res.hora_cierre) ? 'Abierto' : 'Cerrado'}
-                  </div>
+          /* Render Todos or Cerca */
+          loading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-20 mt-24">
+              {[1,2,3,4,5,6].map(i => (
+                <div key={i} className="bg-white rounded-[30px] pt-[70px] pb-8 px-4 flex flex-col items-center relative shadow-sm">
+                  <div className="absolute -top-14 w-[120px] h-[120px] rounded-full bg-slate-200 animate-pulse border-[6px] border-[#F6F6F9]" />
+                  <div className="w-3/4 h-6 bg-slate-200 animate-pulse rounded-md mb-3" />
+                  <div className="w-1/2 h-4 bg-slate-200 animate-pulse rounded-md" />
                 </div>
-                
-                <div className="p-7 flex flex-col flex-grow">
-                  <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-orange-500 transition-colors line-clamp-1">
-                    {res.nombre}
-                  </h3>
-                  <p className="text-slate-400 text-[10px] mb-4 font-bold uppercase tracking-[0.1em]">
-                    {res.categorias?.[0] || 'Restaurante'} · {res.hora_apertura?.slice(0,5)} - {res.hora_cierre?.slice(0,5)}
-                  </p>
-                  
-                  {/* Categorías extra */}
-                  {res.categorias && res.categorias.length > 1 && (
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                      {res.categorias.slice(1).map(cat => (
-                        <span key={cat} className="text-[10px] font-bold bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full border border-orange-100">
-                          {cat}
-                        </span>
-                      ))}
+              ))}
+            </div>
+          ) : filteredRestaurants.length === 0 ? (
+            <div className="text-center py-20 mt-10">
+              <h3 className="text-2xl font-bold text-slate-700">Sin resultados</h3>
+              <p className="text-slate-500 mt-2">Prueba con otra búsqueda.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-16 md:gap-y-20 mt-20 pb-12">
+              {(activeTab === 'cerca' ? restaurantesCerca : filteredRestaurants).map((res, index) => (
+                <motion.div
+                  key={res.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
+                >
+                  <Link 
+                    to={`/menu/${res.slug || res.id}`}
+                    className="group relative bg-white/80 backdrop-blur-sm rounded-[30px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(250,74,12,0.15)] transition-all duration-300 pt-[65px] md:pt-[75px] pb-8 px-3 md:px-5 flex flex-col items-center text-center border border-white hover:border-orange-50/50"
+                  >
+                    {/* Plato flotante circular */}
+                    <div className="absolute -top-14 w-[110px] h-[110px] md:w-[130px] md:h-[130px] rounded-full overflow-hidden shadow-[0_15px_35px_-5px_rgba(0,0,0,0.15)] border-[5px] md:border-[6px] border-[#F6F6F9] group-hover:border-white bg-white group-hover:-translate-y-3 transition-all duration-500">
+                      {res.foto_fachada_url ? (
+                        <img 
+                          src={res.foto_fachada_url} 
+                          alt={res.nombre} 
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
+                          <Store className="w-10 h-10 text-orange-300" />
+                        </div>
+                      )}
+                      
+                      {/* Overlay oscurecido levemente si está cerrado */}
+                      {!estaAbierto(res) && (
+                         <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center transition-all">
+                            <span className="text-white text-[10px] md:text-xs font-black tracking-[0.2em] uppercase">Cerrado</span>
+                         </div>
+                      )}
                     </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between pt-5 border-t border-slate-50 mt-auto">
-                    <span className="text-sm font-bold text-orange-500 flex items-center gap-1">
-                      <Star size={13} className="fill-orange-500" />
-                      Más pedido
-                    </span>
-                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-300 group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-red-500 group-hover:text-white transition-all transform group-hover:translate-x-0.5">
-                      <ArrowRight size={18} />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                    
+                    {/* Info */}
+                    <h3 className="text-[17px] md:text-[22px] font-extrabold text-slate-800 mb-1 leading-tight line-clamp-1 group-hover:text-[#FA4A0C] transition-colors tracking-tight mt-2">
+                      {res.nombre}
+                    </h3>
+                    <p className="text-[#FA4A0C] font-bold text-[13px] md:text-[15px] mt-1 opacity-90 mb-3">
+                      {res.categorias?.[0] || 'Restaurante'}
+                    </p>
+                    
+                    {/* Fake distance/time for "Cerca de ti" */}
+                    {activeTab === 'cerca' && estaAbierto(res) && (
+                      <div className="mt-auto bg-slate-100 text-slate-500 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
+                        <Clock size={12} /> 15-20 min
+                      </div>
+                    )}
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          )
         )}
 
-        {/* Load More Button */}
-        {hasMore && !loading && filteredRestaurants.length > 0 && (
+        {/* Load More Button (Only for Todos/Cerca) */}
+        {activeTab !== 'promos' && hasMore && !loading && filteredRestaurants.length > 0 && (
           <div className="flex justify-center mt-4 pb-12">
             <button 
               onClick={handleLoadMore}

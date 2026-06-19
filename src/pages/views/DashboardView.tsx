@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
 import { Utensils, Package, Tag, Loader2, Power, Download } from 'lucide-react'
 import QRCode from 'qrcode'
+import { motion } from 'framer-motion'
+import { AnimatedCounter } from '../../components/AnimatedCounter'
 
 export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   const [stats, setStats] = useState({ platillos: 0, combos: 0, promos: 0 })
@@ -124,40 +126,48 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
 
       {/* ── Tarjetas de Métricas (Top Row) ── */}
       {loading ? (
-        <div className="flex justify-center py-24">
-          <Loader2 size={44} className="animate-spin text-[#FF7A6A]" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="shimmer h-32 rounded-[24px]" />
+          <div className="shimmer h-32 rounded-[24px]" />
+          <div className="shimmer h-32 rounded-[24px]" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-sm">
+          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
             <div>
               <p className="text-sm font-bold text-slate-600 mb-2">Platillos</p>
-              <h3 className="text-4xl font-black text-[#FF7A6A]">{stats.platillos}</h3>
+              <h3 className="text-4xl font-black text-[#FF7A6A]">
+                <AnimatedCounter to={stats.platillos} />
+              </h3>
             </div>
             <div className="text-[#FF7A6A]/30">
               <Utensils size={48} strokeWidth={1.5} />
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-sm">
+          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
             <div>
               <p className="text-sm font-bold text-slate-600 mb-2">Combos Armados</p>
-              <h3 className="text-4xl font-black text-[#FF7A6A]">{stats.combos}</h3>
+              <h3 className="text-4xl font-black text-[#FF7A6A]">
+                <AnimatedCounter to={stats.combos} />
+              </h3>
             </div>
             <div className="text-[#FF7A6A]/30">
               <Package size={48} strokeWidth={1.5} />
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-sm">
+          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
             <div>
               <p className="text-sm font-bold text-slate-600 mb-2">Promociones</p>
-              <h3 className="text-4xl font-black text-[#FF7A6A]">{stats.promos}</h3>
+              <h3 className="text-4xl font-black text-[#FF7A6A]">
+                <AnimatedCounter to={stats.promos} />
+              </h3>
             </div>
             <div className="text-[#FF7A6A]/30">
               <Tag size={48} strokeWidth={1.5} />
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 

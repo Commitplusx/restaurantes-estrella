@@ -36,6 +36,16 @@ export type CartItem = {
   cartItemId: string;
 }
 
+// CACHE GLOBAL PARA CARGA INSTANTÁNEA
+const menuCache: Record<string, {
+  restaurante: Restaurante;
+  categorias: MenuCategoria[];
+  items: MenuItem[];
+  combos: MenuCombo[];
+  promos: MenuPromocion[];
+  timestamp: number;
+}> = {}
+
 export function PublicMenuView() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -100,7 +110,7 @@ export function PublicMenuView() {
   useEffect(() => {
     let isMounted = true
 
-    async function load() {
+    async function fetchMenuData(silently = false) {
       if (!id) return
 
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
@@ -118,15 +128,12 @@ export function PublicMenuView() {
       }
 
       if (!rest) {
-        if (isMounted) {
+        if (isMounted && !silently) {
           navigate('/?error=notfound', { replace: true })
         }
-        return
+        return null
       }
 
-      if (isMounted) setRestaurante(rest)
-
-      // Use rest.id since the URL param 'id' might be a slug
       const actualId = rest.id;
 
       const [{ data: cats }, { data: prods }, { data: cmbs }, { data: prms }] = await Promise.all([
@@ -136,28 +143,97 @@ export function PublicMenuView() {
         supabase.from('menu_promociones').select('*').eq('restaurante_id', actualId).eq('activa', true)
       ])
 
+      const validPromos = (prms || []).filter(p => !p.fecha_fin || new Date(p.fecha_fin) >= new Date())
+
+      // Guardar en caché
+      menuCache[id] = {
+        restaurante: rest,
+        categorias: cats || [],
+        items: prods || [],
+        combos: cmbs || [],
+        promos: validPromos,
+        timestamp: Date.now()
+      }
+
       if (isMounted) {
+        setRestaurante(rest)
         setCategorias(cats || [])
         setItems(prods || [])
         setCombos(cmbs || [])
-        const validPromos = (prms || []).filter(p => !p.fecha_fin || new Date(p.fecha_fin) >= new Date())
         setPromos(validPromos)
-        setLoading(false)
+        
+        if (!silently) {
+          setLoading(false)
+          // Solo auto-seleccionar pestaña en la primera carga si no es silencioso
+          const hasItems = (prods || []).length > 0
+          const hasCombos = (cmbs || []).length > 0
+          const hasValidPromos = validPromos.length > 0
+          if (!hasItems && hasCombos) setActiveTab('combos')
+          else if (!hasItems && !hasCombos && hasValidPromos) setActiveTab('promos')
+          else setActiveTab('menu')
+        }
+      }
+      
+      return actualId
+    }
 
-        // Bug #3: auto-select best available tab
-        const hasItems = (prods || []).length > 0
-        const hasCombos = (cmbs || []).length > 0
-        const hasValidPromos = validPromos.length > 0
-        if (!hasItems && hasCombos) setActiveTab('combos')
-        else if (!hasItems && !hasCombos && hasValidPromos) setActiveTab('promos')
-        else setActiveTab('menu')
+    async function load() {
+      // 1. Revisar caché local para carga instantánea en 0ms
+      if (id && menuCache[id]) {
+        const cached = menuCache[id]
+        setRestaurante(cached.restaurante)
+        setCategorias(cached.categorias)
+        setItems(cached.items)
+        setCombos(cached.combos)
+        setPromos(cached.promos)
+        setLoading(false)
+        
+        // Ejecutar fetch silencioso en background para actualizar caché si pasaron más de 1 min
+        if (Date.now() - cached.timestamp > 60000) {
+          fetchMenuData(true)
+        }
+      } else {
+        await fetchMenuData()
+      }
+
+      // 2. Configurar Supabase Realtime para este restaurante
+      // Solo nos suscribimos si ya tenemos el ID real del restaurante
+      let actualRestId = id
+      if (id && menuCache[id]) {
+        actualRestId = menuCache[id].restaurante.id
+      } else if (restaurante) {
+        actualRestId = restaurante.id
+      }
+
+      // Creamos el canal de realtime
+      const realtimeChannel = supabase.channel(`public:menu_updates:${actualRestId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `restaurante_id=eq.${actualRestId}` }, () => {
+          fetchMenuData(true) // Silencioso
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_combos', filter: `restaurante_id=eq.${actualRestId}` }, () => {
+          fetchMenuData(true)
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_promociones', filter: `restaurante_id=eq.${actualRestId}` }, () => {
+          fetchMenuData(true)
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes', filter: `id=eq.${actualRestId}` }, () => {
+          fetchMenuData(true)
+        })
+        .subscribe()
+
+      // Limpiar canal al desmontar
+      return () => {
+        supabase.removeChannel(realtimeChannel)
       }
     }
 
-    load()
+    const cleanupRealtime = load()
 
     return () => {
       isMounted = false
+      cleanupRealtime.then(cleanup => {
+        if (typeof cleanup === 'function') cleanup()
+      })
     }
   }, [id])
 
@@ -253,8 +329,59 @@ export function PublicMenuView() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
-      <Loader2 className="animate-spin text-[#FF7A6A] w-10 h-10" />
+    <div className="min-h-screen bg-[#F6F6F9] font-sans pb-32">
+      {/* Topbar Skeleton */}
+      <header className="sticky top-0 bg-white/80 border-b border-slate-50/50 py-3 px-4 md:px-10 flex items-center gap-3">
+        <div className="w-10 h-10 bg-slate-200 animate-pulse rounded-[20px] shrink-0" />
+        <div className="flex-1">
+          <div className="w-32 h-5 bg-slate-200 animate-pulse rounded-md mb-1" />
+          <div className="w-24 h-3 bg-slate-200 animate-pulse rounded-md hidden sm:block" />
+        </div>
+        <div className="w-24 h-10 bg-slate-200 animate-pulse rounded-[20px]" />
+      </header>
+
+      {/* Hero Skeleton */}
+      <div className="relative w-full h-[30vh] md:h-[45vh] bg-slate-200 animate-pulse" />
+
+      <div className="max-w-[1000px] mx-auto px-6 relative -mt-16 md:-mt-24 z-10">
+        {/* Info Card Skeleton */}
+        <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] mb-8 flex flex-col md:flex-row gap-6 md:items-center">
+          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-slate-200 animate-pulse shadow-sm shrink-0" />
+          <div className="flex-1">
+            <div className="w-48 h-8 bg-slate-200 animate-pulse rounded-lg mb-3" />
+            <div className="w-64 h-4 bg-slate-200 animate-pulse rounded-md mb-4" />
+            <div className="flex gap-4">
+              <div className="w-16 h-4 bg-slate-200 animate-pulse rounded-md" />
+              <div className="w-16 h-4 bg-slate-200 animate-pulse rounded-md" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs Skeleton */}
+        <div className="flex gap-8 mb-10 border-b border-slate-200/50 pb-4">
+          <div className="w-20 h-6 bg-slate-200 animate-pulse rounded-md" />
+          <div className="w-20 h-6 bg-slate-200 animate-pulse rounded-md" />
+          <div className="w-20 h-6 bg-slate-200 animate-pulse rounded-md" />
+        </div>
+
+        {/* Grid Skeleton */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-white/80 p-4 rounded-[32px] flex gap-4 items-center">
+              <div className="w-24 h-24 rounded-[24px] bg-slate-200 animate-pulse shrink-0" />
+              <div className="flex-1">
+                <div className="w-3/4 h-5 bg-slate-200 animate-pulse rounded-md mb-2" />
+                <div className="w-1/4 h-5 bg-slate-200 animate-pulse rounded-md mb-3" />
+                <div className="w-full h-3 bg-slate-200 animate-pulse rounded-md mb-1" />
+                <div className="w-2/3 h-3 bg-slate-200 animate-pulse rounded-md mb-4" />
+                <div className="flex justify-between items-center mt-2">
+                  <div className="w-20 h-8 bg-slate-200 animate-pulse rounded-[20px]" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 
@@ -268,7 +395,7 @@ export function PublicMenuView() {
   )
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-[#FF7A6A]/20">
+    <div className="min-h-screen bg-[#F6F6F9] text-slate-900 selection:bg-[#FA4A0C]/20 font-sans pb-32">
 
       {/* TOPBAR */}
       <header className="sticky top-0 bg-white/80 backdrop-blur-xl z-50 border-b border-slate-50/50 py-3 px-4 md:px-10 flex items-center gap-3 shadow-sm">
@@ -305,140 +432,91 @@ export function PublicMenuView() {
         </button>
       </header>
 
-      <div className="max-w-[1400px] mx-auto px-4 py-4 md:p-12">
+      {/* HERO FULL BLEED (Dribbble Style) */}
+      <div className="relative w-full h-[30vh] md:h-[45vh] bg-slate-900 overflow-hidden">
+        {restaurante.foto_fachada_url ? (
+          <img
+            src={restaurante.foto_fachada_url}
+            className="w-full h-full object-cover opacity-60 mix-blend-overlay"
+            alt={restaurante.nombre}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-r from-orange-400 to-red-500 opacity-60 mix-blend-overlay" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F6F6F9] via-[#F6F6F9]/20 to-transparent" />
+      </div>
 
-        {/* INFO DEL RESTAURANTE — compacto en móvil, sidebar en desktop */}
+      <div className="max-w-[1000px] mx-auto px-6 relative -mt-16 md:-mt-24 z-10">
 
-        {/* MOBILE: tarjeta horizontal compacta */}
-        <div className="lg:hidden mb-4">
-          <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-3 flex items-center gap-3">
-            {/* Foto pequeña */}
-            <div className="w-14 h-14 rounded-[20px] overflow-hidden bg-[#FF7A6A]/10 shrink-0 flex items-center justify-center">
-              {restaurante.foto_fachada_url ? (
-                <img src={restaurante.foto_fachada_url} className="w-full h-full object-contain" alt={restaurante.nombre} />
-              ) : (
-                <Store size={22} className="text-orange-300" />
+        {/* RESTAURANT INFO CARD */}
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, type: "spring", bounce: 0.4 }}
+          className="bg-white/80 backdrop-blur-xl rounded-[40px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] p-6 md:p-10 flex flex-col md:flex-row items-center md:items-start gap-6 border border-white mb-10 text-center md:text-left"
+        >
+          {/* Logo (opcional, extraemos de la foto si no hay otra) */}
+          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden shadow-xl border-[6px] border-white bg-orange-50 shrink-0 flex items-center justify-center -mt-16 md:-mt-20">
+            {restaurante.foto_fachada_url ? (
+               <img src={restaurante.foto_fachada_url} className="w-full h-full object-cover" alt="Logo" />
+            ) : (
+               <Store className="w-12 h-12 text-orange-300" />
+            )}
+          </div>
+          
+          <div className="flex-1">
+            <h1 className="text-3xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-2">
+              {restaurante.nombre}
+            </h1>
+            <p className="text-slate-500 font-medium mb-4 flex items-center justify-center md:justify-start gap-2">
+               <MapPin size={16} /> {restaurante.direccion || 'Comitán, Chiapas'}
+            </p>
+            
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+              <span className="flex items-center gap-1.5 bg-[#FA4A0C]/10 text-[#FA4A0C] font-black text-xs px-4 py-2 rounded-full border border-[#FA4A0C]/20">
+                <Clock size={14} /> {restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}
+              </span>
+              {restaurante.categorias?.slice(0,2).map(cat => (
+                <span key={cat} className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 px-3 py-2 rounded-full">
+                  {cat}
+                </span>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* TABS DE NAVEGACIÓN (Sticky Clean UI) */}
+        {(combos.length > 0 || promos.length > 0) && (
+          <div className="sticky top-[70px] z-40 bg-[#F6F6F9]/90 backdrop-blur-md pt-4 pb-2 mb-8 border-b border-slate-200/50">
+            <div className="flex overflow-x-auto hide-scrollbar gap-8">
+              <button
+                onClick={() => setActiveTab('menu')}
+                className={`pb-3 text-[17px] font-semibold transition-all relative shrink-0 ${activeTab === 'menu' ? 'text-[#FA4A0C]' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                🍽️ Menú
+                {activeTab === 'menu' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FA4A0C] rounded-t-full" />}
+              </button>
+              {combos.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('combos')}
+                  className={`pb-3 text-[17px] font-semibold transition-all relative shrink-0 ${activeTab === 'combos' ? 'text-[#FA4A0C]' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  ⭐ Combos
+                  {activeTab === 'combos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FA4A0C] rounded-t-full" />}
+                </button>
+              )}
+              {promos.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('promos')}
+                  className={`pb-3 text-[17px] font-semibold transition-all relative shrink-0 ${activeTab === 'promos' ? 'text-[#FA4A0C]' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  🔥 Promos
+                  {activeTab === 'promos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FA4A0C] rounded-t-full" />}
+                </button>
               )}
             </div>
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <p className="font-black text-slate-900 text-sm truncate">{restaurante.nombre}</p>
-              <p className="text-[11px] text-slate-400 truncate">{restaurante.direccion || 'Comitán, Chiapas'}</p>
-              <p className="text-[11px] text-[#FF7A6A] font-bold">
-                {restaurante.hora_apertura?.slice(0, 5)} – {restaurante.hora_cierre?.slice(0, 5)}
-              </p>
-            </div>
-            {/* Categorias */}
-            {restaurante.categorias?.[0] && (
-              <span className="text-[9px] font-black uppercase tracking-wider bg-[#FF7A6A]/10 text-[#FF7A6A] px-2 py-1 rounded-full border border-[#FF7A6A]/20 shrink-0">
-                {restaurante.categorias[0]}
-              </span>
-            )}
           </div>
-        </div>
-
-        <div className="flex flex-col lg:flex-row gap-8">
-
-          {/* SIDEBAR INFO — solo visible en desktop */}
-          <div className="hidden lg:block lg:w-1/3">
-            <div className="sticky top-24 space-y-6">
-              <div className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm">
-                {/* Foto del restaurante */}
-                <div className="h-48 w-full bg-slate-100 overflow-hidden flex items-center justify-center">
-                  {restaurante.foto_fachada_url ? (
-                    <img
-                      src={restaurante.foto_fachada_url}
-                      className="w-full h-full object-contain"
-                      alt={restaurante.nombre}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#FF7A6A]/10 to-[#FF7A6A]/20">
-                      <Store size={48} className="text-orange-300" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-8">
-                  {restaurante.categorias && restaurante.categorias.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {restaurante.categorias.map(cat => (
-                        <span key={cat} className="text-[10px] font-black uppercase tracking-widest bg-[#FF7A6A]/10 text-[#ff6250] px-3 py-1 rounded-full border border-[#FF7A6A]/20">
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="space-y-5">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-[#FF7A6A]/10 rounded-[20px] text-[#FF7A6A]"><Clock size={18} /></div>
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-black uppercase">Horario</p>
-                        <p className="font-bold text-sm text-slate-700">{restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-amber-50 rounded-[20px] text-amber-500"><MapPin size={18} /></div>
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-black uppercase">Ubicación</p>
-                        <p className="font-bold text-sm text-slate-700">{restaurante.direccion || 'Comitán, Chiapas'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 pt-8 border-t border-slate-50">
-                    <button
-                      onClick={() => setIsCartOpen(true)}
-                      className="w-full bg-slate-900 text-white py-4 rounded-[24px] font-bold flex items-center justify-center gap-3 hover:bg-[#FF7A6A] transition-all shadow-xl shadow-slate-100"
-                    >
-                      <ShoppingBag size={20} />
-                      Ver Carrito ({cartCount})
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* MAIN MENU */}
-          <div className="w-full lg:w-2/3">
-
-            {/* TABS DE NAVEGACIÓN */}
-            {(combos.length > 0 || promos.length > 0) && (
-              <div className="flex gap-2 mb-6 p-1.5 bg-white rounded-[24px] border border-slate-100 shadow-sm w-fit max-w-full overflow-x-auto">
-                <button
-                  onClick={() => setActiveTab('menu')}
-                  className={`px-5 py-2.5 rounded-[20px] text-sm font-bold transition-all ${activeTab === 'menu'
-                    ? 'bg-slate-900 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-700'
-                    }`}
-                >
-                  🍽️ Menú
-                </button>
-                {combos.length > 0 && (
-                  <button
-                    onClick={() => setActiveTab('combos')}
-                    className={`px-5 py-2.5 rounded-[20px] text-sm font-bold transition-all ${activeTab === 'combos'
-                      ? 'bg-slate-900 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-700'
-                      }`}
-                  >
-                    ⭐ Combos
-                  </button>
-                )}
-                {promos.length > 0 && (
-                  <button
-                    onClick={() => setActiveTab('promos')}
-                    className={`px-5 py-2.5 rounded-[20px] text-sm font-bold transition-all ${activeTab === 'promos'
-                      ? 'bg-[#FF7A6A] text-white shadow-md shadow-[#FF7A6A]/20'
-                      : 'text-slate-400 hover:text-slate-700'
-                      }`}
-                  >
-                    🔥 Promos
-                  </button>
-                )}
-              </div>
-            )}
+        )}
 
             {/* PRODUCT CATEGORIES (MENU TAB) */}
             {activeTab === 'menu' && (
@@ -454,17 +532,23 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4 }}
                     >
-                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                        <span className="w-1.5 h-6 bg-[#FF7A6A] rounded-full" />
+                      <h3 className="text-[22px] font-extrabold text-slate-900 mb-6 flex items-center gap-3 tracking-tight">
+                        <span className="w-1.5 h-6 bg-[#FA4A0C] rounded-full" />
                         {cat.emoji} {cat.nombre}
                       </h3>
-                      <div className="grid gap-4">
-                        {catItems.map(item => {
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {catItems.map((item, index) => {
                           const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
                           const cantTotal = getCantidadTotal(item.id, 'item')
                           return (
-                            <div key={item.id} className="bg-white p-5 rounded-[32px] border-none shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(255,122,106,0.12)] hover:-translate-y-1 transition-all flex gap-6 items-center group">
-                              <div className="w-24 h-24 md:w-28 md:h-28 rounded-[24px] overflow-hidden bg-slate-50 shrink-0 cursor-pointer" onClick={() => {
+                            <motion.div
+                              key={item.id}
+                              initial={{ opacity: 0, y: 30 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
+                              className="bg-white/80 backdrop-blur-sm p-4 rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(250,74,12,0.15)] hover:-translate-y-1 transition-all flex gap-4 items-center group border border-white hover:border-orange-50/50"
+                            >
+                              <div className="w-24 h-24 rounded-[24px] overflow-hidden bg-slate-50 shrink-0 cursor-pointer shadow-inner" onClick={() => {
                                 if (item.opciones && item.opciones.length > 0) {
                                   setSelectedItemForOptions(item)
                                   setSelectedOptionsState({})
@@ -473,7 +557,7 @@ export function PublicMenuView() {
                                 }
                               }}>
                                 {item.foto_url ? (
-                                  <img src={item.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt={item.nombre} />
+                                  <img src={item.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" alt={item.nombre} />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-slate-200"><Store size={32} /></div>
                                 )}
@@ -511,14 +595,14 @@ export function PublicMenuView() {
                                   ) : (
                                     <button
                                       onClick={() => addToCart({ ...cartItem, cartItemId: item.id })}
-                                      className="bg-slate-900 hover:bg-[#FF7A6A] text-white font-bold text-xs px-6 py-2.5 rounded-[20px] transition-all flex items-center gap-2"
+                                      className="bg-slate-900 hover:bg-[#FA4A0C] text-white font-bold text-xs px-5 py-2.5 rounded-[20px] transition-all flex items-center gap-2 shadow-lg shadow-slate-900/20"
                                     >
                                       <Plus size={16} /> Añadir
                                     </button>
                                   )}
                                 </div>
                               </div>
-                            </div>
+                            </motion.div>
                           )
                         })}
                       </div>
@@ -586,40 +670,40 @@ export function PublicMenuView() {
 
             {/* PROMOS TAB */}
             {activeTab === 'promos' && (
-              <div className="grid gap-6">
-                {promos.map(promo => {
+              <div className="grid md:grid-cols-2 gap-6">
+                {promos.map((promo, index) => {
                   const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined, cartItemId: promo.id }
                   const cantTotal = getCantidadTotal(promo.id, 'promo')
                   return (
                     <motion.div
                       key={promo.id}
-                      className="bg-white p-5 rounded-[2rem] border border-red-100 shadow-sm flex flex-col md:flex-row gap-6 items-center group relative overflow-hidden"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3 }}
+                      className="bg-white/80 backdrop-blur-sm p-4 rounded-[32px] border border-[#FA4A0C]/10 shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(250,74,12,0.15)] flex flex-col md:flex-row gap-4 items-center group relative overflow-hidden transition-all"
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
                     >
-                      <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-widest">Oferta</div>
-                      <div className="w-full md:w-36 h-36 rounded-[24px] overflow-hidden bg-slate-50 shrink-0">
+                      <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[10px] font-black px-4 py-1 rounded-bl-[20px] z-10 shadow-lg">PROMO</div>
+                      <div className="w-full md:w-32 h-32 rounded-[24px] overflow-hidden bg-slate-50 shrink-0">
                         {promo.foto_url ? (
-                          <img src={promo.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={promo.titulo} />
+                          <img src={promo.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" alt={promo.titulo} />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-200"><Flame size={40} /></div>
+                          <div className="w-full h-full flex items-center justify-center text-slate-200"><Flame size={40} className="text-[#FA4A0C]/50" /></div>
                         )}
                       </div>
-                      <div className="flex-1 text-center md:text-left">
-                        <h4 className="font-bold text-slate-900 text-xl mb-1">{promo.titulo}</h4>
-                        <p className="text-slate-400 text-sm mb-4 line-clamp-2">{promo.descripcion}</p>
-                        <div className="flex items-center justify-between mt-2 w-full">
-                          <span className="text-red-500 font-black text-2xl">${promo.precio_especial?.toFixed(2)}</span>
+                      <div className="flex-1 w-full">
+                        <h4 className="font-extrabold text-slate-900 text-lg mb-1 leading-tight">{promo.titulo}</h4>
+                        <p className="text-slate-400 text-xs mb-3 line-clamp-2">{promo.descripcion}</p>
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-[#FA4A0C] font-black text-xl">${promo.precio_especial?.toFixed(2)}</span>
                           <div>
                             {cantTotal > 0 ? (
                               <div className="flex items-center gap-3 bg-slate-100 rounded-[20px] px-2 py-1">
-                                <button onClick={() => removeFromCart(promo.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-red-600"><Minus size={14} /></button>
+                                <button onClick={() => removeFromCart(promo.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-[#FA4A0C]"><Minus size={14} /></button>
                                 <span className="font-bold text-sm w-4 text-center">{cantTotal}</span>
-                                <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-red-500 rounded-lg text-white"><Plus size={14} /></button>
+                                <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-[#FA4A0C] rounded-lg text-white"><Plus size={14} /></button>
                               </div>
                             ) : (
-                              <button onClick={() => addToCart(cartItem)} className="bg-slate-900 hover:bg-[#FF7A6A] text-white font-bold text-xs px-6 py-2.5 rounded-[20px] transition-all">Añadir</button>
+                              <button onClick={() => addToCart(cartItem)} className="bg-slate-900 hover:bg-[#FA4A0C] text-white font-bold text-xs px-5 py-2.5 rounded-[20px] transition-all shadow-lg shadow-slate-900/20 flex items-center gap-2"><Plus size={16}/> Añadir</button>
                             )}
                           </div>
                         </div>
@@ -630,189 +714,155 @@ export function PublicMenuView() {
               </div>
             )}
           </div>
+{/* Fin Contenedor Central */}
+
+      {/* FOOTER PÚBLICO */}
+      <footer className="bg-white border-t border-slate-100 py-16 px-10 relative z-10 mt-10">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="text-center md:text-left">
+            <div className="flex items-center gap-2 mb-3 justify-center md:justify-start">
+              <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center shadow">
+                <Store className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="text-lg font-black text-slate-800 tracking-tighter">
+                Estrella<span className="text-orange-500">Delivery</span>
+              </span>
+            </div>
+            <p className="text-slate-400 text-sm font-medium">La mejor selección gastronómica de Comitán.</p>
+          </div>
+          <div className="flex gap-12">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-900">Ayuda</p>
+              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Soporte 24/7</a>
+              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Seguridad</a>
+            </div>
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-900">Legal</p>
+              <a href="/terminos" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Términos</a>
+              <a href="/terminos" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Privacidad</a>
+            </div>
+          </div>
         </div>
-      </div>
+      </footer>
 
-      {/* CARRITO DRAWER (RIGHT SIDE) */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 z-[100] transition-opacity duration-500">
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setIsCartOpen(false)}
-            />
-            <motion.div
-              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="absolute top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col"
-            >
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
-                <h2 className="text-xl font-black flex items-center gap-3">
-                  Tu Carrito <span className="text-sm font-black bg-[#FF7A6A] text-white px-2.5 py-0.5 rounded-lg">{cartCount}</span>
-                </h2>
-                <button onClick={closeCart} className="p-2 hover:bg-slate-100 rounded-[20px] transition-colors text-slate-500">
-                  <X size={22} />
-                </button>
+      {/* Floating Cart Button en Mobile */}
+      {cartCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 sm:hidden">
+          <motion.button 
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-[#FA4A0C] text-white px-8 py-3.5 rounded-full font-bold shadow-xl shadow-[#FA4A0C]/30 flex items-center gap-3 text-sm"
+            onClick={() => setIsCartOpen(true)}
+          >
+            <ShoppingBag size={18} />
+            Ver Carrito • {cartCount} items
+          </motion.button>
+        </div>
+      )}
+
+{/* Drawer de Carrito y modal de opciones */}
+  <AnimatePresence>
+    {isCartOpen && (
+      <>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100]" onClick={closeCart} />
+        <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', bounce: 0, duration: 0.4 }} className="fixed top-0 right-0 h-full w-full max-w-md bg-white z-[110] shadow-2xl flex flex-col">
+          
+          <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Tu Pedido</h2>
+              <p className="text-slate-500 text-sm">{restaurante.nombre}</p>
+            </div>
+            <button onClick={closeCart} className="p-2.5 bg-white rounded-full text-slate-400 hover:text-slate-700 shadow-sm"><X size={20} /></button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 bg-white hide-scrollbar">
+            {carrito.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
+                <ShoppingBag size={48} className="text-slate-300 mb-4" />
+                <p className="text-slate-500 font-medium">Tu carrito está vacío</p>
+                <button onClick={closeCart} className="mt-6 px-6 py-2.5 bg-slate-100 text-slate-600 rounded-full font-bold text-sm">Ver menú</button>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                {carrito.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
-                    <ShoppingBag size={64} className="mb-4" />
-                    <p className="font-bold text-xl">Tu carrito está vacío</p>
-                    <p className="text-sm">¡Agrega algo delicioso!</p>
-                  </div>
-                ) : (
-                  carrito.map(p => (
-                    <div key={p.item.id + p.item.tipo} className="flex gap-3 items-center">
-                      {/* Bug #4: show product image if available */}
-                      <div className="w-14 h-14 rounded-[20px] bg-slate-50 overflow-hidden shrink-0 border border-slate-100 flex items-center justify-center">
-                        {p.item.foto_url ? (
-                          <img src={p.item.foto_url} className="w-full h-full object-cover" alt={p.item.nombre} />
-                        ) : (
-                          <Store size={20} className="text-slate-300" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start mb-1">
-                          <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{p.item.nombre}</h4>
-                          <span className="font-black text-[#ff6250] text-sm shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
-                        </div>
-                        {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                          <div className="text-[11px] text-slate-500 mb-1 leading-tight">
-                            {p.item.opcionesSeleccionadas.map(o => o.opcion).join(', ')}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <button onClick={() => removeFromCart(p.item.cartItemId)} className="p-1.5 bg-slate-100 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"><Minus size={13} /></button>
-                          <span className="font-black text-sm w-5 text-center">{p.cantidad}</span>
-                          <button onClick={() => addToCart(p.item)} className="p-1.5 bg-slate-100 hover:bg-[#FF7A6A]/10 rounded-lg text-slate-400 hover:text-[#FF7A6A] transition-colors"><Plus size={13} /></button>
-                          <span className="text-[11px] text-slate-400 ml-1">${p.item.precio.toFixed(2)} c/u</span>
-                        </div>
-                      </div>
+            ) : (
+              <div className="space-y-6">
+                {carrito.map((p, i) => (
+                  <div key={i} className="flex gap-4 p-4 rounded-[24px] bg-slate-50 border border-slate-100">
+                    <div className="w-16 h-16 rounded-[16px] overflow-hidden bg-white shrink-0">
+                      {p.item.foto_url ? <img src={p.item.foto_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-slate-100"><Store size={20} className="text-slate-300"/></div>}
                     </div>
-                  ))
-                )}
-              </div>
-
-              {carrito.length > 0 && (
-                <div className="p-6 bg-white border-t border-slate-100 space-y-4">
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      placeholder="Tu nombre completo *"
-                      value={clienteNombre}
-                      onChange={e => setClienteNombre(e.target.value)}
-                      className="w-full p-3.5 rounded-[24px] border border-slate-200 focus:border-[#FF7A6A] outline-none text-sm bg-slate-50"
-                    />
-                    <div>
-                      <input
-                        type="tel"
-                        placeholder="WhatsApp (10 dígitos) *"
-                        value={clienteTel}
-                        onChange={e => { setClienteTel(e.target.value); setTelError(false) }}
-                        className={`w-full p-3.5 rounded-[24px] border outline-none text-sm bg-slate-50 transition-colors ${telError
-                          ? 'border-red-400 focus:border-red-500 bg-red-50'
-                          : 'border-slate-200 focus:border-[#FF7A6A]'
-                          }`}
-                      />
-                      {telError && <p className="text-red-500 text-xs mt-1 ml-1">Ingresa un número válido de 10 dígitos</p>}
-                    </div>
-
-                    {/* CUPÓN DE DESCUENTO */}
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Ticket size={16} className={`${cuponValido ? 'text-green-500' : 'text-orange-400'}`} />
-                      </div>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="¿Tienes cupón? Ingrésalo"
-                          value={cuponCliente}
-                          onChange={e => {
-                            setCuponCliente(e.target.value.toUpperCase());
-                            if (cuponValido) { setCuponValido(false); setDescuento(0); }
-                          }}
-                          disabled={validandoCupon}
-                          className={`w-full pl-9 p-3.5 rounded-[24px] border outline-none text-sm uppercase placeholder:normal-case font-mono transition-colors ${cuponValido ? 'border-green-400 bg-green-50/50 text-green-700' : 'border-[#FF7A6A]/20 focus:border-[#FF7A6A] bg-[#FF7A6A]/10/30'}`}
-                        />
-                        <button
-                          onClick={validarCuponBtn}
-                          disabled={!cuponCliente || validandoCupon || cuponValido}
-                          className="bg-slate-900 text-white px-4 rounded-[20px] font-bold text-sm disabled:opacity-50 transition-colors hover:bg-[#ff6250] flex items-center gap-2 shrink-0"
-                        >
-                          {validandoCupon ? <Loader2 size={16} className="animate-spin" /> : 'Aplicar'}
-                        </button>
-                      </div>
-                      {cuponValido && (
-                        <p className="text-xs font-bold text-green-600 mt-1 ml-1">✓ Cupón verificado (-${descuento.toFixed(2)})</p>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-slate-900 text-sm leading-tight mb-1">{p.item.nombre}</h4>
+                      {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
+                        <div className="mb-2">
+                          {p.item.opcionesSeleccionadas.map((opt, idx) => (
+                            <p key={idx} className="text-[10px] text-slate-500">+ {opt.opcion} {opt.precio_extra > 0 && `(+$${opt.precio_extra})`}</p>
+                          ))}
+                        </div>
                       )}
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="font-black text-[#FA4A0C]">${(p.item.precio * p.cantidad).toFixed(2)}</span>
+                        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-[12px] px-1 py-1">
+                          <button onClick={() => removeFromCart(p.item.cartItemId)} className="p-1 rounded-md text-slate-400 hover:text-[#FA4A0C]"><Minus size={12} /></button>
+                          <span className="font-bold text-xs w-3 text-center">{p.cantidad}</span>
+                          <button onClick={() => addToCart(p.item)} className="p-1 bg-[#FA4A0C] rounded-md text-white"><Plus size={12} /></button>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                ))}
+                
+                <div className="bg-[#FA4A0C]/5 rounded-[24px] p-5 border border-[#FA4A0C]/10 mt-6">
+                  <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2"><Ticket size={16} className="text-[#FA4A0C]"/> ¿Tienes un cupón?</h4>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Código de cupón" value={cuponCliente} onChange={e => {setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0)}} className="flex-1 bg-white border border-slate-200 rounded-[12px] px-3 py-2 text-sm uppercase outline-none focus:border-[#FA4A0C] font-bold" disabled={validandoCupon} />
+                    <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-slate-900 text-white px-4 py-2 rounded-[12px] text-xs font-bold disabled:opacity-50">{validandoCupon ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Aplicar'}</button>
+                  </div>
+                  {cuponValido && <p className="text-green-600 text-[11px] font-bold mt-2 flex items-center gap-1"><CheckCircle2 size={12}/> Cupón aplicado: -$${descuento.toFixed(2)}</p>}
+                </div>
 
-                  <div className="pt-3 border-t border-slate-100">
-                    <div className="flex justify-between items-center text-slate-500 mb-2 text-sm font-bold">
-                      <span>Subtotal</span>
-                      <span className="text-slate-900">${subtotal.toFixed(2)}</span>
-                    </div>
-                    {descuento > 0 && (
-                      <div className="flex justify-between items-center text-green-600 mb-3 text-sm font-bold">
-                        <span className="flex items-center gap-1"><Ticket size={14} /> Descuento</span>
-                        <span>-${descuento.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center text-slate-900 font-black text-xl mb-4 pt-3 border-t border-slate-100">
-                      <span>Total</span>
-                      <span className="text-[#ff6250]">${total.toFixed(2)}</span>
-                    </div>
-                    <button
-                      onClick={handlePedir}
-                      disabled={procesando}
-                      className="w-full bg-[#FF7A6A] hover:bg-[#ff6250] disabled:opacity-60 text-white font-black py-4 rounded-[24px] shadow-lg shadow-[#FF7A6A]/20 transition-all flex items-center justify-center gap-3 active:scale-95"
-                    >
-                      {procesando ? <Loader2 className="animate-spin" size={20} /> : <MessageCircle size={20} />}
-                      {procesando ? 'Procesando...' : 'Confirmar por WhatsApp'}
-                    </button>
+                <div className="pt-4 border-t border-slate-100 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tu Nombre</label>
+                    <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-slate-50 border border-slate-200 rounded-[16px] px-4 py-3 outline-none focus:border-[#FA4A0C] focus:bg-white transition-all font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tu Teléfono (WhatsApp)</label>
+                    <input type="tel" value={clienteTel} onChange={(e) => {setClienteTel(e.target.value); setTelError(false);}} placeholder="10 dígitos" maxLength={10} className={`w-full bg-slate-50 border rounded-[16px] px-4 py-3 outline-none transition-all font-medium ${telError ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-slate-200 focus:border-[#FA4A0C] focus:bg-white'}`} />
+                    {telError && <p className="text-red-500 text-[10px] font-bold mt-1.5 flex items-center gap-1"><AlertCircle size={10} /> Ingrese un número a 10 dígitos válido</p>}
                   </div>
                 </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* MOBILE FLOATING CART BUTTON */}
-      <AnimatePresence>
-        {carrito.length > 0 && !isCartOpen && (
-          <motion.div 
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-8 left-0 right-0 z-50 px-6 md:hidden"
-          >
-            <motion.button
-              key={cartCount}
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              onClick={() => setIsCartOpen(true)}
-              className="w-full bg-[#FF7A6A] text-white py-4 rounded-[24px] font-black shadow-[0_20px_40px_rgba(255,122,106,0.3)] flex items-center justify-between px-6"
-            >
-              <div className="flex items-center gap-3">
-                <ShoppingBag />
-                <span>Ver Carrito ({cartCount})</span>
               </div>
-              <span>${subtotal.toFixed(2)}</span>
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            )}
+          </div>
+
+          <div className="p-6 bg-white border-t border-slate-100 shrink-0">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-slate-500 font-medium">Subtotal</span>
+              <span className="font-bold text-slate-700">${subtotal.toFixed(2)}</span>
+            </div>
+            {descuento > 0 && (
+              <div className="flex justify-between items-center mb-2 text-green-600">
+                <span className="font-bold flex items-center gap-1"><Ticket size={14}/> Descuento</span>
+                <span className="font-bold">-${descuento.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-end mb-6 pt-2 border-t border-slate-50">
+              <span className="text-slate-900 font-bold">Total a pagar</span>
+              <span className="text-3xl font-black text-[#FA4A0C]">${total.toFixed(2)}</span>
+            </div>
+            
+            <button onClick={handlePedir} disabled={carrito.length === 0 || procesando} className="w-full bg-[#FA4A0C] text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20">
+              {procesando ? <Loader2 className="w-6 h-6 animate-spin" /> : <><MessageCircle size={22} /> Enviar Pedido por WhatsApp</>}
+            </button>
+            <p className="text-center text-[10px] text-slate-400 mt-3 font-medium">Se abrirá WhatsApp con los detalles de tu orden</p>
+          </div>
+        </motion.div>
+      </>
+    )}
 
       {/* MODAL DE OPCIONES DE PRODUCTO */}
       <AnimatePresence>
         {selectedItemForOptions && (
-          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
@@ -878,14 +928,14 @@ export function PublicMenuView() {
                           };
 
                           return (
-                            <label key={oIdx} className={`flex items-center justify-between p-3 rounded-[20px] border cursor-pointer transition-all ${isSelected ? 'border-[#FF7A6A] bg-[#FF7A6A]/10/30' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <label key={oIdx} className={`flex items-center justify-between p-3 rounded-[20px] border cursor-pointer transition-all ${isSelected ? 'border-[#FA4A0C] bg-[#FA4A0C]/10' : 'border-slate-200 hover:border-slate-300'}`}>
                               <div className="flex items-center gap-3">
                                 <div className="relative flex items-center justify-center">
                                   <input 
                                     type={grupo.maximo_selecciones === 1 ? 'radio' : 'checkbox'} 
                                     checked={isSelected}
                                     onChange={toggleOpcion}
-                                    className="w-5 h-5 accent-[#FF7A6A] cursor-pointer"
+                                    className="w-5 h-5 accent-[#FA4A0C] cursor-pointer"
                                   />
                                 </div>
                                 <span className={`text-sm font-bold ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>{opc.nombre}</span>
@@ -943,7 +993,7 @@ export function PublicMenuView() {
                     setSelectedItemForOptions(null);
                     showToast('Agregado', `${selectedItemForOptions.nombre} añadido al carrito`);
                   }}
-                  className="w-full bg-slate-900 hover:bg-[#FF7A6A] text-white font-black py-4 rounded-[24px] shadow-lg transition-colors flex items-center justify-between px-6"
+                  className="w-full bg-[#FA4A0C] hover:bg-[#fa5a20] text-white font-black py-4 rounded-[24px] shadow-lg shadow-[#FA4A0C]/20 transition-colors flex items-center justify-between px-6"
                 >
                   <span>Añadir al Carrito</span>
                   <span>${(
@@ -961,28 +1011,18 @@ export function PublicMenuView() {
         )}
       </AnimatePresence>
 
-      {/* TOAST NOTIFICATION */}
-      <AnimatePresence>
-        {toastMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 z-[200]"
-          >
-            <div className={`flex items-center gap-3 px-5 py-3.5 rounded-[24px] shadow-2xl shadow-slate-200/50 border font-medium ${toastMsg.type === 'error' ? 'bg-red-50 border-red-100 text-red-800' : 'bg-slate-900 border-slate-800 text-white'
-              }`}>
-              {toastMsg.type === 'error' ? <AlertCircle size={20} className="text-red-500" /> : <CheckCircle2 size={20} className="text-emerald-400" />}
-              <div>
-                <p className="text-sm font-bold">{toastMsg.title}</p>
-                {toastMsg.message && <p className="text-xs opacity-80">{toastMsg.message}</p>}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    {/* Toast notification */}
+    {toastMsg && (
+      <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3.5 rounded-full shadow-2xl backdrop-blur-md border ${toastMsg.type === 'error' ? 'bg-red-500/90 border-red-400' : 'bg-slate-900/90 border-slate-700'}`}>
+        {toastMsg.type === 'error' ? <AlertCircle className="w-5 h-5 text-red-200" /> : <CheckCircle2 className="w-5 h-5 text-green-400" />}
+        <div>
+          <p className="text-white text-sm font-bold leading-none mb-0.5">{toastMsg.title}</p>
+          {toastMsg.message && <p className="text-slate-200 text-[11px] leading-none">{toastMsg.message}</p>}
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
 
     </div>
   )
 }
-

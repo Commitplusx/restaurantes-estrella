@@ -11,6 +11,22 @@ export const supabase = createClient(url, key)
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+export interface HorarioDia {
+  abre: string
+  cierra: string
+  activo: boolean
+}
+
+export interface HorariosRestaurante {
+  lunes?: HorarioDia
+  martes?: HorarioDia
+  miercoles?: HorarioDia
+  jueves?: HorarioDia
+  viernes?: HorarioDia
+  sabado?: HorarioDia
+  domingo?: HorarioDia
+}
+
 export interface Restaurante {
   id: string
   nombre: string
@@ -19,9 +35,16 @@ export interface Restaurante {
   activo: boolean
   slug?: string
   foto_fachada_url?: string
+  logo_url?: string
+  descripcion_corta?: string
+  correo?: string
   hora_apertura?: string
   hora_cierre?: string
+  horarios?: HorariosRestaurante
   categorias?: string[]
+  perfil_completo?: boolean
+  es_socio?: boolean
+  programa_lealtad_activo?: boolean
 }
 
 export interface MenuCategoria {
@@ -136,15 +159,26 @@ export async function subirFoto(file: File, path: string): Promise<string | null
 export async function getMyRestaurante(): Promise<Restaurante | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  
-  const { data } = await supabase
+
+  // Intentar con todos los campos nuevos
+  const { data, error } = await supabase
     .from('restaurantes')
-    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, hora_apertura, hora_cierre, categorias')
+    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo')
     .eq('admin_id', user.id)
     .maybeSingle()
-    
+
   if (data) return data
-  
-  // Si no tiene restaurante, retornar null para que el UI muestre el acceso denegado
+
+  // Fallback: si hay error (ej. columnas nuevas no existen aún), query con campos base
+  if (error) {
+    console.warn('getMyRestaurante: fallback a campos base. Ejecuta la migración SQL.', error.message)
+    const { data: fallback } = await supabase
+      .from('restaurantes')
+      .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias')
+      .eq('admin_id', user.id)
+      .maybeSingle()
+    return fallback ?? null
+  }
+
   return null
 }
