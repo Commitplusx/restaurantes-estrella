@@ -394,7 +394,7 @@ export function PublicMenuView() {
       const mapLink = `https://www.google.com/maps?q=${lat},${lng}`
       setDireccionEntrega(prev => prev ? prev + '\nUbicación GPS: ' + mapLink : 'Ubicación GPS: ' + mapLink)
       showToast('¡Listo!', 'Ubicación agregada', 'success')
-    }, (error) => {
+    }, () => {
       showToast('Error', 'No pudimos acceder a tu ubicación. Asegúrate de dar permisos.', 'error')
     })
   }
@@ -562,11 +562,11 @@ export function PublicMenuView() {
     </div>
   )
 
-  if (error || !restaurante) return (
+  if (!restaurante) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAFAFA] px-4 text-center">
       <AlertCircle className="w-16 h-16 text-red-400 mb-4" />
       <h2 className="text-2xl font-bold text-slate-800 mb-2">Restaurante no disponible</h2>
-      <p className="text-slate-500 mb-6">{error || 'El menú que buscas no existe o fue desactivado.'}</p>
+      <p className="text-slate-500 mb-6">El menú que buscas no existe o fue desactivado.</p>
       <Link to="/" className="bg-[#FF7A6A] text-white px-8 py-3 rounded-[24px] font-bold shadow-lg shadow-orange-200">Volver al Inicio</Link>
     </div>
   )
