@@ -85,7 +85,19 @@ export function PublicLandingPage() {
       .eq('activa', true)
       
     if (data) {
-      const validPromos = data.filter(p => !p.fecha_fin || new Date(p.fecha_fin) >= new Date())
+      const currentDay = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'][new Date().getDay()];
+      const validPromos = data.filter(p => {
+        // Expiration date check
+        if (p.fecha_fin) {
+          const endDateStr = p.fecha_fin.includes('T') ? p.fecha_fin : `${p.fecha_fin}T23:59:59`;
+          if (new Date(endDateStr) < new Date()) return false;
+        }
+        // Application day check
+        if (p.dias_aplicacion && p.dias_aplicacion.length > 0 && !p.dias_aplicacion.includes(currentDay)) {
+          return false;
+        }
+        return true;
+      })
       setPromosGlobales(validPromos as any)
     }
     setLoadingPromos(false)

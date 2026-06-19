@@ -5,6 +5,16 @@ import { BottomSheet } from '../../components/BottomSheet'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuPromocion } from '../../lib/supabase'
 
+const DIAS_SEMANA = [
+  { id: 'lun', label: 'Lun' },
+  { id: 'mar', label: 'Mar' },
+  { id: 'mie', label: 'Mié' },
+  { id: 'jue', label: 'Jue' },
+  { id: 'vie', label: 'Vie' },
+  { id: 'sab', label: 'Sáb' },
+  { id: 'dom', label: 'Dom' },
+]
+
 export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
   const [promos, setPromos] = useState<MenuPromocion[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +60,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     if (item) {
       setEditingItem(item)
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, activa: true })
+      setEditingItem({ restaurante_id: restaurante.id, activa: true, dias_aplicacion: DIAS_SEMANA.map(d => d.id) })
     }
     setIsModalOpen(true)
   }
@@ -198,6 +208,38 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Fecha Límite (Opcional)</label>
               <input type="date" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.fecha_fin || ''} onChange={e => setEditingItem({...editingItem, fecha_fin: e.target.value})} />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Días de aplicación *</label>
+            <div className="flex flex-wrap gap-2">
+              {DIAS_SEMANA.map(dia => {
+                // If dias_aplicacion is undefined, it means all days apply (for legacy promos)
+                const currentDias = editingItem.dias_aplicacion || DIAS_SEMANA.map(d => d.id);
+                const isSelected = currentDias.includes(dia.id);
+                return (
+                  <button
+                    key={dia.id}
+                    type="button"
+                    onClick={() => {
+                      let newDias;
+                      if (currentDias.includes(dia.id)) {
+                        newDias = currentDias.filter(d => d !== dia.id)
+                      } else {
+                        newDias = [...currentDias, dia.id]
+                      }
+                      setEditingItem({...editingItem, dias_aplicacion: newDias})
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${isSelected ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                  >
+                    {dia.label}
+                  </button>
+                )
+              })}
+            </div>
+            {editingItem.dias_aplicacion?.length === 0 && (
+              <p className="text-xs text-red-500">Debes seleccionar al menos un día.</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

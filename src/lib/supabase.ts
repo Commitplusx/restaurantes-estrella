@@ -102,6 +102,7 @@ export interface MenuPromocion {
   foto_url: string | null
   fecha_fin: string | null
   activa: boolean
+  dias_aplicacion?: string[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
