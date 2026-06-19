@@ -57,8 +57,7 @@ export function PublicMenuView() {
   const [promos, setPromos] = useState<MenuPromocion[]>([])
 
   const [loading, setLoading] = useState(true)
-  const [error] = useState<string | null>(null)
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<'menu' | 'combos' | 'promos'>('menu')
 
   // Estado del carrito y drawer
@@ -70,7 +69,7 @@ export function PublicMenuView() {
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>('efectivo')
-  const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' } | null>(null)
+  const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
 
   // Estado para validación de cupones
   const [validandoCupon, setValidandoCupon] = useState(false)
