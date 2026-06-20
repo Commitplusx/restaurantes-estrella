@@ -407,7 +407,7 @@ export function PublicMenuView() {
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr
 
     try {
-      const { data: insertData, error: insertError } = await supabase.from('pedidos').insert([{
+      const { error: insertError } = await supabase.from('pedidos').insert([{
         cliente_tel: telLimpio,
         cliente_nombre: clienteNombre.trim(),
         restaurante: restaurante.nombre,
