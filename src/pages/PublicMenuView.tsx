@@ -406,8 +406,7 @@ export function PublicMenuView() {
       
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr
 
-    try {
-      await supabase.from('pedidos').insert([{
+      const { data: insertData, error: insertError } = await supabase.from('pedidos').insert([{
         cliente_tel: telLimpio,
         cliente_nombre: clienteNombre.trim(),
         restaurante: restaurante.nombre,
@@ -415,8 +414,23 @@ export function PublicMenuView() {
         estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'asignado',
         wb_message_id: ticketId,
         metodo_pago: metodoPago,
-        precio: total
-      }])
+        precio: total,
+        tipo_pedido: tipoEntrega
+      }]).select('id').single()
+
+      if (insertError) throw insertError
+
+      // Notificar al admin sobre la nueva orden
+      supabase.functions.invoke('notificar-whatsapp', {
+        body: {
+          tipo: 'nueva_orden_admin',
+          ticket_id: ticketId,
+          restaurante: restaurante.nombre,
+          descripcion: pedidoCompleto,
+          tipo_entrega: tipoEntrega
+        }
+      }).catch(err => console.warn('Error notificando al admin:', err))
+
     } catch (err) { console.warn('Intercepción db fallida:', err) }
 
     if (metodoPago === 'en_linea') {
