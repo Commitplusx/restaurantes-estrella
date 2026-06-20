@@ -4,6 +4,7 @@ import { LoginPage } from './pages/LoginPage'
 import { PortalPage } from './pages/PortalPage'
 import { PublicLandingPage } from './pages/PublicLandingPage'
 import { PublicMenuView } from './pages/PublicMenuView'
+import { SuccessPage } from './pages/SuccessPage'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
@@ -32,6 +33,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<PublicLandingPage />} />
         <Route path="/menu/:id" element={<PublicMenuView />} />
+        <Route path="/success" element={<SuccessPage />} />
         <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />
         <Route path="/portal/*" element={session ? <PortalPage /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />

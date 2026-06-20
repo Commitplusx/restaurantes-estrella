@@ -117,88 +117,7 @@ export function PublicMenuView() {
     }
   }
 
-  // Verificar si venimos de Conekta
-  useEffect(() => {
-    let checkChannel: ReturnType<typeof supabase.channel> | null = null;
-    
-    const checkConektaReturn = async () => {
-      const isSuccess = searchParams.get('success')
-      const pedidoId = searchParams.get('pedido')
-      
-      if (isSuccess === 'true' && pedidoId && restaurante) {
-        showToast('Validando pago...', 'Estamos confirmando tu depósito con el banco.', 'loading')
-        
-        try {
-          const checkAndComplete = async (estadoActual: string, dataPedido: any) => {
-            if (estadoActual === 'asignado' || estadoActual === 'pagado') {
-              showToast('¡Pago Confirmado!', 'Tu pago ha sido procesado exitosamente.', 'success')
-              
-              const numeroRestaurante = restaurante.telefono ? restaurante.telefono.replace(/\D/g, '') : ''
-              const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${dataPedido.cliente_nombre.trim()}* y acabo de pagar en línea el siguiente pedido:\n\n${dataPedido.descripcion}\n\n*Forma de pago:* En Línea (Conekta) 💳\n\n_(Ticket Web: #${pedidoId})_`
-              const waUrl = `https://wa.me/${numeroRestaurante}?text=${encodeURIComponent(mensaje)}`
-              
-              setTimeout(() => {
-                window.open(waUrl, '_blank')
-                setSearchParams({})
-              }, 1500)
-              
-              if (checkChannel) supabase.removeChannel(checkChannel)
-              return true
-            }
-            return false
-          }
-
-          // Obtener el pedido actual
-          const { data: pedidoData } = await supabase
-            .from('pedidos')
-            .select('*')
-            .eq('wb_message_id', pedidoId)
-            .single()
-            
-          if (pedidoData) {
-            // Revisar si ya fue validado por el webhook antes de cargar la app
-            const yaValidado = await checkAndComplete(pedidoData.estado, pedidoData);
-            
-            // Si sigue pendiente, suscribirse a cambios en tiempo real
-            if (!yaValidado) {
-              checkChannel = supabase.channel(`wait-payment-${pedidoId}`)
-                .on(
-                  'postgres_changes',
-                  {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'pedidos',
-                    filter: `id=eq.${pedidoData.id}`
-                  },
-                  (payload) => {
-                    checkAndComplete(payload.new.estado, payload.new)
-                  }
-                )
-                .subscribe()
-
-              // Timeout de seguridad por si el webhook tarda o falla en local
-              setTimeout(() => {
-                showToast('Procesando pago', 'El banco está procesando tu pago. Te contactaremos por WhatsApp en cuanto se confirme.', 'success')
-                setSearchParams({})
-                if (checkChannel) supabase.removeChannel(checkChannel)
-              }, 8000)
-            }
-          }
-        } catch (err) {
-          console.error('Error al procesar pago:', err)
-        }
-      } else if (isSuccess === 'false') {
-        showToast('Pago cancelado', 'No se completó el pago en línea.', 'error')
-        setSearchParams({})
-      }
-    }
-    
-    checkConektaReturn()
-    
-    return () => {
-      if (checkChannel) supabase.removeChannel(checkChannel)
-    }
-  }, [searchParams, restaurante])
+  // Verificamos si la ruta o id cambian para hacer reload silencioso si es necesario
 
   useEffect(() => {
     let isMounted = true
@@ -438,15 +357,20 @@ export function PublicMenuView() {
         descripcion: pedidoCompleto,
         estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'asignado',
         wb_message_id: ticketId,
-        metodo_pago: metodoPago
+        metodo_pago: metodoPago,
+        precio: total
       }])
     } catch (err) { console.warn('Intercepción db fallida:', err) }
 
     if (metodoPago === 'en_linea') {
       try {
+        // Bug 1 fix: aplicar descuento proporcional en los lineItems para que Conekta cobre el total correcto
+        const subtotalBruto = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
+        const factorDescuento = subtotalBruto > 0 ? total / subtotalBruto : 1
+        
         const lineItems = carrito.map(p => ({
           name: p.item.nombre,
-          price: p.item.precio,
+          price: parseFloat((p.item.precio * factorDescuento).toFixed(2)),
           quantity: p.cantidad
         }))
         
@@ -466,7 +390,7 @@ export function PublicMenuView() {
             restauranteNombre: restaurante.nombre,
             lineItems: lineItems,
             subtotal: total,
-            returnUrl: window.location.origin + window.location.pathname
+            returnUrl: window.location.origin + '/success'
           })
         })
         
@@ -475,9 +399,12 @@ export function PublicMenuView() {
           throw new Error(data.error || 'Error al generar link de Conekta')
         }
         
+        // Bug 7 fix: detectar si el URL llegó vacío y avisar al usuario
         if (data.checkoutUrl) {
           window.location.href = data.checkoutUrl
           return
+        } else {
+          throw new Error('Conekta no devolvió un link de pago válido. Intenta nuevamente.')
         }
       } catch (err: any) {
         console.error('Error conekta:', err)
