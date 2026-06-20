@@ -591,17 +591,17 @@ export function PublicMenuView() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#F6F6F9] via-[#F6F6F9]/20 to-transparent" />
       </div>
 
-      <div className="max-w-[1000px] mx-auto px-6 relative -mt-12 md:-mt-16 z-10">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 relative -mt-12 sm:-mt-16 z-10">
 
         {/* RESTAURANT INFO CARD */}
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, type: "spring", bounce: 0.4 }}
-          className="bg-white/80 backdrop-blur-xl rounded-[40px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6 border border-white mb-6 text-center md:text-left"
+          className="bg-white/80 backdrop-blur-xl rounded-[40px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 border border-white mb-6 text-center sm:text-left"
         >
           {/* Logo (opcional, extraemos de la foto si no hay otra) */}
-          <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden shadow-xl border-[6px] border-white bg-orange-50 shrink-0 flex items-center justify-center -mt-16 md:-mt-20">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden shadow-xl border-[6px] border-white bg-orange-50 shrink-0 flex items-center justify-center -mt-16 sm:-mt-20">
             {restaurante.foto_fachada_url ? (
                <img src={restaurante.foto_fachada_url} className="w-full h-full object-contain" loading="lazy" decoding="async" alt="Logo" />
             ) : (
@@ -610,14 +610,14 @@ export function PublicMenuView() {
           </div>
           
           <div className="flex-1">
-            <h1 className="text-3xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-2">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight mb-2">
               {restaurante.nombre}
             </h1>
-            <p className="text-slate-500 font-medium mb-4 flex items-center justify-center md:justify-start gap-2">
+            <p className="text-slate-500 font-medium mb-4 flex items-center justify-center sm:justify-start gap-2">
                <MapPin size={16} /> {restaurante.direccion || 'Comitán, Chiapas'}
             </p>
             
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
               <span className={`flex items-center gap-1.5 font-black text-xs px-4 py-2 rounded-full border ${estaAbierto(restaurante) ? 'bg-[#FA4A0C]/10 text-[#FA4A0C] border-[#FA4A0C]/20' : 'bg-red-500/10 text-red-600 border-red-500/20'}`}>
                 <Clock size={14} /> {estaAbierto(restaurante) ? 'Abierto' : 'Cerrado'} • {restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}
               </span>
@@ -691,7 +691,7 @@ export function PublicMenuView() {
                         <span className="w-1.5 h-6 bg-[#FA4A0C] rounded-full" />
                         {cat.emoji} {cat.nombre}
                       </h3>
-                      <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
                         {catItems.map((item, index) => {
                           const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
                           const cantTotal = getCantidadTotal(item.id, 'item')
@@ -767,7 +767,7 @@ export function PublicMenuView() {
 
             {/* COMBOS TAB */}
             {activeTab === 'combos' && (
-              <div className="grid gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {combos.map(combo => {
                   const cartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' as const, foto_url: combo.foto_url || undefined, cartItemId: combo.id }
                   const cantTotal = getCantidadTotal(combo.id, 'combo')
@@ -817,7 +817,7 @@ export function PublicMenuView() {
 
             {/* PROMOS TAB */}
             {activeTab === 'promos' && (
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {promos.map((promo, index) => {
                   const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined, cartItemId: promo.id }
                   const cantTotal = getCantidadTotal(promo.id, 'promo')
