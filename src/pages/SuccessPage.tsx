@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CheckCircle2, Loader2, MessageCircle, AlertCircle, ShoppingBag } from 'lucide-react';
@@ -67,7 +67,7 @@ export function SuccessPage() {
               .single();
             if (refreshData && (refreshData.estado === 'asignado' || refreshData.estado === 'pagado')) {
               setStatus('success');
-              setPedido(prev => ({ ...prev, estado: refreshData.estado }));
+              setPedido((prev: any) => ({ ...prev, estado: refreshData.estado }));
               fireConfetti();
               clearInterval(pollInterval);
               if (checkChannel) supabase.removeChannel(checkChannel);

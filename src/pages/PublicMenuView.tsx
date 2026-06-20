@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
 import {
@@ -57,7 +57,7 @@ export function PublicMenuView() {
   const [promos, setPromos] = useState<MenuPromocion[]>([])
 
   const [loading, setLoading] = useState(true)
-  const [searchParams, setSearchParams] = useSearchParams()
+
   const [activeTab, setActiveTab] = useState<'menu' | 'combos' | 'promos'>('menu')
 
   // Estado del carrito y drawer
