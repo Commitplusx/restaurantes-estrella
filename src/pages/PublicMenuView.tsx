@@ -451,7 +451,7 @@ export function PublicMenuView() {
     } catch (err: any) { 
       console.error('Intercepción db fallida:', err) 
       alert('Hubo un problema registrando el pedido en la base de datos: ' + (err.message || 'Error desconocido') + '. Por favor intenta nuevamente.');
-      setProcesandoPedido(false);
+      setProcesando(false);
       return;
     }
 
