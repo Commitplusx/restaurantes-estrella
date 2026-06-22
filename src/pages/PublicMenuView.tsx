@@ -90,10 +90,13 @@ export function PublicMenuView() {
   const [selectedItemDetail, setSelectedItemDetail] = useState<any | null>(null)
 
   // Estado del carrito y drawer
-  const [carrito, setCarrito] = useState<{ item: CartItem & { foto_url?: string }, cantidad: number }[]>([])
+  const [carrito, setCarrito] = useState<{ item: CartItem & { foto_url?: string }, cantidad: number }[]>(() => {
+    const saved = sessionStorage.getItem('est_carrito')
+    return saved ? JSON.parse(saved) : []
+  })
   const [isCartOpen, setIsCartOpen] = useState(false)
-  const [clienteNombre, setClienteNombre] = useState('')
-  const [clienteTel, setClienteTel] = useState('')
+  const [clienteNombre, setClienteNombre] = useState(() => sessionStorage.getItem('est_nombre') || '')
+  const [clienteTel, setClienteTel] = useState(() => sessionStorage.getItem('est_tel') || '')
   const [isScrolled, setIsScrolled] = useState(false)
   const [showClosedToast, setShowClosedToast] = useState(false)
 
@@ -119,7 +122,7 @@ export function PublicMenuView() {
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>('efectivo')
+  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>(() => (sessionStorage.getItem('est_metodopago') as 'efectivo' | 'en_linea') || 'efectivo')
   const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
 
   // Estado para validación de cupones
@@ -128,9 +131,22 @@ export function PublicMenuView() {
   const [descuento, setDescuento] = useState(0)
 
   // Estados del nuevo carrito paso a paso
-  const [checkoutStep, setCheckoutStep] = useState(1)
-  const [tipoEntrega, setTipoEntrega] = useState<'domicilio' | 'tienda' | null>(null)
-  const [direccionEntrega, setDireccionEntrega] = useState('')
+  const [checkoutStep, setCheckoutStep] = useState(() => {
+    const saved = sessionStorage.getItem('est_checkoutstep')
+    return saved ? parseInt(saved) : 1
+  })
+  const [tipoEntrega, setTipoEntrega] = useState<'domicilio' | 'tienda' | null>(() => (sessionStorage.getItem('est_tipoentrega') as 'domicilio' | 'tienda' | null) || null)
+  const [direccionEntrega, setDireccionEntrega] = useState(() => sessionStorage.getItem('est_direccion') || '')
+
+  useEffect(() => {
+    sessionStorage.setItem('est_carrito', JSON.stringify(carrito))
+  }, [carrito])
+  useEffect(() => { sessionStorage.setItem('est_nombre', clienteNombre) }, [clienteNombre])
+  useEffect(() => { sessionStorage.setItem('est_tel', clienteTel) }, [clienteTel])
+  useEffect(() => { sessionStorage.setItem('est_metodopago', metodoPago) }, [metodoPago])
+  useEffect(() => { sessionStorage.setItem('est_checkoutstep', checkoutStep.toString()) }, [checkoutStep])
+  useEffect(() => { if (tipoEntrega) sessionStorage.setItem('est_tipoentrega', tipoEntrega) }, [tipoEntrega])
+  useEffect(() => { sessionStorage.setItem('est_direccion', direccionEntrega) }, [direccionEntrega])
 
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 640 : true
 
@@ -415,7 +431,7 @@ export function PublicMenuView() {
         estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'asignado',
         wb_message_id: ticketId,
         metodo_pago: metodoPago,
-        precio: total,
+        total: total,
         tipo_pedido: tipoEntrega
       }]).select('id').single()
 
@@ -432,7 +448,12 @@ export function PublicMenuView() {
         }
       }).catch(err => console.warn('Error notificando al admin:', err))
 
-    } catch (err) { console.warn('Intercepción db fallida:', err) }
+    } catch (err: any) { 
+      console.error('Intercepción db fallida:', err) 
+      alert('Hubo un problema registrando el pedido en la base de datos: ' + (err.message || 'Error desconocido') + '. Por favor intenta nuevamente.');
+      setProcesandoPedido(false);
+      return;
+    }
 
     if (metodoPago === 'en_linea') {
       try {
@@ -462,7 +483,7 @@ export function PublicMenuView() {
             restauranteNombre: restaurante.nombre,
             lineItems: lineItems,
             subtotal: total,
-            returnUrl: window.location.origin + '/success'
+            returnUrl: window.location.origin + `/success?pedido=${ticketId}&success=true`
           })
         })
         
@@ -473,6 +494,7 @@ export function PublicMenuView() {
         
         // Bug 7 fix: detectar si el URL llegó vacío y avisar al usuario
         if (data.checkoutUrl) {
+          await supabase.from('pedidos').update({ conekta_order_id: data.conektaOrderId }).eq('wb_message_id', ticketId)
           window.location.href = data.checkoutUrl
           return
         } else {
@@ -505,59 +527,48 @@ export function PublicMenuView() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-[#F6F6F9] font-sans pb-32">
-      {/* Topbar Skeleton */}
-      <header className="sticky top-0 bg-white/80 border-b border-slate-50/50 py-3 px-4 md:px-10 flex items-center gap-3">
-        <div className="w-10 h-10 bg-slate-200 animate-pulse rounded-[20px] shrink-0" />
-        <div className="flex-1">
-          <div className="w-32 h-5 bg-slate-200 animate-pulse rounded-md mb-1" />
-          <div className="w-24 h-3 bg-slate-200 animate-pulse rounded-md hidden sm:block" />
-        </div>
-        <div className="w-24 h-10 bg-slate-200 animate-pulse rounded-[20px]" />
-      </header>
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent" />
+      
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="relative z-10 flex flex-col items-center"
+      >
+        <motion.div
+          animate={{ 
+            scale: [1, 1.05, 1],
+            rotate: [0, 5, -5, 0]
+          }}
+          transition={{ 
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="w-24 h-24 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-[28px] flex items-center justify-center shadow-[0_0_50px_rgba(249,115,22,0.4)] mb-8"
+        >
+          <svg className="w-12 h-12 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+        </motion.div>
 
-      {/* Hero Skeleton */}
-      <div className="relative w-full h-[30vh] md:h-[45vh] bg-slate-200 animate-pulse" />
-
-      <div className="max-w-[1000px] mx-auto px-6 relative -mt-16 md:-mt-24 z-10">
-        {/* Info Card Skeleton */}
-        <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] mb-8 flex flex-col md:flex-row gap-6 md:items-center">
-          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-slate-200 animate-pulse shadow-sm shrink-0" />
-          <div className="flex-1">
-            <div className="w-48 h-8 bg-slate-200 animate-pulse rounded-lg mb-3" />
-            <div className="w-64 h-4 bg-slate-200 animate-pulse rounded-md mb-4" />
-            <div className="flex gap-4">
-              <div className="w-16 h-4 bg-slate-200 animate-pulse rounded-md" />
-              <div className="w-16 h-4 bg-slate-200 animate-pulse rounded-md" />
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs Skeleton */}
-        <div className="flex gap-8 mb-10 border-b border-slate-200/50 pb-4">
-          <div className="w-20 h-6 bg-slate-200 animate-pulse rounded-md" />
-          <div className="w-20 h-6 bg-slate-200 animate-pulse rounded-md" />
-          <div className="w-20 h-6 bg-slate-200 animate-pulse rounded-md" />
-        </div>
-
-        {/* Grid Skeleton */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="bg-white/80 p-4 rounded-[32px] flex gap-4 items-center">
-              <div className="w-24 h-24 rounded-[24px] bg-slate-200 animate-pulse shrink-0" />
-              <div className="flex-1">
-                <div className="w-3/4 h-5 bg-slate-200 animate-pulse rounded-md mb-2" />
-                <div className="w-1/4 h-5 bg-slate-200 animate-pulse rounded-md mb-3" />
-                <div className="w-full h-3 bg-slate-200 animate-pulse rounded-md mb-1" />
-                <div className="w-2/3 h-3 bg-slate-200 animate-pulse rounded-md mb-4" />
-                <div className="flex justify-between items-center mt-2">
-                  <div className="w-20 h-8 bg-slate-200 animate-pulse rounded-[20px]" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+        <motion.h1 
+          initial={{ y: 10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="text-3xl font-black text-white tracking-tight text-center"
+        >
+          Cargando <span className="text-orange-500">Menú...</span>
+        </motion.h1>
+        
+        <motion.div 
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 150, opacity: 1 }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" }}
+          className="h-1.5 bg-gradient-to-r from-orange-500 to-amber-400 mt-10 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.5)]"
+        />
+      </motion.div>
     </div>
   )
 
@@ -1474,3 +1485,4 @@ export function PublicMenuView() {
     </div>
   )
 }
+

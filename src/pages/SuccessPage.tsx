@@ -9,14 +9,18 @@ export function SuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const pedidoId = searchParams.get('pedido');
-  const success = searchParams.get('success');
+  const orderId = searchParams.get('order_id');
+  const successParam = searchParams.get('success');
+  const paymentStatus = searchParams.get('payment_status');
+  
+  const isSuccess = successParam === 'true' || paymentStatus === 'paid';
 
   const [status, setStatus] = useState<'loading' | 'validating' | 'success' | 'error'>('loading');
   const [pedido, setPedido] = useState<any>(null);
   const [restauranteInfo, setRestauranteInfo] = useState<any>(null);
 
   useEffect(() => {
-    if (!pedidoId || success !== 'true') {
+    if ((!pedidoId && !orderId) || !isSuccess) {
       setStatus('error');
       return;
     }
@@ -26,11 +30,14 @@ export function SuccessPage() {
 
     const fetchPedido = async (retries = 3) => {
       try {
-        const { data: pedidoData, error } = await supabase
-          .from('pedidos')
-          .select('*')
-          .eq('wb_message_id', pedidoId)
-          .single();
+        let query = supabase.from('pedidos').select('*');
+        if (pedidoId) {
+          query = query.eq('wb_message_id', pedidoId);
+        } else if (orderId) {
+          query = query.eq('conekta_order_id', orderId);
+        }
+        
+        const { data: pedidoData, error } = await query.single();
 
         if (error || !pedidoData) {
           if (retries > 0) {
@@ -55,6 +62,9 @@ export function SuccessPage() {
         if (pedidoData.estado === 'asignado' || pedidoData.estado === 'pagado') {
           setStatus('success');
           fireConfetti();
+          sessionStorage.removeItem('est_carrito');
+          sessionStorage.removeItem('est_checkoutstep');
+          sessionStorage.removeItem('est_tipoentrega');
         } else {
           setStatus('validating');
           
@@ -75,7 +85,7 @@ export function SuccessPage() {
           }, 3000);
 
           // Realtime subscription
-          checkChannel = supabase.channel(`wait-payment-${pedidoId}`)
+          checkChannel = supabase.channel(`wait-payment-${pedidoData.id}-${Date.now()}`)
             .on(
               'postgres_changes',
               { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
@@ -84,6 +94,9 @@ export function SuccessPage() {
                   setStatus('success');
                   setPedido(payload.new);
                   fireConfetti();
+                  sessionStorage.removeItem('est_carrito');
+                  sessionStorage.removeItem('est_checkoutstep');
+                  sessionStorage.removeItem('est_tipoentrega');
                   clearInterval(pollInterval);
                   if (checkChannel) supabase.removeChannel(checkChannel);
                 }
@@ -115,12 +128,13 @@ export function SuccessPage() {
       if (checkChannel) supabase.removeChannel(checkChannel);
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [pedidoId, success]);
+  }, [pedidoId, orderId, isSuccess]);
 
   const handleWhatsApp = () => {
     if (!restauranteInfo || !pedido) return;
     const numeroRestaurante = restauranteInfo.telefono ? restauranteInfo.telefono.replace(/\D/g, '') : '';
-    const mensaje = `¡Hola *${restauranteInfo.nombre}*! 👋\nSoy *${pedido.cliente_nombre?.trim()}* y acabo de pagar en línea el siguiente pedido:\n\n${pedido.descripcion}\n\n*Forma de pago:* En Línea (Conekta) 💳\n\n_(Ticket Web: #${pedidoId})_`;
+    const ticketIdFinal = pedidoId || orderId || pedido.id;
+    const mensaje = `¡Hola *${restauranteInfo.nombre}*! 👋\nSoy *${pedido.cliente_nombre?.trim()}* y acabo de pagar en línea el siguiente pedido:\n\n${pedido.descripcion}\n\n*Forma de pago:* En Línea (Conekta) 💳\n\n_(Ticket Web: #${ticketIdFinal})_`;
     const waUrl = `https://wa.me/${numeroRestaurante}?text=${encodeURIComponent(mensaje)}`;
     window.open(waUrl, '_blank');
   };
@@ -228,7 +242,7 @@ export function SuccessPage() {
               <div className="py-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400 text-sm font-medium">Ticket de Orden</span>
-                  <span className="text-gray-800 font-bold bg-gray-100 px-3 py-1 rounded-lg">#{pedidoId}</span>
+                  <span className="text-gray-800 font-bold bg-gray-100 px-3 py-1 rounded-lg">#{pedidoId || orderId || pedido?.id?.substring(0,8)}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -248,10 +262,10 @@ export function SuccessPage() {
                   </div>
                 )}
 
-                {pedido?.precio && (
+                {pedido?.total && (
                   <div className="flex items-center justify-between border-t border-dashed border-gray-200 pt-4 mt-2">
                     <span className="text-gray-500 font-bold">Total Pagado</span>
-                    <span className="text-emerald-600 font-black text-xl">${pedido.precio.toFixed(2)}</span>
+                    <span className="text-emerald-600 font-black text-xl">${pedido.total.toFixed(2)}</span>
                   </div>
                 )}
               </div>
