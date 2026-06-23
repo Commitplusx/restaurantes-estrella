@@ -43,13 +43,10 @@ export function OrderProgressBar({ currentStatus, customSteps }: OrderProgressBa
   // Si no se encuentra (ej. estado raro), asumimos que está en el paso 0
   const activeIndex = currentIndex >= 0 ? currentIndex : 0;
 
-  // Calculamos porcentaje de la línea
-  let progressPercentage = 0;
-  if (isException) {
-    progressPercentage = (activeIndex / (steps.length - 1)) * 100;
-  } else {
-    progressPercentage = (activeIndex / (steps.length - 1)) * 100;
-  }
+  // Calculate progress percentage (same for both normal and exception states)
+  const progressPercentage = steps.length > 1
+    ? (activeIndex / (steps.length - 1)) * 100
+    : 0;
 
   return (
     <div className="w-full py-6">

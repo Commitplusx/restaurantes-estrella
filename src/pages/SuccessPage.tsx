@@ -19,6 +19,10 @@ export function SuccessPage() {
   const [status, setStatus] = useState<'loading' | 'validating' | 'success' | 'error'>('loading');
   const [pedido, setPedido] = useState<any>(null);
   const [restauranteInfo, setRestauranteInfo] = useState<any>(null);
+  // Ref to avoid stale closure bugs in async callbacks (BUG 1 fix)
+  const resolvedRef = React.useRef(false);
+  const confettiFiredRef = React.useRef(false);
+  const pollIntervalRef = React.useRef<any>(null);
 
   useEffect(() => {
     if ((!pedidoId && !orderId) || !isSuccess) {
@@ -26,8 +30,36 @@ export function SuccessPage() {
       return;
     }
 
+    // Reset refs on each mount (BUG 1 + 8 fix)
+    resolvedRef.current = false;
+    confettiFiredRef.current = false;
     let checkChannel: any = null;
     let timeoutId: any = null;
+
+    const fireOnce = () => {
+      if (!confettiFiredRef.current) {
+        confettiFiredRef.current = true;
+        fireConfetti();
+      }
+    };
+
+    const resolveSuccess = (newPedido: any) => {
+      if (resolvedRef.current) return;
+      resolvedRef.current = true;
+      // Clear poll if running (BUG 1 fix)
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      setStatus('success');
+      setPedido(newPedido);
+      fireOnce();
+      sessionStorage.removeItem('est_carrito');
+      sessionStorage.removeItem('est_checkoutstep');
+      sessionStorage.removeItem('est_tipoentrega');
+    };
+
+    const RESOLVED_STATES = ['pendiente', 'pagado', 'asignado', 'recibido', 'preparando', 'en_camino', 'entregado'];
 
     const fetchPedido = async (retries = 3) => {
       try {
@@ -60,68 +92,53 @@ export function SuccessPage() {
           if (restData) setRestauranteInfo(restData);
         }
 
-        if (pedidoData.estado === 'pendiente' || pedidoData.estado === 'asignado' || pedidoData.estado === 'pagado' || pedidoData.estado === 'preparando' || pedidoData.estado === 'en_camino' || pedidoData.estado === 'entregado' || pedidoData.estado === 'recibido') {
-          setStatus('success');
-          fireConfetti();
-          sessionStorage.removeItem('est_carrito');
-          sessionStorage.removeItem('est_checkoutstep');
-          sessionStorage.removeItem('est_tipoentrega');
-          // Continuamos la suscripción para la barra de progreso
+        if (RESOLVED_STATES.includes(pedidoData.estado)) {
+          // Already confirmed — show success immediately and subscribe for live updates
+          resolveSuccess(pedidoData);
           checkChannel = supabase.channel(`live-progress-${pedidoData.id}-${Date.now()}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` }, (payload) => {
               setPedido(payload.new);
             }).subscribe();
         } else {
+          // Waiting for payment confirmation — poll + realtime
           setStatus('validating');
           
-          // Poll every 3 seconds as a fallback
-          const pollInterval = setInterval(async () => {
+          // Poll every 3 seconds as a fallback (BUG 1 fix: store in ref so realtime can clear it)
+          pollIntervalRef.current = setInterval(async () => {
             const { data: refreshData } = await supabase
               .from('pedidos')
-              .select('estado')
+              .select('*')
               .eq('id', pedidoData.id)
               .single();
-            if (refreshData && ['pendiente', 'pagado', 'asignado', 'recibido', 'en_camino', 'entregado'].includes(refreshData.estado)) {
-              setStatus('success');
-              setPedido((prev: any) => ({ ...prev, estado: refreshData.estado }));
-              fireConfetti();
-              clearInterval(pollInterval);
-              // Mantener canal de progreso
+            if (refreshData && RESOLVED_STATES.includes(refreshData.estado)) {
+              resolveSuccess(refreshData);
             }
           }, 3000);
 
-          // Realtime subscription
+          // Realtime subscription (BUG 1 fix: uses resolveSuccess which checks ref)
           checkChannel = supabase.channel(`wait-payment-${pedidoData.id}-${Date.now()}`)
             .on(
               'postgres_changes',
               { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
               (payload) => {
-                if (['pendiente', 'asignado', 'pagado', 'recibido', 'en_camino', 'entregado'].includes(payload.new.estado)) {
-                  if (status !== 'success') {
-                    setStatus('success');
-                    fireConfetti();
-                    sessionStorage.removeItem('est_carrito');
-                    sessionStorage.removeItem('est_checkoutstep');
-                    sessionStorage.removeItem('est_tipoentrega');
-                    clearInterval(pollInterval);
-                  }
-                  setPedido(payload.new);
+                if (RESOLVED_STATES.includes(payload.new.estado)) {
+                  resolveSuccess(payload.new);
                 }
               }
             )
             .subscribe();
 
-          // 15 second timeout
+          // 15 second timeout — stop polling but keep channel alive in case payment arrives late
           timeoutId = setTimeout(() => {
-            if (status !== 'success') {
-              clearInterval(pollInterval);
-              // Si no tuvo exito tras 15s mostramos error o dejamos de intentar. 
-              // Dejamos el channel si lo configuró.
+            if (!resolvedRef.current) {
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+              }
             }
           }, 15000);
         }
       } catch (err) {
-        console.error('Error fetching pedido:', err);
         if (retries > 0) {
           setTimeout(() => fetchPedido(retries - 1), 2000);
           return;
@@ -135,6 +152,10 @@ export function SuccessPage() {
     return () => {
       if (checkChannel) supabase.removeChannel(checkChannel);
       if (timeoutId) clearTimeout(timeoutId);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
     };
   }, [pedidoId, orderId, isSuccess]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
@@ -46,30 +46,35 @@ const menuCache: Record<string, {
 }> = {}
 
 export const estaAbierto = (res: Restaurante) => {
+  // BUG 9 fix: convert times to minutes (integers) to avoid locale-dependent string comparison
+  const toMinutes = (timeStr: string): number => {
+    const [h, m] = timeStr.split(':').map(Number)
+    return h * 60 + (m || 0)
+  }
+  const nowMinutes = () => {
+    const d = new Date()
+    return d.getHours() * 60 + d.getMinutes()
+  }
+  const isOpenRange = (abre: string, cierra: string): boolean => {
+    const now = nowMinutes()
+    const a = toMinutes(abre)
+    const c = toMinutes(cierra)
+    if (a <= c) return now >= a && now <= c   // same-day range
+    return now >= a || now <= c               // crosses midnight
+  }
+
   if (res.horarios) {
     const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
-    const hoy = new Date()
-    const diaString = dias[hoy.getDay()]
+    const diaString = dias[new Date().getDay()]
     const horarioHoy = res.horarios[diaString as keyof typeof res.horarios]
     if (horarioHoy && horarioHoy.activo) {
-      const horaLocal = hoy.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      if (horarioHoy.abre <= horarioHoy.cierra) {
-        return horaLocal >= horarioHoy.abre && horaLocal <= horarioHoy.cierra
-      } else {
-        return horaLocal >= horarioHoy.abre || horaLocal <= horarioHoy.cierra
-      }
+      return isOpenRange(horarioHoy.abre, horarioHoy.cierra)
     }
     return false
   }
 
-  if (!res.hora_apertura || !res.hora_cierre) return false;
-  const ahora = new Date();
-  const horaLocal = ahora.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  if (res.hora_apertura <= res.hora_cierre) {
-    return horaLocal >= res.hora_apertura && horaLocal <= res.hora_cierre;
-  } else {
-    return horaLocal >= res.hora_apertura || horaLocal <= res.hora_cierre;
-  }
+  if (!res.hora_apertura || !res.hora_cierre) return false
+  return isOpenRange(res.hora_apertura, res.hora_cierre)
 }
 
 export function PublicMenuView() {
@@ -121,6 +126,7 @@ export function PublicMenuView() {
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
+  const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>(() => (sessionStorage.getItem('est_metodopago') as 'efectivo' | 'en_linea') || 'efectivo')
   const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
 
@@ -373,7 +379,9 @@ export function PublicMenuView() {
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
 
-  const total = Math.max(0, subtotal - descuento)
+  // BUG 4 fix: reset coupon if cart subtotal drops to 0 or below discount amount
+  const descuentoAplicable = subtotal > 0 ? Math.min(descuento, subtotal) : 0
+  const total = Math.max(0, subtotal - descuentoAplicable)
 
   // Bug #5: reset fields when closing cart without ordering
   const closeCart = () => {
@@ -400,6 +408,7 @@ export function PublicMenuView() {
 
   const handlePedir = async () => {
     if (!restaurante || carrito.length === 0) return
+    if (submittingRef.current) return // BUG 5 fix: prevent double-submit
     if (!clienteNombre.trim()) {
       showToast('Falta el nombre', 'Por favor ingresa tu nombre para continuar', 'error')
       return
@@ -411,8 +420,10 @@ export function PublicMenuView() {
       return
     }
     setTelError(false)
+    submittingRef.current = true
 
     setProcesando(true)
+    // BUG 5 fix: generate ticketId immediately and use ref to prevent double-submit
     const ticketId = Math.random().toString(36).substring(2, 8).toUpperCase()
     const pedidoDetalles = carrito.map(p => {
       const tag = p.item.tipo === 'combo' ? '[COMBO] ' : p.item.tipo === 'promo' ? '[PROMO] ' : ''
@@ -456,8 +467,8 @@ export function PublicMenuView() {
       }).catch(err => console.warn('Error notificando al admin:', err))
 
     } catch (err: any) { 
-      console.error('Intercepción db fallida:', err) 
       alert('Hubo un problema registrando el pedido en la base de datos: ' + (err.message || 'Error desconocido') + '. Por favor intenta nuevamente.');
+      submittingRef.current = false // BUG 5 fix
       setProcesando(false);
       return;
     }
@@ -508,8 +519,8 @@ export function PublicMenuView() {
           throw new Error('Conekta no devolvió un link de pago válido. Intenta nuevamente.')
         }
       } catch (err: any) {
-        console.error('Error conekta:', err)
         showToast('Error', err.message || 'No se pudo generar el pago en línea', 'error')
+        submittingRef.current = false // BUG 5 fix
         setProcesando(false)
         return
       }
