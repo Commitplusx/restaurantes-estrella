@@ -148,7 +148,15 @@ export function PublicMenuView() {
   useEffect(() => { if (tipoEntrega) sessionStorage.setItem('est_tipoentrega', tipoEntrega) }, [tipoEntrega])
   useEffect(() => { sessionStorage.setItem('est_direccion', direccionEntrega) }, [direccionEntrega])
 
-  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 640 : true
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Estado del modal de opciones de producto
   const [selectedItemForOptions, setSelectedItemForOptions] = useState<MenuItem | null>(null)
@@ -428,7 +436,7 @@ export function PublicMenuView() {
         cliente_nombre: clienteNombre.trim(),
         restaurante: restaurante.nombre,
         descripcion: pedidoCompleto,
-        estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'asignado',
+        estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
         wb_message_id: ticketId,
         metodo_pago: metodoPago,
         total: total,
@@ -507,14 +515,7 @@ export function PublicMenuView() {
         return
       }
     } else {
-      const textoCupon = cuponValido ? `\n🎁 *Cupón aplicado:* ${cuponCliente.trim()} (-$${descuento.toFixed(2)})` : cuponCliente.trim() ? `\n🎟️ *Cupón a canjear:* ${cuponCliente.trim()}` : ''
-      const mensaje = `¡Hola *${restaurante.nombre}*! 👋\nSoy *${clienteNombre.trim()}*, me gustaría hacer el siguiente pedido:\n\n${pedidoCompleto}${textoCupon}\n\n*Forma de pago:* ${metodoPago === 'efectivo' ? 'Efectivo 💵' : 'Tarjeta 💳'}\n\n_(Ticket Web: #${ticketId})_`
-
-      // se envia el mensaje al restaurante
-      const numeroRestaurante = restaurante.telefono ? restaurante.telefono.replace(/\D/g, '') : ''
-      const waUrl = `https://wa.me/${numeroRestaurante}?text=${encodeURIComponent(mensaje)}`
-
-      setProcesando(false)
+      // Flujo 100% Web para pagos en Efectivo
       setIsCartOpen(false)
       setCarrito([])
       setClienteNombre('')
@@ -522,7 +523,7 @@ export function PublicMenuView() {
       setCuponCliente('')
       setCuponValido(false)
       setDescuento(0)
-      window.open(waUrl, '_blank')
+      window.location.href = `/success?pedido=${ticketId}&success=true`
     }
   }
 
@@ -1016,7 +1017,7 @@ export function PublicMenuView() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ type: "spring", bounce: 0.4 }}
-            className="fixed bottom-6 left-0 right-0 flex justify-center z-40 pointer-events-none sm:hidden"
+            className="fixed bottom-6 left-0 right-0 flex justify-center z-40 pointer-events-none sm:bottom-10 sm:right-10 sm:left-auto sm:justify-end"
           >
             <motion.button 
               whileTap={{ scale: 0.9 }}
@@ -1049,11 +1050,11 @@ export function PublicMenuView() {
           animate={{ x: 0, y: 0 }} 
           exit={{ [isMobile ? 'y' : 'x']: '100%' }} 
           transition={{ type: 'spring', damping: 25, stiffness: 300 }} 
-          className="fixed bottom-0 left-0 w-full h-[92vh] rounded-t-[32px] sm:top-0 sm:bottom-auto sm:right-0 sm:left-auto sm:h-full sm:w-[440px] sm:max-w-md sm:rounded-none bg-white/95 backdrop-blur-xl z-[110] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] sm:shadow-2xl flex flex-col overflow-hidden"
+          className="fixed bottom-0 left-0 w-full h-[92vh] rounded-t-[32px] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-full sm:w-[440px] sm:max-w-md sm:rounded-none bg-white/95 backdrop-blur-xl z-[110] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] sm:shadow-2xl flex flex-col overflow-hidden"
         >
           
           {/* Grabber bar for mobile */}
-          <div className="w-full flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-full flex justify-center pt-3 pb-1 sm:bottom-10 sm:right-10 sm:left-auto sm:justify-end">
             <div className="w-12 h-1.5 bg-slate-300/50 rounded-full"></div>
           </div>
           
@@ -1280,7 +1281,7 @@ export function PublicMenuView() {
                 </motion.button>
               ) : (
                 <motion.button whileTap={{ scale: 0.95 }} onClick={handlePedir} disabled={procesando} className="w-full bg-[#FA4A0C] text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20">
-                  {procesando ? <Loader2 className="w-6 h-6 animate-spin" /> : metodoPago === 'en_linea' ? <>Ir a Pagar Seguro</> : <><MessageCircle size={22} /> Enviar Pedido por WhatsApp</>}
+                  {procesando ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Confirmar Pedido</>}
                 </motion.button>
               )}
             </div>
@@ -1485,4 +1486,6 @@ export function PublicMenuView() {
     </div>
   )
 }
+
+
 

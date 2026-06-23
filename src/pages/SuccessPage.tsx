@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { CheckCircle2, Loader2, MessageCircle, AlertCircle, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { OrderProgressBar } from '../components/OrderProgressBar';
 
 export function SuccessPage() {
   const [searchParams] = useSearchParams();
@@ -21,7 +22,7 @@ export function SuccessPage() {
 
   useEffect(() => {
     if ((!pedidoId && !orderId) || !isSuccess) {
-      setStatus('error');
+      setStatus('error: initial-check');
       return;
     }
 
@@ -44,7 +45,7 @@ export function SuccessPage() {
             setTimeout(() => fetchPedido(retries - 1), 2000);
             return;
           }
-          setStatus('error');
+          setStatus('error: fetch-timeout');
           return;
         }
 
@@ -59,12 +60,17 @@ export function SuccessPage() {
           if (restData) setRestauranteInfo(restData);
         }
 
-        if (pedidoData.estado === 'asignado' || pedidoData.estado === 'pagado') {
+        if (pedidoData.estado === 'pendiente' || pedidoData.estado === 'asignado' || pedidoData.estado === 'pagado' || pedidoData.estado === 'preparando' || pedidoData.estado === 'en_camino' || pedidoData.estado === 'entregado' || pedidoData.estado === 'recibido') {
           setStatus('success');
           fireConfetti();
           sessionStorage.removeItem('est_carrito');
           sessionStorage.removeItem('est_checkoutstep');
           sessionStorage.removeItem('est_tipoentrega');
+          // Continuamos la suscripción para la barra de progreso
+          checkChannel = supabase.channel(`live-progress-${pedidoData.id}-${Date.now()}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` }, (payload) => {
+              setPedido(payload.new);
+            }).subscribe();
         } else {
           setStatus('validating');
           
@@ -75,12 +81,12 @@ export function SuccessPage() {
               .select('estado')
               .eq('id', pedidoData.id)
               .single();
-            if (refreshData && (refreshData.estado === 'asignado' || refreshData.estado === 'pagado')) {
+            if (refreshData && ['pendiente', 'pagado', 'asignado', 'recibido', 'en_camino', 'entregado'].includes(refreshData.estado)) {
               setStatus('success');
               setPedido((prev: any) => ({ ...prev, estado: refreshData.estado }));
               fireConfetti();
               clearInterval(pollInterval);
-              if (checkChannel) supabase.removeChannel(checkChannel);
+              // Mantener canal de progreso
             }
           }, 3000);
 
@@ -90,15 +96,16 @@ export function SuccessPage() {
               'postgres_changes',
               { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
               (payload) => {
-                if (payload.new.estado === 'asignado' || payload.new.estado === 'pagado') {
-                  setStatus('success');
+                if (['pendiente', 'asignado', 'pagado', 'recibido', 'en_camino', 'entregado'].includes(payload.new.estado)) {
+                  if (status !== 'success') {
+                    setStatus('success');
+                    fireConfetti();
+                    sessionStorage.removeItem('est_carrito');
+                    sessionStorage.removeItem('est_checkoutstep');
+                    sessionStorage.removeItem('est_tipoentrega');
+                    clearInterval(pollInterval);
+                  }
                   setPedido(payload.new);
-                  fireConfetti();
-                  sessionStorage.removeItem('est_carrito');
-                  sessionStorage.removeItem('est_checkoutstep');
-                  sessionStorage.removeItem('est_tipoentrega');
-                  clearInterval(pollInterval);
-                  if (checkChannel) supabase.removeChannel(checkChannel);
                 }
               }
             )
@@ -108,7 +115,8 @@ export function SuccessPage() {
           timeoutId = setTimeout(() => {
             if (status !== 'success') {
               clearInterval(pollInterval);
-              if (checkChannel) supabase.removeChannel(checkChannel);
+              // Si no tuvo exito tras 15s mostramos error o dejamos de intentar. 
+              // Dejamos el channel si lo configuró.
             }
           }, 15000);
         }
@@ -118,7 +126,7 @@ export function SuccessPage() {
           setTimeout(() => fetchPedido(retries - 1), 2000);
           return;
         }
-        setStatus('error');
+        setStatus('error: fetch-catch');
       }
     };
 
@@ -193,7 +201,7 @@ export function SuccessPage() {
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Validando Pago</h2>
               <p className="text-gray-500">Estamos confirmando tu depósito con el banco. Por favor no cierres esta ventana.</p>
             </motion.div>
-          ) : status === 'error' ? (
+          ) : status.startsWith('error') ? (
             <motion.div
               key="error"
               initial={{ opacity: 0, y: 20 }}
@@ -205,6 +213,7 @@ export function SuccessPage() {
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Pago no encontrado</h2>
               <p className="text-gray-500 mb-6">Hubo un problema validando el ticket de tu compra. Si ya se descontó el saldo, por favor contacta al restaurante.</p>
+              <p className="text-xs text-red-400 font-mono mb-4">Debug: {status}</p>
               <button 
                 onClick={() => navigate('/')}
                 className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl transition-colors"
@@ -235,8 +244,24 @@ export function SuccessPage() {
                     <CheckCircle2 className="w-12 h-12" strokeWidth={2.5} />
                   </motion.div>
                 </motion.div>
-                <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-400 tracking-tight mb-1">¡Pago Exitoso!</h1>
-                <p className="text-emerald-600/80 mt-1 font-bold text-lg">Tu orden ha sido confirmada</p>
+                <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-400 tracking-tight mb-1">
+                  {pedido?.estado === 'cancelado' || pedido?.estado === 'rechazado' ? 'Pedido Cancelado' : pedido?.estado === 'entregado' ? '¡Disfruta tu comida!' : '¡Orden Confirmada!'}
+                </h1>
+                
+                {pedido?.tipo_pedido === 'tienda' ? (
+                  <>
+                    <p className="text-emerald-600/80 mt-1 font-bold text-lg mb-2">¡Éxito! Te esperamos pronto en la tienda.</p>
+                    <p className="text-gray-500 text-sm">Tu pedido ha sido recibido y comenzaremos a prepararlo para que pases a recogerlo.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-emerald-600/80 mt-1 font-bold text-lg mb-4">Sigue el estado de tu pedido en tiempo real</p>
+                    {/* Progress Bar Injection */}
+                    {pedido && (
+                      <OrderProgressBar currentStatus={pedido.estado} />
+                    )}
+                  </>
+                )}
               </div>
 
               <div className="py-6 space-y-4">
