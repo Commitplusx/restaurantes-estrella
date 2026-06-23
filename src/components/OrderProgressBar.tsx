@@ -74,7 +74,6 @@ export function OrderProgressBar({ currentStatus, customSteps }: OrderProgressBa
         {steps.map((step, index) => {
           const isCompleted = index < activeIndex;
           const isActive = index === activeIndex;
-          const isPending = index > activeIndex;
 
           let bgColor = 'bg-white border-2 border-gray-200 text-gray-400';
           if (isCompleted) {

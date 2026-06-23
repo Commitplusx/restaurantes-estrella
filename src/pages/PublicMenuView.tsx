@@ -7,7 +7,6 @@ import {
   Plus,
   Minus,
   ShoppingBag,
-  MessageCircle,
   AlertCircle,
   Loader2,
   Star,

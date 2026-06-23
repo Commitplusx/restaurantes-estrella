@@ -22,7 +22,7 @@ export function SuccessPage() {
 
   useEffect(() => {
     if ((!pedidoId && !orderId) || !isSuccess) {
-      setStatus('error: initial-check');
+      setStatus('error');
       return;
     }
 
@@ -45,7 +45,7 @@ export function SuccessPage() {
             setTimeout(() => fetchPedido(retries - 1), 2000);
             return;
           }
-          setStatus('error: fetch-timeout');
+          setStatus('error');
           return;
         }
 
@@ -126,7 +126,7 @@ export function SuccessPage() {
           setTimeout(() => fetchPedido(retries - 1), 2000);
           return;
         }
-        setStatus('error: fetch-catch');
+        setStatus('error');
       }
     };
 
@@ -201,7 +201,7 @@ export function SuccessPage() {
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Validando Pago</h2>
               <p className="text-gray-500">Estamos confirmando tu depósito con el banco. Por favor no cierres esta ventana.</p>
             </motion.div>
-          ) : status.startsWith('error') ? (
+          ) : status === 'error' ? (
             <motion.div
               key="error"
               initial={{ opacity: 0, y: 20 }}
@@ -213,7 +213,6 @@ export function SuccessPage() {
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Pago no encontrado</h2>
               <p className="text-gray-500 mb-6">Hubo un problema validando el ticket de tu compra. Si ya se descontó el saldo, por favor contacta al restaurante.</p>
-              <p className="text-xs text-red-400 font-mono mb-4">Debug: {status}</p>
               <button 
                 onClick={() => navigate('/')}
                 className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl transition-colors"
