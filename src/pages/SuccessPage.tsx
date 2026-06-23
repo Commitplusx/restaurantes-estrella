@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CheckCircle2, Loader2, MessageCircle, AlertCircle, ShoppingBag } from 'lucide-react';
@@ -20,9 +20,9 @@ export function SuccessPage() {
   const [pedido, setPedido] = useState<any>(null);
   const [restauranteInfo, setRestauranteInfo] = useState<any>(null);
   // Ref to avoid stale closure bugs in async callbacks (BUG 1 fix)
-  const resolvedRef = React.useRef(false);
-  const confettiFiredRef = React.useRef(false);
-  const pollIntervalRef = React.useRef<any>(null);
+  const resolvedRef = useRef(false);
+  const confettiFiredRef = useRef(false);
+  const pollIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     if ((!pedidoId && !orderId) || !isSuccess) {
