@@ -16,6 +16,7 @@ interface Restaurante {
   horarios?: any
   categorias?: string[]
   slug?: string
+  activo?: boolean
 }
 
 export function PublicLandingPage() {

@@ -7,7 +7,6 @@ import { PublicMenuView } from './pages/PublicMenuView'
 import { SuccessPage } from './pages/SuccessPage'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
