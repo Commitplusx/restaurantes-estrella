@@ -40,6 +40,16 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
     loadData()
   }, [restaurante.id])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin:combos:${restaurante.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_combos', filter: `restaurante_id=eq.${restaurante.id}` }, () => {
+        loadData()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [restaurante.id])
+
   async function loadData() {
     setLoading(true)
     const { data } = await supabase.from('menu_combos').select('*').eq('restaurante_id', restaurante.id).order('created_at', { ascending: false })

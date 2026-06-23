@@ -252,3 +252,26 @@ label { font-size: 0.85rem; color: var(--text); font-weight: 600; display: block
   }
 }
 
+/* ── Estilos de Impresión (Tickets Térmicos) ──────────────────── */
+@media print {
+  /* Ocultar TODO excepto el ticket */
+  body > * { display: none !important; }
+  #print-ticket { 
+    display: block !important; 
+    width: 80mm;
+    max-width: 80mm;
+    margin: 0;
+    padding: 4mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    color: #000;
+    background: #fff;
+  }
+  /* Quitar colores innecesarios para ahorrar tinta */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  
+  /* Forzar mostrar el ticket */
+  #print-ticket.hidden { display: block !important; }
+}
+
+

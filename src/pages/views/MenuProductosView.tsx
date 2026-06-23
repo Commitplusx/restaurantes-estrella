@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Image as ImageIcon, X, Loader2, Utensils } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, X, Loader2, Utensils, Clock } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
 import { supabase, subirFoto } from '../../lib/supabase'
@@ -55,6 +55,19 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     loadData()
   }, [restaurante.id])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin:items:${restaurante.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `restaurante_id=eq.${restaurante.id}` }, () => {
+        loadData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categorias', filter: `restaurante_id=eq.${restaurante.id}` }, () => {
+        loadData()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [restaurante.id])
+
   async function loadData() {
     setLoading(true)
     const [ { data: cats }, { data: prods } ] = await Promise.all([
@@ -62,6 +75,27 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
       supabase.from('menu_items').select('*').eq('restaurante_id', restaurante.id).order('orden')
     ])
     setCategorias(cats || [])
+
+    // Auto-reset agotado_hoy: si el platillo tiene agotado_hasta pasado, lo limpiamos
+    const today = new Date().toISOString().split('T')[0]
+    const toReset = (prods || []).filter(p =>
+      p.agotado_hoy &&
+      p.agotado_hasta &&
+      p.agotado_hasta.split('T')[0] < today
+    )
+    if (toReset.length > 0) {
+      await supabase.from('menu_items')
+        .update({ agotado_hoy: false, agotado_hasta: null })
+        .in('id', toReset.map(p => p.id))
+      // Actualizar los objetos localmente
+      prods?.forEach(p => {
+        if (toReset.find(r => r.id === p.id)) {
+          p.agotado_hoy = false
+          p.agotado_hasta = null
+        }
+      })
+    }
+
     setItems(prods || [])
     setLoading(false)
   }
@@ -121,6 +155,17 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     const newVal = !item.disponible
     setItems(items.map(i => i.id === item.id ? { ...i, disponible: newVal } : i))
     await supabase.from('menu_items').update({ disponible: newVal }).eq('id', item.id)
+  }
+
+  const handleToggleAgotado = async (item: MenuItem) => {
+    const newVal = !item.agotado_hoy
+    // Si se marca como agotado, guardar el fin del día de hoy para que mañana se limpie solo
+    const endOfToday = newVal ? new Date(new Date().toISOString().split('T')[0] + 'T23:59:59').toISOString() : null
+    await supabase.from('menu_items').update({
+      agotado_hoy: newVal,
+      agotado_hasta: endOfToday
+    }).eq('id', item.id)
+    setItems(prev => prev.map(i => i.id === item.id ? {...i, agotado_hoy: newVal, agotado_hasta: endOfToday} : i))
   }
 
   if (loading) return (
@@ -226,6 +271,17 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
                           <input type="checkbox" checked={item.disponible} onChange={() => toggleDisponible(item)} />
                           <span className="toggle-slider"></span>
                         </label>
+                        <button
+                          onClick={() => handleToggleAgotado(item)}
+                          title={item.agotado_hoy ? 'Marcar como disponible' : 'Marcar como agotado hoy'}
+                          className={`p-2 rounded-[12px] transition-colors text-xs font-bold ${
+                            item.agotado_hoy
+                              ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                              : 'text-slate-400 hover:text-amber-500 hover:bg-amber-50'
+                          }`}
+                        >
+                          {item.agotado_hoy ? '🔴' : '🟢'}
+                        </button>
                         <div className="flex flex-col sm:flex-row gap-1">
                           <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-[12px] transition-colors" onClick={() => handleOpenModal(item)}>
                             <Edit2 size={16} />
@@ -255,17 +311,20 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nombre del platillo *</label>
             <input required type="text" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.nombre || ''} onChange={e => setEditingItem({...editingItem, nombre: e.target.value})} placeholder="Ej. Hamburguesa Doble" />
+            <p className="text-[11px] text-slate-400 font-medium leading-tight">Escribe el nombre claro y sin abreviaturas. <span className="text-slate-500 font-bold">Ej. Frappé de Moka</span></p>
           </div>
           
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Descripción</label>
             <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium min-h-[100px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Ingredientes, preparación..." />
+            <p className="text-[11px] text-slate-400 font-medium leading-tight">💡 <span className="text-orange-500 font-bold">Tip de ventas:</span> Describe los ingredientes para que se escuche antojable. Los clientes compran más cuando saben qué incluye.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Precio ($) *</label>
               <input required type="number" step="0.01" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.precio || 0} onChange={e => setEditingItem({...editingItem, precio: parseFloat(e.target.value)})} />
+              <p className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">Si tiene varios tamaños, pon el precio del tamaño más chico aquí.</p>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Categoría</label>
@@ -273,6 +332,28 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 {categorias.length === 0 && <option value="">Automática</option>}
               </select>
+            </div>
+          </div>
+
+          {/* Horario de Disponibilidad */}
+          <div className="flex flex-col gap-2 bg-blue-50/50 border border-blue-100 rounded-2xl p-4">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+              <Clock size={14} className="text-blue-400" /> Disponible solo en horario (opcional)
+            </label>
+            <p className="text-[11px] text-slate-400 font-medium">Deja vacío si está disponible siempre. Ejemplo: desayunos solo de 8:00 a 12:00.</p>
+            <div className="flex gap-3 items-center">
+              <div className="flex-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Desde</label>
+                <input type="time" className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm font-medium mt-1"
+                  value={editingItem.hora_inicio_disponible || ''}
+                  onChange={e => setEditingItem({...editingItem, hora_inicio_disponible: e.target.value || null})} />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Hasta</label>
+                <input type="time" className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-sm font-medium mt-1"
+                  value={editingItem.hora_fin_disponible || ''}
+                  onChange={e => setEditingItem({...editingItem, hora_fin_disponible: e.target.value || null})} />
+              </div>
             </div>
           </div>
 
@@ -306,7 +387,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
 
           {/* Opciones y Modificadores */}
           <div className="mt-6 border-t border-slate-100 pt-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
               <h3 className="font-black text-slate-800">Opciones y Extras</h3>
               <button type="button" onClick={() => setEditingItem({
                 ...editingItem,
@@ -314,6 +395,13 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
               })} className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-1">
                 <Plus size={14} /> Añadir Grupo
               </button>
+            </div>
+            
+            <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3 mb-4 flex gap-2 items-start">
+              <div className="text-orange-400 mt-0.5">💡</div>
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                Usa <strong className="text-orange-600">Variantes</strong> si el cliente debe elegir forzosamente un tamaño o tipo (Ej. Chico, Mediano). Usa <strong className="text-emerald-600">Extras</strong> si quieres cobrar por ingredientes adicionales (Ej. Extra Queso +$15).
+              </p>
             </div>
             
             <div className="space-y-4">
@@ -326,23 +414,39 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
                         newOpciones[gIndex].titulo = e.target.value;
                         setEditingItem({ ...editingItem, opciones: newOpciones });
                       }} />
-                      <div className="flex gap-4 text-sm items-center">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={grupo.requerido} onChange={e => {
+                      <div className="flex flex-col sm:flex-row gap-2 bg-slate-200/50 p-1.5 rounded-xl w-full">
+                        <button
+                          type="button"
+                          onClick={() => {
                             const newOpciones = [...(editingItem.opciones || [])];
-                            newOpciones[gIndex].requerido = e.target.checked;
+                            newOpciones[gIndex].requerido = true;
+                            newOpciones[gIndex].maximo_selecciones = 1;
                             setEditingItem({ ...editingItem, opciones: newOpciones });
-                          }} className="accent-orange-500" />
-                          <span className="font-medium text-slate-600">Obligatorio</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <span className="font-medium text-slate-600">Max selecciones:</span>
-                          <input type="number" min="1" className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-center" value={grupo.maximo_selecciones} onChange={e => {
+                          }}
+                          className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            grupo.requerido && grupo.maximo_selecciones === 1
+                              ? 'bg-white text-orange-600 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          ◉ Variantes (Debe elegir 1)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
                             const newOpciones = [...(editingItem.opciones || [])];
-                            newOpciones[gIndex].maximo_selecciones = parseInt(e.target.value) || 1;
+                            newOpciones[gIndex].requerido = false;
+                            newOpciones[gIndex].maximo_selecciones = 10;
                             setEditingItem({ ...editingItem, opciones: newOpciones });
-                          }} />
-                        </label>
+                          }}
+                          className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            !grupo.requerido && grupo.maximo_selecciones > 1
+                              ? 'bg-white text-emerald-600 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          ☑ Extras (Opcional, varios)
+                        </button>
                       </div>
                     </div>
                     <button type="button" onClick={() => {

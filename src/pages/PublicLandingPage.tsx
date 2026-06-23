@@ -106,6 +106,35 @@ export function PublicLandingPage() {
   useEffect(() => {
     loadRestaurants(0)
     loadPromos()
+
+    // Realtime para actualizar la lista de restaurantes en vivo
+    const channel = supabase
+      .channel('public:landing_restaurantes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes' }, (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          const updatedRest = payload.new as Restaurante
+          setRestaurantes(prev => {
+            if (!updatedRest.activo) {
+              return prev.filter(r => r.id !== updatedRest.id)
+            }
+            const exists = prev.some(r => r.id === updatedRest.id)
+            if (exists) {
+              return prev.map(r => r.id === updatedRest.id ? { ...r, ...updatedRest } : r)
+            }
+            return [updatedRest, ...prev]
+          })
+        } else if (payload.eventType === 'INSERT') {
+          const newRest = payload.new as Restaurante
+          if (newRest.activo) {
+            setRestaurantes(prev => [newRest, ...prev])
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setRestaurantes(prev => prev.filter(r => r.id !== payload.old.id))
+        }
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   const handleLoadMore = () => {

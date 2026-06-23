@@ -49,6 +49,16 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     loadData()
   }, [restaurante.id])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin:promos:${restaurante.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_promociones', filter: `restaurante_id=eq.${restaurante.id}` }, () => {
+        loadData()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [restaurante.id])
+
   async function loadData() {
     setLoading(true)
     const { data } = await supabase.from('menu_promociones').select('*').eq('restaurante_id', restaurante.id).order('created_at', { ascending: false })

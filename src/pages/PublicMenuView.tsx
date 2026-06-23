@@ -81,6 +81,7 @@ export function PublicMenuView() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
+  const [restaurantePausado, setRestaurantePausado] = useState(false)
 
   const [categorias, setCategorias] = useState<MenuCategoria[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
@@ -181,15 +182,56 @@ export function PublicMenuView() {
     try {
       const { data, error } = await supabase.rpc('validar_cupon_publico', { p_codigo: cuponCliente })
 
-      if (error || !data?.ok) {
-        showToast('Cupón Inválido', data?.error || 'El cupón no es válido o ya expiró', 'error')
-        setCuponValido(false)
-        setDescuento(0)
-      } else {
+      if (!error && data?.ok) {
         showToast('Cupón Aplicado', `¡Se descontarán $${data.monto.toFixed(2)} de tu orden!`, 'success')
         setCuponValido(true)
         setDescuento(data.monto)
+        return
       }
+
+      // Si no encontró cupón global, buscar en cupones propios del restaurante
+      if (restaurante?.id) {
+        const { data: cuponPropio } = await supabase
+          .from('cupones_restaurante')
+          .select('*')
+          .eq('restaurante_id', restaurante.id)
+          .eq('codigo', cuponCliente.toUpperCase())
+          .eq('activo', true)
+          .maybeSingle()
+
+        if (cuponPropio) {
+          // Validar expiración
+          if (cuponPropio.fecha_fin && new Date(cuponPropio.fecha_fin) < new Date()) {
+            showToast('Cupón expirado', 'Este cupón ya no está disponible', 'error')
+            return
+          }
+          // Validar usos
+          if (cuponPropio.uso_maximo && cuponPropio.usos_actuales >= cuponPropio.uso_maximo) {
+            showToast('Cupón agotado', 'Este cupón ya alcanzó su límite de usos', 'error')
+            return
+          }
+          // Calcular descuento
+          const subtotalActual = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
+          const descuentoCalculado = cuponPropio.tipo === 'porcentaje'
+            ? subtotalActual * (cuponPropio.valor / 100)
+            : cuponPropio.valor
+          const descuentoFinal = Math.min(descuentoCalculado, subtotalActual)
+          setCuponValido(true)
+          setDescuento(descuentoFinal)
+          showToast('¡Cupón Aplicado!', `Descuento de $${descuentoFinal.toFixed(2)} aplicado`, 'success')
+          // Incrementar contador de usos
+          await supabase
+            .from('cupones_restaurante')
+            .update({ usos_actuales: cuponPropio.usos_actuales + 1 })
+            .eq('id', cuponPropio.id)
+          return
+        }
+      }
+
+      // Ningún cupón encontrado
+      showToast('Cupón Inválido', data?.error || 'El cupón no es válido o ya expiró', 'error')
+      setCuponValido(false)
+      setDescuento(0)
     } catch (err) {
       showToast('Error', 'Hubo un error de conexión', 'error')
     } finally {
@@ -323,9 +365,26 @@ export function PublicMenuView() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_promociones', filter: `restaurante_id=eq.${actualRestId}` }, () => {
           fetchMenuData(true)
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes', filter: `id=eq.${actualRestId}` }, () => {
-          fetchMenuData(true)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'restaurantes', filter: `id=eq.${actualRestId}` }, (payload) => {
+          const nuevo = payload.new as Restaurante
+          if (nuevo.activo === false) {
+            // Restaurante se desactivó en tiempo real → mostrar overlay amigable
+            setRestaurantePausado(true)
+          } else if (nuevo.activo === true) {
+            // Volvió a abrir → quitar overlay y refrescar menú
+            setRestaurantePausado(false)
+            fetchMenuData(true)
+          } else {
+            fetchMenuData(true)
+          }
         })
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'cupones_restaurante', filter: `restaurante_id=eq.${actualRestId}` },
+          () => {
+            // Cuando el dueño desactiva/activa/elimina un cupón, el cliente lo ve de inmediato
+            fetchMenuData(true)
+          }
+        )
         .subscribe()
 
       // Limpiar canal al desmontar
@@ -537,49 +596,64 @@ export function PublicMenuView() {
     }
   }
 
-  if (loading) return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent" />
-      
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative z-10 flex flex-col items-center"
-      >
-        <motion.div
-          animate={{ 
-            scale: [1, 1.05, 1],
-            rotate: [0, 5, -5, 0]
-          }}
-          transition={{ 
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="w-24 h-24 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-[28px] flex items-center justify-center shadow-[0_0_50px_rgba(249,115,22,0.4)] mb-8"
-        >
-          <svg className="w-12 h-12 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-          </svg>
-        </motion.div>
+  if (restaurantePausado) return (
+    <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center px-6 text-center">
+      <div className="bg-white rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-slate-100 p-10 max-w-sm w-full">
+        <div className="w-20 h-20 rounded-[24px] bg-amber-50 flex items-center justify-center mx-auto mb-5">
+          <span className="text-4xl">⏸️</span>
+        </div>
+        <h2 className="text-2xl font-black text-slate-800 mb-2">Restaurante pausado</h2>
+        <p className="text-slate-500 text-sm leading-relaxed mb-1">
+          <strong className="text-slate-700">{restaurante?.nombre}</strong> tomó un descanso y no está recibiendo pedidos en este momento.
+        </p>
+        <p className="text-slate-400 text-sm mb-7">
+          Por favor regresa un poco más tarde. Cuando retomen actividad verás el menú automáticamente.
+        </p>
+        <div className="flex gap-2 items-center justify-center text-xs text-amber-500 font-bold bg-amber-50 rounded-xl px-4 py-2.5">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          Esperando que reabran...
+        </div>
+      </div>
+    </div>
+  )
 
-        <motion.h1 
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-3xl font-black text-white tracking-tight text-center"
-        >
-          Cargando <span className="text-orange-500">Menú...</span>
-        </motion.h1>
-        
-        <motion.div 
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 150, opacity: 1 }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" }}
-          className="h-1.5 bg-gradient-to-r from-orange-500 to-amber-400 mt-10 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.5)]"
-        />
-      </motion.div>
+  if (loading) return (
+    <div className="min-h-screen bg-[#FAFAFA] animate-pulse">
+      {/* Header Skeleton */}
+      <div className="h-48 md:h-64 bg-slate-200 w-full mb-8 rounded-b-[40px]"></div>
+      
+      <div className="max-w-5xl mx-auto px-4">
+        {/* Info & Tabs Skeleton */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-24 h-24 bg-slate-300 rounded-full -mt-20 mb-4 border-4 border-[#FAFAFA]"></div>
+          <div className="h-8 bg-slate-200 rounded-lg w-48 mb-2"></div>
+          <div className="h-4 bg-slate-200 rounded-lg w-32 mb-6"></div>
+          
+          <div className="flex gap-4 w-full max-w-sm">
+            <div className="h-12 bg-slate-200 rounded-[20px] flex-1"></div>
+            <div className="h-12 bg-slate-200 rounded-[20px] flex-1"></div>
+          </div>
+        </div>
+
+        {/* Categories Skeleton */}
+        <div className="flex gap-3 mb-8 overflow-hidden">
+          {[1,2,3,4].map(i => <div key={i} className="h-10 bg-slate-200 rounded-full w-24 shrink-0"></div>)}
+        </div>
+
+        {/* Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+          {[1,2,3,4,5,6].map(i => (
+            <div key={i} className="bg-slate-100 p-4 rounded-[32px] flex gap-4 h-32">
+              <div className="w-24 h-24 rounded-[24px] bg-slate-200 shrink-0"></div>
+              <div className="flex-1 space-y-3 py-2">
+                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                <div className="h-6 bg-slate-200 rounded-full w-20 mt-auto"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 
@@ -593,117 +667,115 @@ export function PublicMenuView() {
   )
 
   return (
-    <div className="min-h-screen bg-[#F6F6F9] text-slate-900 selection:bg-[#FA4A0C]/20 font-sans pb-32">
+    <div className="min-h-screen bg-white text-slate-900 selection:bg-[#FA4A0C]/20 font-sans pb-32">
 
-      {/* TOPBAR TRANSLÚCIDA / SÓLIDA AL HACER SCROLL */}
-      <header className={`fixed top-0 left-0 right-0 z-50 py-3 px-4 md:px-10 flex items-center gap-3 transition-all duration-300 ${isScrolled ? 'bg-white/90 backdrop-blur-xl border-b border-slate-200/50 shadow-sm' : 'bg-gradient-to-b from-black/50 to-transparent border-transparent'}`}>
+      {/* TOPBAR */}
+      <header className={`fixed top-0 left-0 right-0 z-50 py-3 px-4 md:px-10 flex items-center gap-3 transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm' : 'bg-transparent'}`}>
         <Link
           to="/"
-          className={`p-2 rounded-full transition-all shrink-0 backdrop-blur-md ${isScrolled ? 'bg-slate-100 text-slate-500 hover:bg-[#FF7A6A] hover:text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}
+          className={`p-2.5 rounded-full transition-all shrink-0 ${isScrolled ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-black/20 backdrop-blur-md text-white hover:bg-black/30'}`}
         >
           <ChevronLeft size={20} />
         </Link>
         <div className={`flex-1 min-w-0 transition-opacity duration-300 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>
-          <h1 className="text-base md:text-lg font-black text-slate-900 truncate">{restaurante.nombre}</h1>
-          <p className="text-[11px] text-slate-400 font-medium hidden sm:flex items-center gap-1">
-            <MapPin size={11} /> {restaurante.direccion || 'Comitán, Chiapas'}
-          </p>
+          <h1 className="text-base font-bold text-slate-900 truncate">{restaurante.nombre}</h1>
         </div>
-        {/* Carrito en header removido a petición del usuario */}
       </header>
 
-      {/* HERO FULL BLEED (Dribbble Style) */}
-      <div className="relative w-full h-[30vh] md:h-[35vh] bg-slate-900 overflow-hidden">
+      {/* HERO FULL BLEED (RAPPI STYLE) */}
+      <div className="relative w-full h-[25vh] md:h-[25vh] bg-slate-50 overflow-hidden">
         {restaurante.foto_fachada_url ? (
-          <img
-            src={restaurante.foto_fachada_url}
-            className="w-full h-full object-cover opacity-60 mix-blend-overlay"
-            loading="lazy"
-            decoding="async"
-            alt={restaurante.nombre}
-          />
+          <>
+            {/* Fondo borroso para rellenar espacios vacíos (solo en móvil) */}
+            <div 
+              className="absolute inset-0 bg-cover bg-center blur-2xl scale-110 opacity-50 md:hidden"
+              style={{ backgroundImage: `url(${restaurante.foto_fachada_url})` }}
+            />
+            {/* Imagen principal: contenida en móvil, oculta en PC */}
+            <img
+              src={restaurante.foto_fachada_url}
+              className="relative w-full h-full object-contain md:hidden"
+              loading="lazy"
+              decoding="async"
+              alt={restaurante.nombre}
+            />
+          </>
         ) : (
-          <div className="w-full h-full bg-gradient-to-r from-orange-400 to-red-500 opacity-60 mix-blend-overlay" />
+          <div className="w-full h-full bg-slate-50" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F6F6F9] via-[#F6F6F9]/20 to-transparent" />
       </div>
 
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 relative -mt-12 sm:-mt-16 z-10">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-8 relative z-10">
 
-        {/* RESTAURANT INFO CARD */}
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, type: "spring", bounce: 0.4 }}
-          className="bg-white/80 backdrop-blur-xl rounded-[40px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 border border-white mb-6 text-center sm:text-left"
-        >
-          {/* Logo (opcional, extraemos de la foto si no hay otra) */}
-          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden shadow-xl border-[6px] border-white bg-orange-50 shrink-0 flex items-center justify-center -mt-16 sm:-mt-20">
+        {/* INFO CARD (RAPPI STYLE) */}
+        <div className="bg-white rounded-t-3xl sm:rounded-none -mt-6 sm:mt-0 pt-0 pb-6 flex flex-col items-center sm:items-start text-center sm:text-left border-b border-slate-100">
+          
+          <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-48 md:h-48 rounded-[18px] md:rounded-[32px] overflow-hidden shadow-sm border-4 md:border-[8px] border-white bg-white shrink-0 flex items-center justify-center -mt-10 md:-mt-24 mb-3 md:mb-6 z-20">
             {restaurante.foto_fachada_url ? (
-               <img src={restaurante.foto_fachada_url} className="w-full h-full object-contain" loading="lazy" decoding="async" alt="Logo" />
+               <img src={restaurante.foto_fachada_url} className="w-full h-full object-cover" loading="lazy" decoding="async" alt="Logo" />
             ) : (
-               <Store className="w-12 h-12 text-orange-300" />
+               <Store className="w-10 h-10 md:w-20 md:h-20 text-slate-300" />
             )}
           </div>
           
-          <div className="flex-1">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight mb-2">
-              {restaurante.nombre}
-            </h1>
-            <p className="text-slate-500 font-medium mb-4 flex items-center justify-center sm:justify-start gap-2">
-               <MapPin size={16} /> {restaurante.direccion || 'Comitán, Chiapas'}
-            </p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-1">
+            {restaurante.nombre}
+          </h1>
+          
+          <p className="text-slate-500 text-sm mb-4 flex items-center justify-center sm:justify-start gap-1">
+            <Star size={14} className="text-amber-400 fill-amber-400" /> 
+            <span className="font-medium text-slate-700">4.8</span>
+            <span className="text-slate-300 mx-1">•</span>
+            {restaurante.categorias?.slice(0, 2).join(' • ') || 'Restaurante'}
+          </p>
+          
+          <div className="flex flex-wrap justify-center sm:justify-start gap-4 text-sm mt-1">
+            <div className="flex items-center gap-1.5 text-slate-600">
+              <Clock size={16} className="text-slate-400" /> 
+              <span>{restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}</span>
+            </div>
             
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
-              <span className={`flex items-center gap-1.5 font-black text-xs px-4 py-2 rounded-full border ${estaAbierto(restaurante) ? 'bg-[#FA4A0C]/10 text-[#FA4A0C] border-[#FA4A0C]/20' : 'bg-red-500/10 text-red-600 border-red-500/20'}`}>
-                <Clock size={14} /> {estaAbierto(restaurante) ? 'Abierto' : 'Cerrado'} • {restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}
-              </span>
-              {restaurante.categorias?.slice(0,2).map((cat, idx) => (
-                <span key={idx} className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 px-3 py-2 rounded-full">
-                  {cat || 'Categoría'}
-                </span>
-              ))}
+            <div className="flex items-center gap-1.5 text-slate-600">
+               <MapPin size={16} className="text-slate-400" /> 
+               <span className="line-clamp-1 max-w-[200px]">{restaurante.direccion || 'Comitán'}</span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {!estaAbierto(restaurante) && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-red-50 text-red-600 font-bold text-center text-sm p-4 rounded-2xl mb-8 flex items-center justify-center gap-2 border border-red-100"
-          >
-            <AlertCircle size={18} />
-            El restaurante está cerrado por ahora. Solo se tomarán pedidos cuando abra.
-          </motion.div>
+          <div className="bg-slate-50 text-slate-600 font-medium text-sm p-4 rounded-xl mt-6 flex items-center justify-center sm:justify-start gap-2 border border-slate-200">
+            <AlertCircle size={18} className="text-slate-400" />
+            Cerrado. Solo puedes hacer pedidos en el horario del restaurante.
+          </div>
         )}
 
-        {/* TABS DE NAVEGACIÓN (Sticky Clean UI) */}
+        {/* TABS DE NAVEGACIÓN (RAPPI STYLE) */}
         {(combos.length > 0 || promos.length > 0) && (
-          <div className="sticky top-[70px] z-40 bg-[#F6F6F9]/90 backdrop-blur-md pt-4 pb-2 mb-8 border-b border-slate-200/50">
-            <div className="flex overflow-x-auto hide-scrollbar gap-8">
+          <div className="sticky top-[52px] z-40 bg-white pt-6 pb-0 mb-6 border-b border-slate-100">
+            <div className="flex overflow-x-auto hide-scrollbar gap-8 px-2">
               <button
                 onClick={() => setActiveTab('menu')}
-                className={`pb-3 text-[17px] font-semibold transition-all relative shrink-0 ${activeTab === 'menu' ? 'text-[#FA4A0C]' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === 'menu' ? 'text-slate-900' : 'text-slate-400'}`}
               >
-                🍽️ Menú
-                {activeTab === 'menu' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FA4A0C] rounded-t-full" />}
+                Menú
+                {activeTab === 'menu' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
               </button>
               {combos.length > 0 && (
                 <button
                   onClick={() => setActiveTab('combos')}
-                  className={`pb-3 text-[17px] font-semibold transition-all relative shrink-0 ${activeTab === 'combos' ? 'text-[#FA4A0C]' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === 'combos' ? 'text-slate-900' : 'text-slate-400'}`}
                 >
-                  ⭐ Combos
-                  {activeTab === 'combos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FA4A0C] rounded-t-full" />}
+                  Combos
+                  {activeTab === 'combos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
                 </button>
               )}
               {promos.length > 0 && (
                 <button
                   onClick={() => setActiveTab('promos')}
-                  className={`pb-3 text-[17px] font-semibold transition-all relative shrink-0 ${activeTab === 'promos' ? 'text-[#FA4A0C]' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === 'promos' ? 'text-slate-900' : 'text-slate-400'}`}
                 >
-                  🔥 Promos
-                  {activeTab === 'promos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#FA4A0C] rounded-t-full" />}
+                  Promociones
+                  {activeTab === 'promos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
                 </button>
               )}
             </div>
@@ -712,79 +784,73 @@ export function PublicMenuView() {
 
             {/* PRODUCT CATEGORIES (MENU TAB) */}
             {activeTab === 'menu' && (
-              <div>
+              <div className="mt-8">
                 {categorias.map(cat => {
                   const catItems = items.filter(i => i.categoria_id === cat.id)
                   if (catItems.length === 0) return null
                   return (
                     <motion.div
                       key={cat.id}
-                      className="mb-12"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4 }}
+                      className="mb-10"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                     >
-                      <h3 className="text-[22px] font-extrabold text-slate-900 mb-6 flex items-center gap-3 tracking-tight">
-                        <span className="w-1.5 h-6 bg-[#FA4A0C] rounded-full" />
-                        {cat.emoji} {cat.nombre}
+                      <h3 className="text-xl font-bold text-slate-900 mb-4 px-2 tracking-tight">
+                        {cat.nombre}
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {catItems.map((item, index) => {
                           const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
                           const cantTotal = getCantidadTotal(item.id, 'item')
+                          // Filtrar por horario si tiene horario configurado
+                          const horaActual = new Date().toTimeString().slice(0,5) // 'HH:MM'
+                          const fueraDeHorario = !!(
+                            item.hora_inicio_disponible && item.hora_fin_disponible &&
+                            (horaActual < item.hora_inicio_disponible || horaActual > item.hora_fin_disponible)
+                          )
                           return (
-                            <motion.div
+                            <div
                               key={item.id}
-                              initial={{ opacity: 0, y: 30 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
-                              className="bg-white/80 backdrop-blur-sm p-4 rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(250,74,12,0.15)] hover:-translate-y-1 transition-all flex gap-4 items-center group border border-white hover:border-orange-50/50"
+                              className={`bg-white p-4 rounded-[16px] border border-slate-100 flex gap-4 items-stretch cursor-pointer hover:border-slate-200 transition-colors ${fueraDeHorario ? 'opacity-50' : ''}`}
+                              onClick={() => setSelectedItemDetail({ ...item, cartItemTipo: 'item' })}
                             >
-                              <div className="w-24 h-24 rounded-[24px] overflow-hidden bg-slate-50 shrink-0 cursor-pointer shadow-inner" onClick={() => {
-                                setSelectedItemDetail({ ...item, cartItemTipo: 'item' })
-                              }}>
-                                {item.foto_url ? (
-                                  <img src={item.foto_url} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" alt={item.nombre} />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-slate-200"><Store size={32} /></div>
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex justify-between items-start mb-1 cursor-pointer" onClick={() => {
-                                  setSelectedItemDetail({ ...item, cartItemTipo: 'item' })
-                                }}>
-                                  <h4 className="font-bold text-slate-900 text-lg">{item.nombre}</h4>
-                                  <span className="text-[#ff6250] font-black text-lg">${item.precio.toFixed(2)}</span>
+                              <div className="flex-1 min-w-0 flex flex-col">
+                                <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{item.nombre}</h4>
+                                <p className="text-slate-500 text-sm mb-3 line-clamp-2 leading-snug">{item.descripcion}</p>
+                                <div className="mt-auto flex items-center justify-between">
+                                  <span className="text-slate-900 font-bold text-[15px]">${item.precio.toFixed(2)}</span>
+                                  
+                                  {item.agotado_hoy ? (
+                                    <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">Agotado</span>
+                                  ) : fueraDeHorario ? (
+                                    <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">{item.hora_inicio_disponible}</span>
+                                  ) : null}
                                 </div>
-                                <p className="text-slate-400 text-xs md:text-sm mb-4 line-clamp-2 leading-relaxed">{item.descripcion}</p>
-                                <div className="flex justify-between items-center">
-                                  {item.opciones && item.opciones.length > 0 ? (
-                                    <button
-                                      onClick={() => {
+                              </div>
+                              <div className="w-[100px] h-[100px] rounded-[12px] overflow-hidden bg-slate-50 shrink-0 relative">
+                                {item.foto_url ? (
+                                  <img src={item.foto_url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt={item.nombre} />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-slate-200"><Store size={24} /></div>
+                                )}
+                                {(!item.agotado_hoy && !fueraDeHorario) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (item.opciones && item.opciones.length > 0) {
                                         setSelectedItemForOptions(item)
                                         setSelectedOptionsState({})
-                                      }}
-                                      className="bg-slate-100 hover:bg-[#FF7A6A]/10 text-slate-700 hover:text-[#ff6250] font-bold text-xs px-6 py-2.5 rounded-[20px] transition-all flex items-center gap-2"
-                                    >
-                                      Opciones {cantTotal > 0 && <span className="bg-[#FF7A6A] text-white px-1.5 py-0.5 rounded-md text-[10px]">{cantTotal}</span>}
-                                    </button>
-                                  ) : cantTotal > 0 ? (
-                                    <div className="flex items-center gap-3 bg-slate-50 rounded-[20px] px-2 py-1 border border-slate-100">
-                                      <button onClick={() => removeFromCart(item.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-[#ff6250]"><Minus size={14} /></button>
-                                      <span className="font-bold text-sm w-4 text-center">{cantTotal}</span>
-                                      <button onClick={() => addToCart({ ...cartItem, cartItemId: item.id })} className="p-1.5 bg-[#FF7A6A] rounded-lg text-white"><Plus size={14} /></button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => addToCart({ ...cartItem, cartItemId: item.id })}
-                                      className="bg-slate-900 hover:bg-[#FA4A0C] text-white font-bold text-xs px-5 py-2.5 rounded-[20px] transition-all flex items-center gap-2 shadow-lg shadow-slate-900/20"
-                                    >
-                                      <Plus size={16} /> Añadir
-                                    </button>
-                                  )}
-                                </div>
+                                      } else {
+                                        addToCart({ ...cartItem, cartItemId: item.id })
+                                      }
+                                    }}
+                                    className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform"
+                                  >
+                                    <Plus size={16} strokeWidth={3} />
+                                  </button>
+                                )}
                               </div>
-                            </motion.div>
+                            </div>
                           )
                         })}
                       </div>

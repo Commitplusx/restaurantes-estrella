@@ -93,42 +93,28 @@ export function SuccessPage() {
         }
 
         if (RESOLVED_STATES.includes(pedidoData.estado)) {
-          // Already confirmed — show success immediately and subscribe for live updates
+          // Ya estaba confirmado, configuramos el canal de progreso continuo
           resolveSuccess(pedidoData);
-          checkChannel = supabase.channel(`live-progress-${pedidoData.id}-${Date.now()}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` }, (payload) => {
-              setPedido(payload.new);
-            }).subscribe();
         } else {
-          // Waiting for payment confirmation — poll + realtime
+          // Esperando confirmación de pago
           setStatus('validating');
           
-          // Poll every 3 seconds as a fallback (BUG 1 fix: store in ref so realtime can clear it)
+          // Fallback manual cada 3 segundos
           pollIntervalRef.current = setInterval(async () => {
             const { data: refreshData } = await supabase
               .from('pedidos')
               .select('*')
               .eq('id', pedidoData.id)
               .single();
-            if (refreshData && RESOLVED_STATES.includes(refreshData.estado)) {
-              resolveSuccess(refreshData);
+            if (refreshData) {
+              setPedido(refreshData); // Siempre actualizamos el estado
+              if (RESOLVED_STATES.includes(refreshData.estado)) {
+                resolveSuccess(refreshData);
+              }
             }
           }, 3000);
-
-          // Realtime subscription (BUG 1 fix: uses resolveSuccess which checks ref)
-          checkChannel = supabase.channel(`wait-payment-${pedidoData.id}-${Date.now()}`)
-            .on(
-              'postgres_changes',
-              { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
-              (payload) => {
-                if (RESOLVED_STATES.includes(payload.new.estado)) {
-                  resolveSuccess(payload.new);
-                }
-              }
-            )
-            .subscribe();
-
-          // 15 second timeout — stop polling but keep channel alive in case payment arrives late
+          
+          // Timeout de 15 segundos para el fallback
           timeoutId = setTimeout(() => {
             if (!resolvedRef.current) {
               if (pollIntervalRef.current) {
@@ -138,6 +124,21 @@ export function SuccessPage() {
             }
           }, 15000);
         }
+
+        // UNIFICADO: Un solo canal de realtime que siempre actualiza la UI
+        checkChannel = supabase.channel(`pedido-updates-${pedidoData.id}-${Date.now()}`)
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
+            (payload) => {
+              setPedido(payload.new); // ¡ESTO ARREGLA EL BUG DE NO ACTUALIZAR!
+              if (RESOLVED_STATES.includes(payload.new.estado)) {
+                resolveSuccess(payload.new);
+              }
+            }
+          )
+          .subscribe();
+
       } catch (err) {
         if (retries > 0) {
           setTimeout(() => fetchPedido(retries - 1), 2000);

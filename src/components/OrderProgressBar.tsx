@@ -92,8 +92,8 @@ export function OrderProgressBar({ currentStatus, customSteps }: OrderProgressBa
               >
                 {isCompleted ? <Check size={20} /> : step.icon}
               </motion.div>
-              <div className="absolute -bottom-6 whitespace-nowrap">
-                <span className={`text-xs font-bold transition-colors duration-500 ${isActive ? (isException ? 'text-red-600' : 'text-emerald-600') : isCompleted ? 'text-gray-800' : 'text-gray-400'}`}>
+              <div className="absolute top-12 w-20 sm:w-24 text-center leading-tight flex justify-center">
+                <span className={`text-[10px] sm:text-xs font-bold transition-colors duration-500 ${isActive ? (isException ? 'text-red-600' : 'text-emerald-600') : isCompleted ? 'text-gray-800' : 'text-gray-400'}`}>
                   {step.label}
                 </span>
               </div>

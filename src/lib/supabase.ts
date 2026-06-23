@@ -80,6 +80,10 @@ export interface MenuItem {
   es_popular: boolean
   orden: number
   opciones?: OpcionGrupo[]
+  hora_inicio_disponible?: string | null  // formato 'HH:MM'
+  hora_fin_disponible?: string | null     // formato 'HH:MM'
+  agotado_hoy?: boolean
+  agotado_hasta?: string | null
 }
 
 export interface MenuCombo {
