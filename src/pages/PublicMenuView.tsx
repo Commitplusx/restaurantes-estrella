@@ -550,7 +550,7 @@ export function PublicMenuView() {
     }).join('\n')
 
     const detallesEntregaStr = tipoEntrega === 'domicilio' 
-      ? `\n\n🛵 *Tipo de entrega:* A domicilio\n📍 *Dirección:* ${ubicacionGPS ? `${direccionEntrega} | (LAT: ${ubicacionGPS.lat}, LNG: ${ubicacionGPS.lng})` : direccionEntrega}`
+      ? `\n\n🛵 *Tipo de entrega:* A domicilio`
       : `\n\n🏪 *Tipo de entrega:* Recoger en tienda`
       
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr
@@ -561,11 +561,14 @@ export function PublicMenuView() {
         cliente_nombre: clienteNombre.trim(),
         restaurante: restaurante.nombre,
         descripcion: pedidoCompleto,
+        direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
+        lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
+        lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
         estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
         wb_message_id: ticketId,
         metodo_pago: metodoPago,
         total: total,
-        tipo_pedido: tipoEntrega
+        tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda'
       }]).select('id').single()
 
       if (insertError) throw insertError
