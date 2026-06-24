@@ -178,7 +178,6 @@ export function PublicMenuView() {
 
   // Estados de cálculo H3
   const [costoEnvio, setCostoEnvio] = useState(0)
-  const [zonaEnvioNombre, setZonaEnvioNombre] = useState('')
   const [fueraDeCobertura, setFueraDeCobertura] = useState(false)
   const [calculandoEnvio, setCalculandoEnvio] = useState(false)
 
@@ -524,7 +523,7 @@ export function PublicMenuView() {
         // Reverse geocoding silencioso para obtener la colonia
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-          if (status === 'OK' && results[0]) {
+          if (status === 'OK' && results && results.length > 0 && results[0]) {
             setDireccionEntrega(results[0].formatted_address);
           } else {
             setDireccionEntrega(`Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
@@ -567,21 +566,6 @@ export function PublicMenuView() {
     }
   }
 
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      const lat = e.latLng.lat();
-      const lng = e.latLng.lng();
-      setUbicacionGPS({ lat, lng });
-      setDirectionsResponse(null);
-      
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === "OK" && results && results[0]) {
-          setDireccionEntrega(results[0].formatted_address);
-        }
-      });
-    }
-  };
 
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
