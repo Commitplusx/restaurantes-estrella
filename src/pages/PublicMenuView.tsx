@@ -149,6 +149,7 @@ export function PublicMenuView() {
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
   const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(null)
+  const [buscandoGPS, setBuscandoGPS] = useState(false)
   const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null)
   const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
@@ -460,6 +461,7 @@ export function PublicMenuView() {
 
   const obtenerUbicacionGPS = () => {
     if ("geolocation" in navigator) {
+      setBuscandoGPS(true);
       navigator.geolocation.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
@@ -469,6 +471,7 @@ export function PublicMenuView() {
         if (window.google) {
           const geocoder = new window.google.maps.Geocoder();
           geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            setBuscandoGPS(false);
             if (status === "OK" && results && results[0]) {
               setDireccionEntrega(results[0].formatted_address);
               showToast('Ubicación encontrada', 'Confirma que el punto en el mapa sea correcto', 'success');
@@ -477,9 +480,11 @@ export function PublicMenuView() {
             }
           });
         } else {
+          setBuscandoGPS(false);
           setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
         }
       }, () => {
+        setBuscandoGPS(false);
         showToast('Error de Ubicación', 'No pudimos acceder a tu GPS. Por favor escribe tu dirección.', 'error')
       }, { enableHighAccuracy: true })
     } else {
@@ -1312,8 +1317,24 @@ export function PublicMenuView() {
                         <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 overflow-hidden shadow-sm flex flex-col gap-3">
                           
                           {/* Botón de Auto-ubicación */}
-                          <motion.button whileTap={{ scale: 0.95 }} onClick={obtenerUbicacionGPS} className="w-full bg-slate-900 hover:bg-black text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-md">
-                            <MapPin size={16} /> Encontrar mi ubicación automáticamente
+                          <motion.button 
+                            whileTap={{ scale: 0.95 }} 
+                            onClick={obtenerUbicacionGPS} 
+                            disabled={buscandoGPS}
+                            className="w-full bg-slate-900 hover:bg-black disabled:opacity-80 text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md relative overflow-hidden group"
+                          >
+                            {buscandoGPS ? (
+                              <>
+                                <div className="absolute inset-0 bg-[#FA4A0C]/20 animate-pulse"></div>
+                                <Loader2 size={16} className="animate-spin relative z-10" /> 
+                                <span className="relative z-10">Buscando satélites...</span>
+                              </>
+                            ) : (
+                              <>
+                                <MapPin size={16} className="group-hover:animate-bounce" /> 
+                                Encontrar mi ubicación automáticamente
+                              </>
+                            )}
                           </motion.button>
 
                           {/* MAPA INTERACTIVO */}
