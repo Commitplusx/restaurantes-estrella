@@ -921,14 +921,37 @@ export function PublicMenuView() {
 
             {/* PRODUCT CATEGORIES (MENU TAB) */}
             {activeTab === 'menu' && (
-              <div className="mt-8">
+              <div className="mt-8 relative">
+                {/* STICKY CATEGORY NAV */}
+                {categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 1 && (
+                  <div className="sticky top-[60px] md:top-[70px] z-30 bg-white/95 backdrop-blur-md py-3 -mx-4 px-4 overflow-x-auto flex gap-2 border-b border-slate-100 shadow-[0_4px_12px_rgba(0,0,0,0.02)] mb-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {categorias.filter(c => items.some(i => i.categoria_id === c.id)).map(cat => (
+                      <button 
+                        key={`nav-${cat.id}`}
+                        onClick={() => {
+                          const el = document.getElementById(`cat-${cat.id}`);
+                          // Restamos un poco más de offset para el header
+                          if (el) {
+                            const y = el.getBoundingClientRect().top + window.scrollY - 130;
+                            window.scrollTo({ top: y, behavior: 'smooth' });
+                          }
+                        }}
+                        className="whitespace-nowrap px-5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-full text-sm transition-colors border border-slate-200 shrink-0"
+                      >
+                        {cat.nombre}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {categorias.map(cat => {
                   const catItems = items.filter(i => i.categoria_id === cat.id)
                   if (catItems.length === 0) return null
                   return (
                     <motion.div
+                      id={`cat-${cat.id}`}
                       key={cat.id}
-                      className="mb-10"
+                      className="mb-10 scroll-mt-[140px]"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                     >

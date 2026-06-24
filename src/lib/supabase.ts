@@ -28,6 +28,7 @@ export interface HorariosRestaurante {
 }
 
 export interface Restaurante {
+  stripe_account_id?: string
   id: string
   nombre: string
   telefono: string
