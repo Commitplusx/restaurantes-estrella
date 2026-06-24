@@ -1311,6 +1311,11 @@ export function PublicMenuView() {
                       {tipoEntrega === 'domicilio' && (
                         <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 overflow-hidden shadow-sm flex flex-col gap-3">
                           
+                          {/* Botón de Auto-ubicación */}
+                          <motion.button whileTap={{ scale: 0.95 }} onClick={obtenerUbicacionGPS} className="w-full bg-slate-900 hover:bg-black text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-md">
+                            <MapPin size={16} /> Encontrar mi ubicación automáticamente
+                          </motion.button>
+
                           {/* MAPA INTERACTIVO */}
                           <div className="w-full h-48 rounded-[12px] overflow-hidden border border-slate-200 shadow-inner bg-slate-100 relative">
                             {isGoogleMapsLoaded ? (
@@ -1360,10 +1365,7 @@ export function PublicMenuView() {
                           )}
 
                           <div>
-                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
-                              <span>Dirección de Entrega</span>
-                              <button onClick={obtenerUbicacionGPS} className="text-[#FA4A0C] normal-case flex items-center gap-1 hover:underline"><MapPin size={12}/> Autodetectar</button>
-                            </label>
+                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Dirección de Entrega</label>
                             <textarea 
                               value={direccionEntrega} 
                               onChange={(e) => setDireccionEntrega(e.target.value)} 
