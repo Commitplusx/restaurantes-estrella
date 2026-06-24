@@ -1138,8 +1138,9 @@ export function PublicMenuView() {
           initial={{ [isMobile ? 'y' : 'x']: '100%' }} 
           animate={{ x: 0, y: 0 }} 
           exit={{ [isMobile ? 'y' : 'x']: '100%' }} 
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }} 
-          className="fixed bottom-0 left-0 w-full h-[92vh] rounded-t-[32px] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-full sm:w-[440px] sm:max-w-md sm:rounded-none bg-white/95 backdrop-blur-xl z-[110] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] sm:shadow-2xl flex flex-col overflow-hidden"
+          transition={{ type: 'spring', damping: 28, stiffness: 350 }} 
+          style={{ willChange: "transform" }}
+          className="fixed bottom-0 left-0 w-full h-[92vh] rounded-t-[32px] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-full sm:w-[440px] sm:max-w-md sm:rounded-none bg-white z-[110] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] sm:shadow-2xl flex flex-col overflow-hidden"
         >
           
           {/* Grabber bar for mobile */}
