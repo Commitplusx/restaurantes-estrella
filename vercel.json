@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/menu/:slug",
+      "destination": "/api/seo-menu"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
