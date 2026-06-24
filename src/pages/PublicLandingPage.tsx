@@ -372,7 +372,7 @@ export function PublicLandingPage() {
                     </div>
                     
                     {/* Info */}
-                    <h3 className="text-[17px] md:text-[22px] font-extrabold text-slate-800 mb-1 leading-tight line-clamp-1 group-hover:text-[#FA4A0C] transition-colors tracking-tight mt-2">
+                    <h3 className="text-[18px] md:text-[26px] font-brother font-normal text-slate-800 mb-1 leading-tight line-clamp-2 text-balance group-hover:text-[#FA4A0C] transition-colors tracking-widest mt-2 uppercase">
                       {res.nombre}
                     </h3>
                     <p className="text-[#FA4A0C] font-bold text-[13px] md:text-[15px] mt-1 opacity-90 mb-3">

@@ -63,7 +63,7 @@ const LazyImage = ({ src, alt, className, imgClassName }: { src?: string | null,
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'} ${imgClassName || ''}`}
+        className={`w-full h-full transition-opacity duration-500 ${!imgClassName?.includes('object-') ? 'object-cover' : ''} ${loaded ? 'opacity-100' : 'opacity-0'} ${imgClassName || ''}`}
       />
     </div>
   )
@@ -160,7 +160,7 @@ export function PublicMenuView() {
     libraries: LIBRARIES
   });
   const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>(() => (sessionStorage.getItem('est_metodopago') as 'efectivo' | 'en_linea') || 'efectivo')
+  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>('efectivo') // Forzado a efectivo por ahora
   const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
 
   // Estado para validación de cupones
@@ -812,7 +812,7 @@ export function PublicMenuView() {
           <ChevronLeft size={20} />
         </Link>
         <div className={`flex-1 min-w-0 transition-opacity duration-300 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>
-          <h1 className="text-base font-bold text-slate-900 truncate">{restaurante.nombre}</h1>
+          <h1 className="text-[16px] md:text-[20px] font-brother font-normal uppercase tracking-widest text-slate-900 truncate mt-1">{restaurante.nombre}</h1>
         </div>
       </header>
 
@@ -848,7 +848,7 @@ export function PublicMenuView() {
             <LazyImage src={restaurante.foto_fachada_url} alt="Logo" className="w-full h-full" />
           </div>
           
-          <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-1">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-brother font-normal uppercase tracking-widest text-slate-900 mb-1 mt-2 text-balance leading-none break-words px-2">
             {restaurante.nombre}
           </h1>
           
@@ -1520,7 +1520,7 @@ export function PublicMenuView() {
                           </div>
                           {metodoPago === 'efectivo' && <CheckCircle2 size={24} className="text-green-500" />}
                         </button>
-                        
+                        {/* OCULTADO TEMPORALMENTE 
                         <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-5 px-6 rounded-[24px] border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${metodoPago === 'en_linea' ? 'bg-[#FA4A0C]/20' : 'bg-slate-100'}`}>💳</div>
                           <div className="text-left flex-1">
@@ -1529,6 +1529,7 @@ export function PublicMenuView() {
                           </div>
                           {metodoPago === 'en_linea' && <CheckCircle2 size={24} className="text-[#FA4A0C]" />}
                         </button>
+                        */}
                       </div>
                     </div>
                   </motion.div>
