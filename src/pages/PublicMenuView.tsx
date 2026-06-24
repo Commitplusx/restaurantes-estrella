@@ -573,16 +573,18 @@ export function PublicMenuView() {
 
       if (insertError) throw insertError
 
-      // Notificar al admin sobre la nueva orden
-      supabase.functions.invoke('notificar-whatsapp', {
-        body: {
-          tipo: 'nueva_orden_admin',
-          ticket_id: ticketId,
-          restaurante: restaurante.nombre,
-          descripcion: pedidoCompleto,
-          tipo_entrega: tipoEntrega
-        }
-      }).catch(err => console.warn('Error notificando al admin:', err))
+      // Notificar al admin sobre la nueva orden SOLO si es a domicilio
+      if (tipoEntrega === 'domicilio') {
+        supabase.functions.invoke('notificar-whatsapp', {
+          body: {
+            tipo: 'nueva_orden_admin',
+            ticket_id: ticketId,
+            restaurante: restaurante.nombre,
+            descripcion: pedidoCompleto,
+            tipo_entrega: tipoEntrega
+          }
+        }).catch(err => console.warn('Error notificando al admin:', err))
+      }
 
     } catch (err: any) { 
       alert('Hubo un problema registrando el pedido en la base de datos: ' + (err.message || 'Error desconocido') + '. Por favor intenta nuevamente.');
