@@ -46,6 +46,8 @@ export interface Restaurante {
   perfil_completo?: boolean
   es_socio?: boolean
   programa_lealtad_activo?: boolean
+  lat?: number | null
+  lng?: number | null
 }
 
 export interface MenuCategoria {
