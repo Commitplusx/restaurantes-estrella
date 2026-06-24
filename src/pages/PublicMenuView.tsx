@@ -1347,11 +1347,11 @@ export function PublicMenuView() {
                                 onClick={handleMapClick}
                                 options={{ disableDefaultUI: true, zoomControl: true }}
                               >
-                                {ubicacionGPS && restaurante.direccion && !directionsResponse && (
+                                {ubicacionGPS && !directionsResponse && (
                                   <DirectionsService
                                     options={{
                                       destination: ubicacionGPS,
-                                      origin: restaurante.direccion,
+                                      origin: restaurante.direccion || "Ciudad de México",
                                       travelMode: google.maps.TravelMode.DRIVING
                                     }}
                                     callback={(response, status) => {
