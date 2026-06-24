@@ -16,7 +16,9 @@ import {
   ChevronLeft,
   X,
   Ticket,
-  CheckCircle2
+  CheckCircle2,
+  Truck,
+  LocateFixed
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript, GoogleMap, Marker, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
@@ -148,6 +150,7 @@ export function PublicMenuView() {
   
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null)
   const [procesando, setProcesando] = useState(false)
   const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(null)
   const [buscandoGPS, setBuscandoGPS] = useState(false)
@@ -193,6 +196,10 @@ export function PublicMenuView() {
       setFueraDeCobertura(false)
       try {
         const hexIndex = h3.latLngToCell(ubicacionGPS.lat, ubicacionGPS.lng, 10)
+        
+        // Artificial delay for better UX (so the animation isn't just a flash)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+
         const { data } = await supabase
           .from('h3_zonas')
           .select('precio, nombre')
@@ -502,6 +509,29 @@ export function PublicMenuView() {
         .map(p => p.item.cartItemId === cartItemId ? { ...p, cantidad: p.cantidad - 1 } : p)
         .filter(p => p.cantidad > 0)
     })
+  }
+
+  // Fix Map interaction to be like Rappi/Uber (fixed center pin)
+  const handleMapDragEnd = () => {
+    if (mapInstance) {
+      const center = mapInstance.getCenter();
+      if (center) {
+        const lat = center.lat();
+        const lng = center.lng();
+        setUbicacionGPS({ lat, lng });
+        setDirectionsResponse(null);
+        
+        // Reverse geocoding silencioso para obtener la colonia
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            setDireccionEntrega(results[0].formatted_address);
+          } else {
+            setDireccionEntrega(`Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+          }
+        });
+      }
+    }
   }
 
   const obtenerUbicacionGPS = () => {
@@ -1321,16 +1351,7 @@ export function PublicMenuView() {
 
                 {/* PASO 3: ENTREGA Y MAPA */}
                 {checkoutStep === 3 && (
-                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-4">
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex justify-between items-center">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Tus Datos</p>
-                        <p className="text-sm font-bold text-slate-800">{clienteNombre} • {clienteTel}</p>
-                      </div>
-                      <button onClick={() => setCheckoutStep(2)} className="text-[#FA4A0C] font-bold text-xs bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">Editar</button>
-                    </div>
-
-                    <div className="pt-2">
+                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-4">                    <div className="pt-2">
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">¿Cómo quieres recibirlo?</label>
                       <motion.div layout className="flex flex-col sm:flex-row gap-3">
                         <AnimatePresence mode="popLayout">
@@ -1378,88 +1399,122 @@ export function PublicMenuView() {
                       )}
 
                       {tipoEntrega === 'domicilio' && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 overflow-hidden shadow-sm flex flex-col gap-3">
+                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-4 rounded-[20px] border border-slate-200 mt-2 overflow-hidden shadow-sm flex flex-col gap-4">
                           
-                          {/* Botón de Auto-ubicación */}
-                          <motion.button 
-                            whileTap={{ scale: 0.95 }} 
-                            onClick={obtenerUbicacionGPS} 
-                            disabled={buscandoGPS}
-                            className="w-full bg-slate-900 hover:bg-black disabled:opacity-80 text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md relative overflow-hidden group"
-                          >
-                            {buscandoGPS ? (
-                              <>
-                                <div className="absolute inset-0 bg-[#FA4A0C]/20 animate-pulse"></div>
-                                <Loader2 size={16} className="animate-spin relative z-10" /> 
-                                <span className="relative z-10">Buscando satélites...</span>
-                              </>
-                            ) : (
-                              <>
-                                <MapPin size={16} className="group-hover:animate-bounce" /> 
-                                Encontrar mi ubicación automáticamente
-                              </>
-                            )}
-                          </motion.button>
-
-                          {/* MAPA INTERACTIVO */}
-                          <div className="w-full h-48 rounded-[12px] overflow-hidden border border-slate-200 shadow-inner bg-slate-100 relative">
-                            {isGoogleMapsLoaded ? (
-                              <GoogleMap
-                                mapContainerStyle={{ width: '100%', height: '100%' }}
-                                center={ubicacionGPS || { lat: 19.4326, lng: -99.1332 }}
-                                zoom={ubicacionGPS ? 15 : 5}
-                                onClick={handleMapClick}
-                                options={{ disableDefaultUI: true, zoomControl: true }}
+                          {/* MAPA INTERACTIVO CON BOTON INTEGRADO */}
+                          <div className="w-full h-56 rounded-[16px] overflow-hidden border border-slate-200 shadow-inner bg-slate-100 relative">
+                            
+                            {/* Botón Flotante de Auto-ubicación vibrante (Estilo Rappi) */}
+                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[80%] max-w-[250px]">
+                              <motion.button 
+                                whileTap={{ scale: 0.95 }} 
+                                onClick={obtenerUbicacionGPS} 
+                                disabled={buscandoGPS}
+                                className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-3 rounded-full font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(250,74,12,0.4)] disabled:opacity-80 transition-colors"
                               >
-                                {ubicacionGPS && !directionsResponse && (
-                                  <DirectionsService
-                                    options={{
-                                      destination: ubicacionGPS,
-                                      origin: (restaurante.lat && restaurante.lng)
-                          ? { lat: restaurante.lat, lng: restaurante.lng }
-                          : (restaurante.direccion || `${restaurante.nombre}, México`),
-                                      travelMode: google.maps.TravelMode.DRIVING
-                                    }}
-                                    callback={(response, status) => {
-                                      if (status === 'OK' && response !== null) {
-                                        setDirectionsResponse(response)
-                                      }
-                                    }}
-                                  />
-                                )}
-                                {directionsResponse ? (
-                                  <DirectionsRenderer options={{ directions: directionsResponse, suppressMarkers: false }} />
+                                {buscandoGPS ? (
+                                  <>
+                                    <Loader2 size={18} className="animate-spin" /> 
+                                    <span>Ubicando...</span>
+                                  </>
                                 ) : (
-                                  ubicacionGPS && (
-                                    <Marker 
-                                      position={ubicacionGPS} 
-                                      draggable={true}
-                                      onDragEnd={(e) => e.latLng && handleMapClick(e as any)}
-                                    />
-                                  )
+                                  <>
+                                    <LocateFixed size={18} className="animate-pulse" /> 
+                                    Mi Ubicación
+                                  </>
                                 )}
-                              </GoogleMap>
+                              </motion.button>
+                            </div>
+
+                            {isGoogleMapsLoaded ? (
+                              <div className="relative w-full h-full">
+                                <GoogleMap
+                                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                                  center={ubicacionGPS || (restaurante?.lat && restaurante?.lng ? { lat: restaurante.lat, lng: restaurante.lng } : { lat: 16.2516, lng: -92.1332 })}
+                                  zoom={ubicacionGPS ? 16 : 14}
+                                  onLoad={(map) => setMapInstance(map)}
+                                  onDragEnd={handleMapDragEnd}
+                                  options={{ 
+                                    disableDefaultUI: true, 
+                                    zoomControl: false, // Desactivado para vista más limpia
+                                    gestureHandling: 'greedy'
+                                  }}
+                                >
+                                  {ubicacionGPS && !directionsResponse && (
+                                    <DirectionsService
+                                      options={{
+                                        destination: ubicacionGPS,
+                                        origin: (restaurante.lat && restaurante.lng)
+                                          ? { lat: restaurante.lat, lng: restaurante.lng }
+                                          : (restaurante.direccion || `${restaurante.nombre}, México`),
+                                        travelMode: google.maps.TravelMode.DRIVING
+                                      }}
+                                      callback={(response, status) => {
+                                        if (status === 'OK' && response !== null) {
+                                          setDirectionsResponse(response)
+                                        }
+                                      }}
+                                    />
+                                  )}
+                                  {directionsResponse && (
+                                    <DirectionsRenderer options={{ directions: directionsResponse, suppressMarkers: true, preserveViewport: true }} />
+                                  )}
+                                  {directionsResponse && restaurante.lat && restaurante.lng && (
+                                    <Marker 
+                                      position={{ lat: restaurante.lat, lng: restaurante.lng }}
+                                      icon={{ url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" }}
+                                      title="Restaurante"
+                                    />
+                                  )}
+                                </GoogleMap>
+                                
+                                {/* Pin fijo central (Estilo Rappi/Uber) */}
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
+                                  <MapPin className="text-[#FA4A0C] w-12 h-12 fill-[#FA4A0C] animate-bounce-short" style={{ filter: 'drop-shadow(0px 5px 5px rgba(0,0,0,0.3))' }} />
+                                  <div className="w-3 h-1 bg-black/40 rounded-[100%] mx-auto -mt-1 blur-[1px]"></div>
+                                </div>
+                                
+                                {/* Overlay text superior */}
+                                <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/90 text-slate-800 text-xs font-bold px-4 py-2 rounded-full shadow-md backdrop-blur-md pointer-events-none z-10 text-center whitespace-nowrap border border-slate-200">
+                                  Mueve el mapa para ajustar el pin
+                                </div>
+                              </div>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Cargando mapa...</div>
                             )}
+
+                            {/* Animación premium de calculandoEnvio */}
+                            <AnimatePresence>
+                              {(calculandoEnvio || buscandoGPS || (ubicacionGPS && !directionsResponse)) && (
+                                <motion.div 
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  className="absolute inset-0 bg-white/40 backdrop-blur-sm z-20 flex flex-col items-center justify-center"
+                                >
+                                  <motion.div
+                                    animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                                    transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                                    className="w-14 h-14 bg-white rounded-full shadow-[0_10px_30px_rgba(250,74,12,0.3)] flex items-center justify-center mb-3 border-2 border-[#FA4A0C]/20 relative"
+                                  >
+                                    <div className="absolute inset-0 rounded-full border-2 border-[#FA4A0C] border-t-transparent animate-spin opacity-50"></div>
+                                    <Truck size={24} className="text-[#FA4A0C]" />
+                                  </motion.div>
+                                  <motion.div 
+                                    initial={{ y: 10, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    className="bg-slate-900/90 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2"
+                                  >
+                                    <Loader2 size={14} className="animate-spin text-[#FA4A0C]" />
+                                    <span>Calculando envío...</span>
+                                  </motion.div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
 
-                          {directionsResponse && (
-                            <div className="bg-green-50 border border-green-200 p-3 rounded-xl flex gap-3 items-center">
-                              <div className="bg-green-500 w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"><CheckCircle2 size={16}/></div>
-                              <p className="text-green-800 text-xs font-bold leading-tight">¡Listo! Tenemos tu dirección y sabemos exactamente cómo llegar a entregarte.</p>
-                            </div>
-                          )}
 
-                          <div>
-                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Dirección de Entrega</label>
-                            <textarea 
-                              value={direccionEntrega} 
-                              onChange={(e) => setDireccionEntrega(e.target.value)} 
-                              placeholder="Escribe tu calle, número, colonia, y referencias..." 
-                              className="w-full bg-white border border-slate-200 rounded-[12px] px-4 py-3 text-sm outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 resize-none h-20 text-slate-800 placeholder:text-slate-300 shadow-sm transition-all"
-                            />
-                          </div>
+
 
                         </motion.div>
                       )}
@@ -1499,75 +1554,80 @@ export function PublicMenuView() {
           </div>
 
           {carrito.length > 0 && (
-            <div className="p-6 border-t border-slate-100/50 shrink-0">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-slate-500 font-medium">Subtotal</span>
-                <span className="font-bold text-slate-700">${subtotal.toFixed(2)}</span>
-              </div>
-              {tipoEntrega === 'domicilio' && (
-                <div className="flex justify-between items-center mb-2 text-slate-600">
-                  <span className="font-medium flex items-center gap-1">
-                    Envío {zonaEnvioNombre && <span className="text-xs opacity-70">({zonaEnvioNombre})</span>}
-                  </span>
-                  <span className={`font-bold ${fueraDeCobertura ? 'text-red-500 text-sm' : ''}`}>
-                    {calculandoEnvio ? <Loader2 size={14} className="animate-spin inline" /> : fueraDeCobertura ? 'Fuera de cobertura' : `$${costoEnvio.toFixed(2)}`}
-                  </span>
+            <div className="p-4 border-t border-slate-100/50 shrink-0 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.03)] z-10 relative">
+              <div className="flex flex-col gap-3">
+                {tipoEntrega === 'domicilio' && (
+                  <div className="flex justify-between items-center bg-[#FA4A0C]/5 border border-[#FA4A0C]/20 px-3 py-2 rounded-xl mb-1 shadow-sm">
+                    <span className="text-[#FA4A0C] font-black flex items-center gap-2 text-[11px] uppercase tracking-wider">
+                      <Truck size={16} /> Costo de Envío
+                    </span>
+                    <AnimatePresence mode="wait">
+                      <motion.span 
+                        key={calculandoEnvio ? 'calc' : fueraDeCobertura ? 'out' : 'price'}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        className={`font-black text-sm ${fueraDeCobertura ? 'text-red-500' : 'text-[#FA4A0C]'}`}
+                      >
+                        {calculandoEnvio ? (
+                          <span className="flex items-center gap-1"><Loader2 size={14} className="animate-spin inline" /> ...</span>
+                        ) : fueraDeCobertura ? (
+                          'Sin cobertura'
+                        ) : (
+                          `+ $${costoEnvio.toFixed(2)}`
+                        )}
+                      </motion.span>
+                    </AnimatePresence>
+                  </div>
+                )}
+                <div className="flex justify-between items-end px-2 mt-1">
+                  <span className="text-slate-900 font-bold">Total a pagar</span>
+                  <span className="text-3xl font-black text-[#FA4A0C]">${total.toFixed(2)}</span>
                 </div>
-              )}
-              {descuento > 0 && (
-                <div className="flex justify-between items-center mb-2 text-green-600">
-                  <span className="font-bold flex items-center gap-1"><Ticket size={14}/> Descuento</span>
-                  <span className="font-bold">-${descuento.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-end mb-6 pt-2">
-                <span className="text-slate-900 font-bold">Total a pagar</span>
-                <span className="text-3xl font-black text-[#FA4A0C]">${total.toFixed(2)}</span>
-              </div>
-              
-              {checkoutStep < 4 ? (
-                <motion.button 
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    if (checkoutStep === 2) {
-                      const telLimpio = clienteTel.replace(/\D/g, '')
-                      if (telLimpio.length !== 10) {
-                        setTelError(true);
-                        showToast('Atención', 'Ingresa un número a 10 dígitos', 'error');
-                        return;
-                      }
-                      if (!clienteNombre.trim()) {
-                        showToast('Atención', 'Dinos tu nombre', 'error');
-                        return;
-                      }
-                    }
-                    if (checkoutStep === 3) {
-                      if (!tipoEntrega) {
-                        showToast('Atención', 'Selecciona cómo quieres recibir tu pedido', 'error');
-                        return;
-                      }
-                      if (tipoEntrega === 'domicilio') {
-                        if (!direccionEntrega.trim() || !ubicacionGPS) {
-                          showToast('Atención', 'Selecciona tu ubicación en el mapa', 'error');
+                {checkoutStep < 4 ? (
+                  <motion.button 
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      if (checkoutStep === 2) {
+                        const telLimpio = clienteTel.replace(/\D/g, '')
+                        if (telLimpio.length !== 10) {
+                          setTelError(true);
+                          showToast('Atención', 'Ingresa un número a 10 dígitos', 'error');
                           return;
                         }
-                        if (fueraDeCobertura) {
-                          showToast('Sin Cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error');
+                        if (!clienteNombre.trim()) {
+                          showToast('Atención', 'Dinos tu nombre', 'error');
                           return;
                         }
                       }
-                    }
-                    setCheckoutStep(prev => prev + 1)
-                  }} 
-                  className="w-full bg-slate-900 text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xl shadow-slate-900/20"
-                >
-                  {checkoutStep === 1 ? 'Continuar a Tus Datos' : checkoutStep === 2 ? 'Continuar a Entrega' : 'Ir al Pago'}
-                </motion.button>
-              ) : (
-                <motion.button whileTap={{ scale: 0.95 }} onClick={handlePedir} disabled={procesando} className="w-full bg-[#FA4A0C] text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20">
-                  {procesando ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Confirmar Pedido</>}
-                </motion.button>
-              )}
+                      if (checkoutStep === 3) {
+                        if (!tipoEntrega) {
+                          showToast('Atención', 'Selecciona cómo quieres recibir tu pedido', 'error');
+                          return;
+                        }
+                        if (tipoEntrega === 'domicilio') {
+                          if (!direccionEntrega.trim() || !ubicacionGPS) {
+                            showToast('Atención', 'Selecciona tu ubicación en el mapa', 'error');
+                            return;
+                          }
+                          if (fueraDeCobertura) {
+                            showToast('Sin Cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error');
+                            return;
+                          }
+                        }
+                      }
+                      setCheckoutStep(prev => prev + 1)
+                    }} 
+                    className="w-full bg-slate-900 text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xl shadow-slate-900/20"
+                  >
+                    {checkoutStep === 1 ? 'Continuar a Tus Datos' : checkoutStep === 2 ? 'Continuar a Entrega' : 'Ir al Pago'}
+                  </motion.button>
+                ) : (
+                  <motion.button whileTap={{ scale: 0.95 }} onClick={handlePedir} disabled={procesando || calculandoEnvio} className="w-full bg-[#FA4A0C] text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20">
+                    {procesando ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Confirmar Pedido</>}
+                  </motion.button>
+                )}
+              </div>
             </div>
           )}
         </motion.div>

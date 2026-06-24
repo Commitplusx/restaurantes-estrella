@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2, Ticket } from 'lucide-react'
+import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2, Ticket, BellRing } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,10 +13,11 @@ const MenuCombosView = lazy(() => import('./views/MenuCombosView').then(m => ({ 
 const MenuPromosView = lazy(() => import('./views/MenuPromosView').then(m => ({ default: m.MenuPromosView })))
 const CuponesView = lazy(() => import('./views/CuponesView').then(m => ({ default: m.CuponesView })))
 const PerfilView = lazy(() => import('./views/PerfilView').then(m => ({ default: m.PerfilView })))
+const PedidosView = lazy(() => import('./views/PedidosView').then(m => ({ default: m.PedidosView })))
 
 export function PortalPage() {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil'>('dashboard')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -178,6 +179,12 @@ export function PortalPage() {
           </div>
           
           <NavButton 
+            id="desktop-tour-pedidos"
+            active={activeTab === 'pedidos'} icon={<BellRing size={20}/>} label="Pedidos Activos" 
+            onClick={() => setActiveTab('pedidos')} 
+          />
+          
+          <NavButton 
             id="desktop-tour-platillos"
             active={activeTab === 'productos'} icon={<Utensils size={20}/>} label="Platillos" 
             onClick={() => setActiveTab('productos')} 
@@ -240,7 +247,7 @@ export function PortalPage() {
           <header id="tour-welcome" className="px-6 lg:px-8 py-6 flex items-center justify-between z-20 sticky top-0 bg-white/80 backdrop-blur-xl">
             <div>
               <h2 className="text-2xl lg:text-3xl font-bold text-slate-800">
-                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'productos' ? 'Platillos' : activeTab === 'combos' ? 'Combos' : activeTab === 'promos' ? 'Promociones' : activeTab === 'cupones' ? 'Cupones de Descuento' : 'Perfil'}
+                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'pedidos' ? 'Pedidos Activos' : activeTab === 'productos' ? 'Platillos' : activeTab === 'combos' ? 'Combos' : activeTab === 'promos' ? 'Promociones' : activeTab === 'cupones' ? 'Cupones de Descuento' : 'Perfil'}
               </h2>
               <div className="text-sm text-slate-400 font-medium mt-1">Inicio / {activeTab}</div>
             </div>
@@ -307,6 +314,7 @@ export function PortalPage() {
                     </div>
                   }>
                     {activeTab === 'dashboard' && <DashboardView restaurante={restaurante} />}
+                    {activeTab === 'pedidos'   && <PedidosView restaurante={restaurante} />}
                     {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
                     {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
                     {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
@@ -321,6 +329,7 @@ export function PortalPage() {
       {/* ── Bottom Nav (Mobile) ── */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex justify-between">
         <MobileNavBtn id="mobile-tour-dashboard" active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => setActiveTab('dashboard')} />
+        <MobileNavBtn id="mobile-tour-pedidos" active={activeTab === 'pedidos'} icon={<BellRing size={22}/>} label="Pedidos" onClick={() => setActiveTab('pedidos')} />
         <MobileNavBtn id="mobile-tour-platillos" active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => setActiveTab('productos')} />
         <MobileNavBtn id="mobile-tour-combos" active={activeTab === 'combos'} icon={<Package size={22}/>} label="Combos" onClick={() => setActiveTab('combos')} />
         <MobileNavBtn id="mobile-tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />

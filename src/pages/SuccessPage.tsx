@@ -59,7 +59,7 @@ export function SuccessPage() {
       sessionStorage.removeItem('est_tipoentrega');
     };
 
-    const RESOLVED_STATES = ['pendiente', 'pagado', 'asignado', 'recibido', 'preparando', 'en_camino', 'entregado'];
+    const RESOLVED_STATES = ['pendiente', 'pagado', 'asignado', 'recibido', 'preparando', 'en_camino', 'entregado', 'en_cocina', 'listo_para_recoger'];
 
     const fetchPedido = async (retries = 3) => {
       try {
@@ -288,8 +288,9 @@ export function SuccessPage() {
                 ) : (
                   <>
                     <p className="text-emerald-600/80 mt-1 font-bold text-sm md:text-base mb-4">
-                      {pedido?.estado === 'aceptado' ? '¡El restaurante está preparando tu comida! 🍳'
-                      : pedido?.estado === 'en_camino' ? '¡Tu repartidor recogió la orden y va en camino! 🛵'
+                      {pedido?.estado === 'aceptado' || pedido?.estado === 'en_cocina' ? '¡El restaurante está preparando tu comida! 🍳'
+                      : pedido?.estado === 'listo_para_recoger' ? '¡Tu orden está lista para ser recogida! 🏃‍♂️'
+                      : pedido?.estado === 'recibido' || pedido?.estado === 'en_camino' ? '¡Tu repartidor recogió la orden y va en camino! 🛵'
                       : 'Sigue el estado de tu pedido en tiempo real'}
                     </p>
                     {/* Progress Bar Injection */}

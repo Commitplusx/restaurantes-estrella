@@ -20,7 +20,7 @@ interface OrderProgressBarProps {
 // Mapeamos los estados de Supabase a los pasos visuales
 const defaultSteps: StepDef[] = [
   { id: 'asignado', label: 'Aceptado', icon: <Clock size={20} /> },
-  { id: 'recibido', label: 'Recibido', icon: <ChefHat size={20} /> },
+  { id: 'en_restaurante', label: 'En Restaurante', icon: <ChefHat size={20} /> },
   { id: 'en_camino', label: 'En Camino', icon: <Truck size={20} /> },
   { id: 'entregado', label: 'Entregado', icon: <Package size={20} /> }
 ];
@@ -31,8 +31,10 @@ export function OrderProgressBar({ currentStatus, customSteps }: OrderProgressBa
   // Normalizar el estado actual a los IDs visuales
   // Si Supabase dice 'pendiente' o 'pagado', lo pintamos en el primer paso ('asignado')
   let normalizedStatus = currentStatus as string;
-  if (['pendiente', 'pagado'].includes(currentStatus)) {
+  if (['pendiente', 'pagado', 'asignado'].includes(currentStatus)) {
     normalizedStatus = 'asignado';
+  } else if (['en_cocina', 'listo_para_recoger', 'recibido', 'preparando'].includes(currentStatus)) {
+    normalizedStatus = 'en_restaurante';
   }
 
   const isException = ['cancelado', 'rechazado'].includes(currentStatus);
