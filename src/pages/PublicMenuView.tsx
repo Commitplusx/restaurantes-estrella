@@ -10,7 +10,6 @@ import {
   AlertCircle,
   Loader2,
   Star,
-  Flame,
   Clock,
   MapPin,
   ChevronLeft,
@@ -19,6 +18,9 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
+
+const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
 
 export type OpcionSeleccionada = {
   grupo: string;
@@ -146,6 +148,11 @@ export function PublicMenuView() {
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
+  const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(null)
+  const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: LIBRARIES
+  });
   const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>(() => (sessionStorage.getItem('est_metodopago') as 'efectivo' | 'en_linea') || 'efectivo')
   const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
@@ -450,9 +457,48 @@ export function PublicMenuView() {
     })
   }
 
-  const getCantidadTotal = (productId: string, tipo: 'item' | 'combo' | 'promo') => {
-    return carrito.filter(p => p.item.id === productId && p.item.tipo === tipo).reduce((sum, p) => sum + p.cantidad, 0)
+  const obtenerUbicacionGPS = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setUbicacionGPS({ lat, lng });
+        
+        if (window.google) {
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            if (status === "OK" && results && results[0]) {
+              setDireccionEntrega(results[0].formatted_address);
+              showToast('Ubicación encontrada', 'Confirma que el punto en el mapa sea correcto', 'success');
+            } else {
+              setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+            }
+          });
+        } else {
+          setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        }
+      }, () => {
+        showToast('Error de Ubicación', 'No pudimos acceder a tu GPS. Por favor escribe tu dirección.', 'error')
+      }, { enableHighAccuracy: true })
+    } else {
+      showToast('Error', 'Tu navegador no soporta geolocalización', 'error')
+    }
   }
+
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      setUbicacionGPS({ lat, lng });
+      
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === "OK" && results && results[0]) {
+          setDireccionEntrega(results[0].formatted_address);
+        }
+      });
+    }
+  };
 
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
@@ -465,23 +511,6 @@ export function PublicMenuView() {
   const closeCart = () => {
     setIsCartOpen(false)
     setTimeout(() => setCheckoutStep(1), 300)
-  }
-
-  const obtenerUbicacionGPS = () => {
-    if (!navigator.geolocation) {
-      showToast('Error', 'Tu navegador no soporta geolocalización', 'error')
-      return
-    }
-    showToast('Buscando...', 'Obteniendo tu ubicación exacta...', 'success')
-    navigator.geolocation.getCurrentPosition((position) => {
-      const lat = position.coords.latitude
-      const lng = position.coords.longitude
-      const mapLink = `https://www.google.com/maps?q=${lat},${lng}`
-      setDireccionEntrega(prev => prev ? prev + '\nUbicación GPS: ' + mapLink : 'Ubicación GPS: ' + mapLink)
-      showToast('¡Listo!', 'Ubicación agregada', 'success')
-    }, () => {
-      showToast('Error', 'No pudimos acceder a tu ubicación. Asegúrate de dar permisos.', 'error')
-    })
   }
 
   const handlePedir = async () => {
@@ -513,7 +542,7 @@ export function PublicMenuView() {
     }).join('\n')
 
     const detallesEntregaStr = tipoEntrega === 'domicilio' 
-      ? `\n\n🛵 *Tipo de entrega:* A domicilio\n📍 *Dirección:* ${direccionEntrega.trim() || 'No especificada'}`
+      ? `\n\n🛵 *Tipo de entrega:* A domicilio\n📍 *Dirección:* ${ubicacionGPS ? `${direccionEntrega} | (LAT: ${ubicacionGPS.lat}, LNG: ${ubicacionGPS.lng})` : direccionEntrega}`
       : `\n\n🏪 *Tipo de entrega:* Recoger en tienda`
       
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr
@@ -889,8 +918,6 @@ export function PublicMenuView() {
             {activeTab === 'combos' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {combos.map(combo => {
-                  const cartItem = { id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo' as const, foto_url: combo.foto_url || undefined, cartItemId: combo.id }
-                  const cantTotal = getCantidadTotal(combo.id, 'combo')
                   return (
                     <motion.div
                       key={combo.id}
@@ -898,7 +925,7 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <div className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined })}>
+                      <div className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id })}>
                           <LazyImage src={combo.foto_url} alt={combo.nombre} className="w-full h-[180px] rounded-[16px] mb-4" imgClassName="group-hover:scale-105 transition-transform duration-500" />
                           
                           <div className="flex-1 flex flex-col">
@@ -931,7 +958,7 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
                     >
-                      <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo', foto_url: promo.foto_url || undefined })}>
+                      <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo', foto_url: promo.foto_url || undefined, cartItemId: promo.id })}>
                           <div className="relative">
                             <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[10px] font-black px-4 py-1 rounded-bl-[20px] z-10 shadow-lg">PROMO</div>
                             <LazyImage src={promo.foto_url} alt={promo.titulo} className="w-full h-[220px] rounded-[18px] mb-4" imgClassName="group-hover:scale-105 transition-transform duration-700 ease-out" />
@@ -1072,7 +1099,6 @@ export function PublicMenuView() {
       </footer>
 
       {/* Floating Cart Button en Mobile */}
-      {/* Floating Cart Button en Mobile */}
       <AnimatePresence>
         {cartCount > 0 && (
           <motion.div 
@@ -1163,7 +1189,7 @@ export function PublicMenuView() {
                 {checkoutStep === 1 && (
                   <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
                     {carrito.map((p, i) => (
-                      <div key={i} className="flex gap-4 p-4 rounded-[24px] bg-slate-50 border border-slate-100">
+                      <div key={i} className="flex gap-4 p-4 rounded-[24px] bg-white border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow">
                         <div className="w-16 h-16 rounded-[12px] overflow-hidden bg-slate-50 shrink-0">
                           <LazyImage src={p.item.foto_url} className="w-full h-full" />
                         </div>
@@ -1203,13 +1229,13 @@ export function PublicMenuView() {
                 {checkoutStep === 2 && (
                   <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-5">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tu Nombre</label>
-                      <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-slate-50 border border-slate-200 rounded-[16px] px-4 py-3 outline-none focus:border-[#FA4A0C] focus:bg-white transition-all font-medium" />
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Tu Nombre</label>
+                      <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-white border border-slate-200 rounded-[16px] px-4 py-3.5 outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 transition-all font-medium text-slate-800 placeholder:text-slate-300 shadow-sm" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tu Teléfono (WhatsApp)</label>
-                      <input type="tel" value={clienteTel} onChange={(e) => {setClienteTel(e.target.value); setTelError(false);}} placeholder="10 dígitos" maxLength={10} className={`w-full bg-slate-50 border rounded-[16px] px-4 py-3 outline-none transition-all font-medium ${telError ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-slate-200 focus:border-[#FA4A0C] focus:bg-white'}`} />
-                      {telError && <p className="text-red-500 text-[10px] font-bold mt-1.5 flex items-center gap-1"><AlertCircle size={10} /> Ingrese un número a 10 dígitos válido</p>}
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Tu Teléfono (WhatsApp)</label>
+                      <input type="tel" value={clienteTel} onChange={(e) => {setClienteTel(e.target.value); setTelError(false);}} placeholder="10 dígitos" maxLength={10} className={`w-full bg-white border rounded-[16px] px-4 py-3.5 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-300 shadow-sm ${telError ? 'border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-500/10' : 'border-slate-200 focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10'}`} />
+                      {telError && <p className="text-red-500 text-[10px] font-bold mt-2 flex items-center gap-1"><AlertCircle size={10} /> Ingrese un número a 10 dígitos válido</p>}
                     </div>
 
                     <div className="pt-4 border-t border-slate-100">
@@ -1224,10 +1250,10 @@ export function PublicMenuView() {
                               exit={{ opacity: 0, scale: 0.8, display: 'none' }}
                               whileTap={{ scale: 0.95 }}
                               onClick={() => setTipoEntrega(tipoEntrega === 'domicilio' ? null : 'domicilio')} 
-                              className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'border-[#FA4A0C] bg-[#FA4A0C] text-white shadow-lg shadow-[#FA4A0C]/30' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
+                              className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
                             >
                               <span className="text-2xl">🛵</span>
-                              <span className="text-xs">{tipoEntrega === 'domicilio' ? 'Elegiste A Domicilio (toca para cambiar)' : 'A Domicilio'}</span>
+                              <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'domicilio' ? 'Elegiste A Domicilio (toca para cambiar)' : 'A Domicilio'}</span>
                             </motion.button>
                           )}
                           {tipoEntrega !== 'domicilio' && (
@@ -1238,10 +1264,10 @@ export function PublicMenuView() {
                               exit={{ opacity: 0, scale: 0.8, display: 'none' }}
                               whileTap={{ scale: 0.95 }}
                               onClick={() => setTipoEntrega(tipoEntrega === 'tienda' ? null : 'tienda')} 
-                              className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'border-[#FA4A0C] bg-[#FA4A0C] text-white shadow-lg shadow-[#FA4A0C]/30' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
+                              className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
                             >
                               <span className="text-2xl">🏪</span>
-                              <span className="text-xs">{tipoEntrega === 'tienda' ? 'Elegiste Recoger en Tienda (toca para cambiar)' : 'Recoger en Tienda'}</span>
+                              <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'tienda' ? 'Elegiste Recoger en Tienda (toca para cambiar)' : 'Recoger en Tienda'}</span>
                             </motion.button>
                           )}
                         </AnimatePresence>
@@ -1250,27 +1276,56 @@ export function PublicMenuView() {
 
                     <AnimatePresence>
                       {tipoEntrega === 'tienda' && restaurante.maps_url && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-blue-50 p-4 rounded-[20px] border border-blue-200 mt-2 overflow-hidden flex flex-col items-center text-center">
-                           <MapPin className="text-blue-500 mb-2 w-6 h-6" />
-                           <p className="text-sm text-blue-800 font-medium mb-3">Recoge tu pedido en nuestro local</p>
-                           <a href={restaurante.maps_url} target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center transition-colors">
+                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 overflow-hidden flex flex-col items-center text-center shadow-sm">
+                           <MapPin className="text-slate-400 mb-2 w-6 h-6" />
+                           <p className="text-sm text-slate-800 font-bold mb-3">Recoge tu pedido en nuestro local</p>
+                           <a href={restaurante.maps_url} target="_blank" rel="noopener noreferrer" className="w-full bg-slate-900 hover:bg-black text-white py-3.5 rounded-[12px] font-bold text-xs flex items-center justify-center transition-colors shadow-md">
                              Ver indicaciones en Maps
                            </a>
                         </motion.div>
                       )}
 
                       {tipoEntrega === 'domicilio' && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-4 rounded-[20px] border border-slate-200 mt-2 overflow-hidden">
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Dirección de Entrega</label>
-                          <textarea 
-                            value={direccionEntrega} 
-                            onChange={(e) => setDireccionEntrega(e.target.value)} 
-                            placeholder="Escribe tu calle, número, colonia, y referencias..." 
-                            className="w-full bg-white border border-slate-200 rounded-[12px] px-3 py-3 text-sm outline-none focus:border-[#FA4A0C] resize-none h-24 mb-3"
-                          />
-                          <motion.button whileTap={{ scale: 0.95 }} onClick={obtenerUbicacionGPS} className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 py-2.5 rounded-[12px] font-bold text-xs flex items-center justify-center gap-2 transition-colors">
-                            <MapPin size={16} /> Usar mi ubicación GPS actual
+                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 overflow-hidden shadow-sm flex flex-col gap-3">
+                          
+                          {/* Botón de Auto-ubicación */}
+                          <motion.button whileTap={{ scale: 0.95 }} onClick={obtenerUbicacionGPS} className="w-full bg-slate-900 hover:bg-black text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-md">
+                            <MapPin size={16} /> Encontrar mi ubicación automáticamente
                           </motion.button>
+
+                          {/* MAPA INTERACTIVO */}
+                          <div className="w-full h-48 rounded-[12px] overflow-hidden border border-slate-200 shadow-inner bg-slate-100 relative">
+                            {isGoogleMapsLoaded ? (
+                              <GoogleMap
+                                mapContainerStyle={{ width: '100%', height: '100%' }}
+                                center={ubicacionGPS || { lat: 19.4326, lng: -99.1332 }}
+                                zoom={ubicacionGPS ? 17 : 5}
+                                onClick={handleMapClick}
+                                options={{ disableDefaultUI: true, zoomControl: true }}
+                              >
+                                {ubicacionGPS && (
+                                  <Marker 
+                                    position={ubicacionGPS} 
+                                    draggable={true}
+                                    onDragEnd={(e) => e.latLng && handleMapClick(e as any)}
+                                  />
+                                )}
+                              </GoogleMap>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Cargando mapa...</div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Dirección de Entrega</label>
+                            <textarea 
+                              value={direccionEntrega} 
+                              onChange={(e) => setDireccionEntrega(e.target.value)} 
+                              placeholder="Escribe tu calle, número, colonia, y referencias..." 
+                              className="w-full bg-white border border-slate-200 rounded-[12px] px-4 py-3 text-sm outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 resize-none h-20 text-slate-800 placeholder:text-slate-300 shadow-sm transition-all"
+                            />
+                          </div>
+
                         </motion.div>
                       )}
                     </AnimatePresence>
