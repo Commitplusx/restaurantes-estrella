@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import * as h3 from 'h3-js'
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
 import {
   Store,
@@ -171,6 +172,50 @@ export function PublicMenuView() {
   })
   const [tipoEntrega, setTipoEntrega] = useState<'domicilio' | 'tienda' | null>(() => (sessionStorage.getItem('est_tipoentrega') as 'domicilio' | 'tienda' | null) || null)
   const [direccionEntrega, setDireccionEntrega] = useState(() => sessionStorage.getItem('est_direccion') || '')
+
+  // Estados de cálculo H3
+  const [costoEnvio, setCostoEnvio] = useState(0)
+  const [zonaEnvioNombre, setZonaEnvioNombre] = useState('')
+  const [fueraDeCobertura, setFueraDeCobertura] = useState(false)
+  const [calculandoEnvio, setCalculandoEnvio] = useState(false)
+
+  // Calcular tarifa H3 automáticamente cuando cambia la ubicación
+  useEffect(() => {
+    async function calcularEnvio() {
+      if (tipoEntrega !== 'domicilio' || !ubicacionGPS) {
+        setCostoEnvio(0)
+        setZonaEnvioNombre('')
+        setFueraDeCobertura(false)
+        return
+      }
+
+      setCalculandoEnvio(true)
+      setFueraDeCobertura(false)
+      try {
+        const hexIndex = h3.latLngToCell(ubicacionGPS.lat, ubicacionGPS.lng, 10)
+        const { data } = await supabase
+          .from('h3_zonas')
+          .select('precio, nombre')
+          .eq('h3_index', hexIndex)
+          .maybeSingle()
+          
+        if (data && data.precio !== undefined) {
+          setCostoEnvio(data.precio)
+          setZonaEnvioNombre(data.nombre || 'Zona Estrella')
+        } else {
+          setCostoEnvio(0)
+          setZonaEnvioNombre('')
+          setFueraDeCobertura(true)
+        }
+      } catch (err) {
+        console.error("Error calculando envío H3:", err)
+      } finally {
+        setCalculandoEnvio(false)
+      }
+    }
+    
+    calcularEnvio()
+  }, [ubicacionGPS, tipoEntrega])
 
   useEffect(() => {
     sessionStorage.setItem('est_carrito', JSON.stringify(carrito))
@@ -513,7 +558,7 @@ export function PublicMenuView() {
 
   // BUG 4 fix: reset coupon if cart subtotal drops to 0 or below discount amount
   const descuentoAplicable = subtotal > 0 ? Math.min(descuento, subtotal) : 0
-  const total = Math.max(0, subtotal - descuentoAplicable)
+  const total = Math.max(0, subtotal - descuentoAplicable) + (tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0)
 
   // Bug #5: reset fields when closing cart without ordering
   const closeCart = () => {
@@ -526,6 +571,11 @@ export function PublicMenuView() {
     if (submittingRef.current) return // BUG 5 fix: prevent double-submit
     if (!clienteNombre.trim()) {
       showToast('Falta el nombre', 'Por favor ingresa tu nombre para continuar', 'error')
+      return
+    }
+    // Bloqueo si está fuera de cobertura
+    if (tipoEntrega === 'domicilio' && fueraDeCobertura) {
+      showToast('Fuera de cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error')
       return
     }
     // Bug #1: proper phone validation
@@ -550,7 +600,7 @@ export function PublicMenuView() {
     }).join('\n')
 
     const detallesEntregaStr = tipoEntrega === 'domicilio' 
-      ? `\n\n🛵 *Tipo de entrega:* A domicilio`
+      ? `\n\n🛵 *Tipo de entrega:* A domicilio` + (costoEnvio > 0 ? `\n🚚 *Costo Envío:* $${costoEnvio}` : '')
       : `\n\n🏪 *Tipo de entrega:* Recoger en tienda`
       
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr
@@ -597,13 +647,22 @@ export function PublicMenuView() {
       try {
         // Bug 1 fix: aplicar descuento proporcional en los lineItems para que Conekta cobre el total correcto
         const subtotalBruto = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
-        const factorDescuento = subtotalBruto > 0 ? total / subtotalBruto : 1
+        const factorDescuento = subtotalBruto > 0 ? (total - (tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0)) / subtotalBruto : 1
         
         const lineItems = carrito.map(p => ({
           name: p.item.nombre,
           price: parseFloat((p.item.precio * factorDescuento).toFixed(2)),
           quantity: p.cantidad
         }))
+
+        if (tipoEntrega === 'domicilio' && costoEnvio > 0 && !fueraDeCobertura) {
+          lineItems.push({
+            name: 'Costo de Envío',
+            price: costoEnvio,
+            quantity: 1
+          })
+        }
+
         
         const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/conekta-checkout'
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -1445,6 +1504,16 @@ export function PublicMenuView() {
                 <span className="text-slate-500 font-medium">Subtotal</span>
                 <span className="font-bold text-slate-700">${subtotal.toFixed(2)}</span>
               </div>
+              {tipoEntrega === 'domicilio' && (
+                <div className="flex justify-between items-center mb-2 text-slate-600">
+                  <span className="font-medium flex items-center gap-1">
+                    Envío {zonaEnvioNombre && <span className="text-xs opacity-70">({zonaEnvioNombre})</span>}
+                  </span>
+                  <span className={`font-bold ${fueraDeCobertura ? 'text-red-500 text-sm' : ''}`}>
+                    {calculandoEnvio ? <Loader2 size={14} className="animate-spin inline" /> : fueraDeCobertura ? 'Fuera de cobertura' : `$${costoEnvio.toFixed(2)}`}
+                  </span>
+                </div>
+              )}
               {descuento > 0 && (
                 <div className="flex justify-between items-center mb-2 text-green-600">
                   <span className="font-bold flex items-center gap-1"><Ticket size={14}/> Descuento</span>
@@ -1477,9 +1546,15 @@ export function PublicMenuView() {
                         showToast('Atención', 'Selecciona cómo quieres recibir tu pedido', 'error');
                         return;
                       }
-                      if (tipoEntrega === 'domicilio' && !direccionEntrega.trim()) {
-                        showToast('Atención', 'Ingresa tu dirección de entrega', 'error');
-                        return;
+                      if (tipoEntrega === 'domicilio') {
+                        if (!direccionEntrega.trim() || !ubicacionGPS) {
+                          showToast('Atención', 'Selecciona tu ubicación en el mapa', 'error');
+                          return;
+                        }
+                        if (fueraDeCobertura) {
+                          showToast('Sin Cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error');
+                          return;
+                        }
                       }
                     }
                     setCheckoutStep(prev => prev + 1)
