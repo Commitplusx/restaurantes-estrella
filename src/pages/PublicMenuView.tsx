@@ -1351,7 +1351,7 @@ export function PublicMenuView() {
                                   <DirectionsService
                                     options={{
                                       destination: ubicacionGPS,
-                                      origin: restaurante.direccion || "Ciudad de México",
+                                      origin: restaurante.direccion || `${restaurante.nombre}, México`,
                                       travelMode: google.maps.TravelMode.DRIVING
                                     }}
                                     callback={(response, status) => {
