@@ -45,6 +45,25 @@ const menuCache: Record<string, {
   timestamp: number;
 }> = {}
 
+// COMPONENTE DE IMAGEN CON SKELETON LOADER
+const LazyImage = ({ src, alt, className, imgClassName }: { src?: string | null, alt?: string, className?: string, imgClassName?: string }) => {
+  const [loaded, setLoaded] = useState(false);
+  if (!src) return <div className={`bg-slate-100 flex items-center justify-center ${className || ''}`}><Store size={24} className="text-slate-300"/></div>;
+  return (
+    <div className={`relative overflow-hidden bg-slate-100 ${className || ''}`}>
+      {!loaded && <div className="absolute inset-0 bg-slate-200 animate-pulse" />}
+      <img
+        src={src}
+        alt={alt || ''}
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'} ${imgClassName || ''}`}
+      />
+    </div>
+  )
+}
+
 export const estaAbierto = (res: Restaurante) => {
   // BUG 9 fix: convert times to minutes (integers) to avoid locale-dependent string comparison
   const toMinutes = (timeStr: string): number => {
@@ -711,11 +730,7 @@ export function PublicMenuView() {
         <div className="bg-white rounded-t-3xl sm:rounded-none -mt-6 sm:mt-0 pt-0 pb-6 flex flex-col items-center sm:items-start text-center sm:text-left border-b border-slate-100">
           
           <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-48 md:h-48 rounded-[18px] md:rounded-[32px] overflow-hidden shadow-sm border-4 md:border-[8px] border-white bg-white shrink-0 flex items-center justify-center -mt-10 md:-mt-24 mb-3 md:mb-6 z-20">
-            {restaurante.foto_fachada_url ? (
-               <img src={restaurante.foto_fachada_url} className="w-full h-full object-cover" loading="lazy" decoding="async" alt="Logo" />
-            ) : (
-               <Store className="w-10 h-10 md:w-20 md:h-20 text-slate-300" />
-            )}
+            <LazyImage src={restaurante.foto_fachada_url} alt="Logo" className="w-full h-full" />
           </div>
           
           <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-1">
@@ -834,11 +849,7 @@ export function PublicMenuView() {
                                 </div>
                               </div>
                               <div className="w-[100px] h-[100px] rounded-[12px] overflow-hidden bg-slate-50 shrink-0 relative">
-                                {item.foto_url ? (
-                                  <img src={item.foto_url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt={item.nombre} />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-slate-200"><Store size={24} /></div>
-                                )}
+                                <LazyImage src={item.foto_url} alt={item.nombre} className="w-full h-full" />
                                 {(!item.agotado_hoy && !fueraDeHorario) && (
                                   <button
                                     onClick={(e) => {
@@ -883,40 +894,25 @@ export function PublicMenuView() {
                   return (
                     <motion.div
                       key={combo.id}
-                      className="bg-white p-5 rounded-[40px] border-none shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(255,122,106,0.12)] hover:-translate-y-1 transition-all flex flex-col md:flex-row gap-6 items-center group relative"
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <div className="w-full md:w-36 h-36 rounded-[24px] overflow-hidden bg-slate-50 shrink-0 cursor-pointer" onClick={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' })}>
-                        {combo.foto_url ? (
-                          <img src={combo.foto_url} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={combo.nombre} />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-200"><Star size={40} /></div>
-                        )}
-                      </div>
-                      <div className="flex-1 text-center md:text-left">
-                        <div className="cursor-pointer" onClick={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' })}>
-                          <h4 className="font-bold text-slate-900 text-xl mb-1">{combo.nombre}</h4>
-                          <p className="text-slate-400 text-sm mb-3">{combo.descripcion}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
-                          {combo.incluye?.map((inc, i) => <span key={i} className="text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-md">✓ {inc}</span>)}
-                        </div>
-                        <div className="flex items-center justify-between mt-2 w-full">
-                          <span className="text-[#ff6250] font-black text-2xl">${combo.precio.toFixed(2)}</span>
-                          <div>
-                            {cantTotal > 0 ? (
-                              <div className="flex items-center gap-3 bg-slate-100 rounded-[20px] px-2 py-1">
-                                <button onClick={() => removeFromCart(combo.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-[#ff6250]"><Minus size={14} /></button>
-                                <span className="font-bold text-sm w-4 text-center">{cantTotal}</span>
-                                <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-[#FF7A6A] rounded-lg text-white"><Plus size={14} /></button>
-                              </div>
-                            ) : (
-                              <button onClick={() => addToCart(cartItem)} className="bg-slate-900 hover:bg-[#FF7A6A] text-white font-bold text-xs px-6 py-2.5 rounded-[20px] transition-all">Añadir</button>
-                            )}
+                      <div className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined })}>
+                          <LazyImage src={combo.foto_url} alt={combo.nombre} className="w-full h-[180px] rounded-[16px] mb-4" imgClassName="group-hover:scale-105 transition-transform duration-500" />
+                          
+                          <div className="flex-1 flex flex-col">
+                            <div className="cursor-pointer" onClick={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' })}>
+                              <h4 className="font-bold text-slate-900 text-xl mb-1">{combo.nombre}</h4>
+                              <p className="text-slate-400 text-sm mb-3">{combo.descripcion}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mb-4 justify-start">
+                              {combo.incluye?.map((inc, i) => <span key={i} className="text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-md">✓ {inc}</span>)}
+                            </div>
+                            <div className="flex items-center justify-between mt-auto">
+                              <span className="text-[#ff6250] font-black text-2xl">${combo.precio.toFixed(2)}</span>
+                            </div>
                           </div>
-                        </div>
                       </div>
                     </motion.div>
                   )
@@ -928,43 +924,28 @@ export function PublicMenuView() {
             {activeTab === 'promos' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {promos.map((promo, index) => {
-                  const cartItem = { id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo' as const, foto_url: promo.foto_url || undefined, cartItemId: promo.id }
-                  const cantTotal = getCantidadTotal(promo.id, 'promo')
                   return (
                     <motion.div
                       key={promo.id}
-                      className="bg-white/80 backdrop-blur-sm p-4 rounded-[32px] border border-[#FA4A0C]/10 shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(250,74,12,0.15)] flex flex-col md:flex-row gap-4 items-center group relative overflow-hidden transition-all"
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
                     >
-                      <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[10px] font-black px-4 py-1 rounded-bl-[20px] z-10 shadow-lg">PROMO</div>
-                      <div className="w-full md:w-32 h-32 rounded-[24px] overflow-hidden bg-slate-50 shrink-0 cursor-pointer" onClick={() => setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' })}>
-                        {promo.foto_url ? (
-                          <img src={promo.foto_url} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" alt={promo.titulo} />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-200"><Flame size={40} className="text-[#FA4A0C]/50" /></div>
-                        )}
-                      </div>
-                      <div className="flex-1 w-full">
-                        <div className="cursor-pointer" onClick={() => setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' })}>
-                          <h4 className="font-extrabold text-slate-900 text-lg mb-1 leading-tight">{promo.titulo}</h4>
-                          <p className="text-slate-400 text-xs mb-3 line-clamp-2">{promo.descripcion}</p>
-                        </div>
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-[#FA4A0C] font-black text-xl">${promo.precio_especial?.toFixed(2)}</span>
-                          <div>
-                            {cantTotal > 0 ? (
-                              <div className="flex items-center gap-3 bg-slate-100 rounded-[20px] px-2 py-1">
-                                <button onClick={() => removeFromCart(promo.id)} className="p-1.5 bg-white rounded-lg text-slate-400 hover:text-[#FA4A0C]"><Minus size={14} /></button>
-                                <span className="font-bold text-sm w-4 text-center">{cantTotal}</span>
-                                <button onClick={() => addToCart(cartItem)} className="p-1.5 bg-[#FA4A0C] rounded-lg text-white"><Plus size={14} /></button>
-                              </div>
-                            ) : (
-                              <button onClick={() => addToCart(cartItem)} className="bg-slate-900 hover:bg-[#FA4A0C] text-white font-bold text-xs px-5 py-2.5 rounded-[20px] transition-all shadow-lg shadow-slate-900/20 flex items-center gap-2"><Plus size={16}/> Añadir</button>
-                            )}
+                      <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo', foto_url: promo.foto_url || undefined })}>
+                          <div className="relative">
+                            <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[10px] font-black px-4 py-1 rounded-bl-[20px] z-10 shadow-lg">PROMO</div>
+                            <LazyImage src={promo.foto_url} alt={promo.titulo} className="w-full h-[220px] rounded-[18px] mb-4" imgClassName="group-hover:scale-105 transition-transform duration-700 ease-out" />
                           </div>
-                        </div>
+                          
+                          <div className="flex-1 flex flex-col px-1">
+                            <div className="cursor-pointer" onClick={() => setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' })}>
+                              <h4 className="font-extrabold text-slate-900 text-lg mb-1 leading-tight">{promo.titulo}</h4>
+                              <p className="text-slate-400 text-xs mb-3 line-clamp-2">{promo.descripcion}</p>
+                            </div>
+                            <div className="flex items-center justify-between mt-auto">
+                              <span className="text-[#FA4A0C] font-black text-xl">${promo.precio_especial?.toFixed(2)}</span>
+                            </div>
+                          </div>
                       </div>
                     </motion.div>
                   )
@@ -1183,8 +1164,8 @@ export function PublicMenuView() {
                   <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
                     {carrito.map((p, i) => (
                       <div key={i} className="flex gap-4 p-4 rounded-[24px] bg-slate-50 border border-slate-100">
-                        <div className="w-16 h-16 rounded-[16px] overflow-hidden bg-slate-100/50 shrink-0">
-                          {p.item.foto_url ? <img src={p.item.foto_url} loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-slate-100"><Store size={20} className="text-slate-300"/></div>}
+                        <div className="w-16 h-16 rounded-[12px] overflow-hidden bg-slate-50 shrink-0">
+                          <LazyImage src={p.item.foto_url} className="w-full h-full" />
                         </div>
                         <div className="flex-1">
                           <h4 className="font-bold text-slate-900 text-sm leading-tight mb-1">{p.item.nombre}</h4>
@@ -1396,16 +1377,12 @@ export function PublicMenuView() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="relative w-full sm:max-w-lg bg-white sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="relative w-full h-48 bg-slate-100 shrink-0">
-                {selectedItemForOptions.foto_url ? (
-                  <img src={selectedItemForOptions.foto_url} loading="lazy" decoding="async" className="w-full h-full object-contain" alt={selectedItemForOptions.nombre} />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-300"><Store size={48} /></div>
-                )}
-                <button onClick={() => setSelectedItemForOptions(null)} className="absolute top-4 right-4 p-2 bg-black/30 backdrop-blur-md text-white rounded-full hover:bg-black/50 transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
+              <div className="w-full h-[200px] bg-slate-50 relative shrink-0">
+                  <LazyImage src={selectedItemForOptions.foto_url} alt={selectedItemForOptions.nombre} className="w-full h-full" imgClassName="object-contain" />
+                  <button onClick={() => setSelectedItemForOptions(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-600 shadow-sm z-10">
+                    <X size={20} />
+                  </button>
+                </div>
               <div className="p-6 shrink-0 border-b border-slate-100">
                 <h3 className="text-2xl font-black text-slate-900">{selectedItemForOptions.nombre}</h3>
                 <p className="text-slate-500 text-sm mt-1">{selectedItemForOptions.descripcion}</p>
