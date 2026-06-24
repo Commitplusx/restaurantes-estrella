@@ -275,9 +275,23 @@ export function SuccessPage() {
                     <p className="text-emerald-600/80 mt-1 font-bold text-sm md:text-base mb-2">¡Éxito! Te esperamos pronto en la tienda.</p>
                     <p className="text-gray-500 text-xs md:text-sm leading-tight">Tu pedido ha sido recibido y comenzaremos a prepararlo para que pases a recogerlo.</p>
                   </>
+                ) : pedido?.estado === 'entregado' ? (
+                  <>
+                    <p className="text-emerald-600 font-bold text-lg md:text-xl mt-4 mb-2">¡Pedido Entregado! 🎉</p>
+                    <p className="text-gray-500 text-sm md:text-base leading-tight">Esperamos que disfrutes tu comida. ¡Gracias por tu preferencia!</p>
+                  </>
+                ) : pedido?.estado === 'cancelado' || pedido?.estado === 'rechazado' ? (
+                  <>
+                    <p className="text-red-500 font-bold text-lg md:text-xl mt-4 mb-2">Pedido Cancelado ❌</p>
+                    <p className="text-gray-500 text-sm md:text-base leading-tight">Tu pedido no pudo ser procesado o fue cancelado.</p>
+                  </>
                 ) : (
                   <>
-                    <p className="text-emerald-600/80 mt-1 font-bold text-sm md:text-base mb-4">Sigue el estado de tu pedido en tiempo real</p>
+                    <p className="text-emerald-600/80 mt-1 font-bold text-sm md:text-base mb-4">
+                      {pedido?.estado === 'aceptado' ? '¡El restaurante está preparando tu comida! 🍳'
+                      : pedido?.estado === 'en_camino' ? '¡Tu repartidor recogió la orden y va en camino! 🛵'
+                      : 'Sigue el estado de tu pedido en tiempo real'}
+                    </p>
                     {/* Progress Bar Injection */}
                     {pedido && (
                       <OrderProgressBar currentStatus={pedido.estado} />
