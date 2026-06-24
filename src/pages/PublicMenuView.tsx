@@ -735,10 +735,17 @@ export function PublicMenuView() {
               <span>{restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}</span>
             </div>
             
-            <div className="flex items-center gap-1.5 text-slate-600">
-               <MapPin size={16} className="text-slate-400" /> 
-               <span className="line-clamp-1 max-w-[200px]">{restaurante.direccion || 'Comitán'}</span>
-            </div>
+            {restaurante.maps_url ? (
+              <a href={restaurante.maps_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 transition-colors">
+                <MapPin size={16} className="text-blue-500" /> 
+                <span className="line-clamp-1 max-w-[200px] underline decoration-blue-200">{restaurante.direccion || 'Ver en mapa'}</span>
+              </a>
+            ) : (
+              <div className="flex items-center gap-1.5 text-slate-600">
+                <MapPin size={16} className="text-slate-400" /> 
+                <span className="line-clamp-1 max-w-[200px]">{restaurante.direccion || 'Comitán'}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1261,6 +1268,16 @@ export function PublicMenuView() {
                     </div>
 
                     <AnimatePresence>
+                      {tipoEntrega === 'tienda' && restaurante.maps_url && (
+                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-blue-50 p-4 rounded-[20px] border border-blue-200 mt-2 overflow-hidden flex flex-col items-center text-center">
+                           <MapPin className="text-blue-500 mb-2 w-6 h-6" />
+                           <p className="text-sm text-blue-800 font-medium mb-3">Recoge tu pedido en nuestro local</p>
+                           <a href={restaurante.maps_url} target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center transition-colors">
+                             Ver indicaciones en Maps
+                           </a>
+                        </motion.div>
+                      )}
+
                       {tipoEntrega === 'domicilio' && (
                         <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-4 rounded-[20px] border border-slate-200 mt-2 overflow-hidden">
                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Dirección de Entrega</label>
@@ -1519,15 +1536,24 @@ export function PublicMenuView() {
       </AnimatePresence>
 
     {/* Toast notification */}
-    {toastMsg && (
-      <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3.5 rounded-full shadow-2xl backdrop-blur-md border ${toastMsg.type === 'error' ? 'bg-red-500/90 border-red-400' : toastMsg.type === 'loading' ? 'bg-slate-900/90 border-slate-700' : 'bg-slate-900/90 border-slate-700'}`}>
-        {toastMsg.type === 'error' ? <AlertCircle className="w-5 h-5 text-red-200" /> : toastMsg.type === 'loading' ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <CheckCircle2 className="w-5 h-5 text-green-400" />}
-        <div>
-          <p className="text-white text-sm font-bold leading-none mb-0.5">{toastMsg.title}</p>
-          {toastMsg.message && <p className="text-slate-200 text-[11px] leading-none">{toastMsg.message}</p>}
-        </div>
-      </motion.div>
-    )}
+    <AnimatePresence>
+      {toastMsg && (
+        <motion.div 
+          key="global-toast"
+          initial={{ y: -50, opacity: 0, x: "-50%" }} 
+          animate={{ y: 0, opacity: 1, x: "-50%" }} 
+          exit={{ y: -50, opacity: 0, x: "-50%", scale: 0.9 }} 
+          transition={{ type: "spring", bounce: 0.3, duration: 0.5 }}
+          className={`fixed top-8 sm:top-12 left-1/2 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-full shadow-2xl backdrop-blur-xl border ${toastMsg.type === 'error' ? 'bg-red-500/95 border-red-400' : toastMsg.type === 'loading' ? 'bg-slate-900/95 border-slate-700' : 'bg-green-600/95 border-green-500 text-white'}`}
+        >
+          {toastMsg.type === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : toastMsg.type === 'loading' ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <CheckCircle2 className="w-5 h-5 text-white" />}
+          <div>
+            <p className="text-white text-sm font-bold leading-none mb-0.5">{toastMsg.title}</p>
+            {toastMsg.message && <p className="text-white/80 text-[11px] leading-none">{toastMsg.message}</p>}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   </AnimatePresence>
 
       {/* PREMIUM CLOSED TOAST */}

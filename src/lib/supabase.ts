@@ -34,6 +34,7 @@ export interface Restaurante {
   direccion: string | null
   activo: boolean
   slug?: string
+  maps_url?: string | null
   foto_fachada_url?: string
   logo_url?: string
   descripcion_corta?: string
