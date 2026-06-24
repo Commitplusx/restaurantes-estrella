@@ -18,7 +18,7 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
+import { useLoadScript, GoogleMap, Marker, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
 
@@ -149,6 +149,7 @@ export function PublicMenuView() {
   const [telError, setTelError] = useState(false)
   const [procesando, setProcesando] = useState(false)
   const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(null)
+  const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null)
   const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: LIBRARIES
@@ -463,6 +464,7 @@ export function PublicMenuView() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setUbicacionGPS({ lat, lng });
+        setDirectionsResponse(null);
         
         if (window.google) {
           const geocoder = new window.google.maps.Geocoder();
@@ -490,6 +492,7 @@ export function PublicMenuView() {
       const lat = e.latLng.lat();
       const lng = e.latLng.lng();
       setUbicacionGPS({ lat, lng });
+      setDirectionsResponse(null);
       
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode({ location: { lat, lng } }, (results, status) => {
@@ -1158,7 +1161,7 @@ export function PublicMenuView() {
                 )}
                 <div>
                   <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                    {checkoutStep === 1 ? 'Tu Pedido' : checkoutStep === 2 ? 'Tus Datos' : 'Método de Pago'}
+                    {checkoutStep === 1 ? 'Tu Pedido' : checkoutStep === 2 ? 'Tus Datos' : checkoutStep === 3 ? 'Entrega' : 'Método de Pago'}
                   </h2>
                   <p className="text-slate-500 text-sm">{restaurante.nombre}</p>
                 </div>
@@ -1173,6 +1176,8 @@ export function PublicMenuView() {
                 <div className={`flex-1 h-1.5 rounded-full transition-colors ${checkoutStep >= 2 ? 'bg-[#FA4A0C]' : 'bg-slate-200'}`} />
                 <div className="w-2" />
                 <div className={`flex-1 h-1.5 rounded-full transition-colors ${checkoutStep >= 3 ? 'bg-[#FA4A0C]' : 'bg-slate-200'}`} />
+                <div className="w-2" />
+                <div className={`flex-1 h-1.5 rounded-full transition-colors ${checkoutStep >= 4 ? 'bg-[#FA4A0C]' : 'bg-slate-200'}`} />
               </div>
             )}
           </div>
@@ -1226,7 +1231,7 @@ export function PublicMenuView() {
                   </motion.div>
                 )}
 
-                {/* PASO 2: DATOS DE ENTREGA */}
+                {/* PASO 2: DATOS PERSONALES */}
                 {checkoutStep === 2 && (
                   <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-5">
                     <div>
@@ -1238,8 +1243,25 @@ export function PublicMenuView() {
                       <input type="tel" value={clienteTel} onChange={(e) => {setClienteTel(e.target.value); setTelError(false);}} placeholder="10 dígitos" maxLength={10} className={`w-full bg-white border rounded-[16px] px-4 py-3.5 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-300 shadow-sm ${telError ? 'border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-500/10' : 'border-slate-200 focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10'}`} />
                       {telError && <p className="text-red-500 text-[10px] font-bold mt-2 flex items-center gap-1"><AlertCircle size={10} /> Ingrese un número a 10 dígitos válido</p>}
                     </div>
+                    <div className="bg-slate-50 p-4 rounded-2xl flex items-start gap-3 mt-4 border border-slate-100">
+                      <div className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0">💡</div>
+                      <p className="text-xs text-slate-500 mt-1">Tu información está segura. Solo la usamos para contactarte si el repartidor no encuentra tu casa.</p>
+                    </div>
+                  </motion.div>
+                )}
 
-                    <div className="pt-4 border-t border-slate-100">
+                {/* PASO 3: ENTREGA Y MAPA */}
+                {checkoutStep === 3 && (
+                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-4">
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Tus Datos</p>
+                        <p className="text-sm font-bold text-slate-800">{clienteNombre} • {clienteTel}</p>
+                      </div>
+                      <button onClick={() => setCheckoutStep(2)} className="text-[#FA4A0C] font-bold text-xs bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">Editar</button>
+                    </div>
+
+                    <div className="pt-2">
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">¿Cómo quieres recibirlo?</label>
                       <motion.div layout className="flex flex-col sm:flex-row gap-3">
                         <AnimatePresence mode="popLayout">
@@ -1289,27 +1311,40 @@ export function PublicMenuView() {
                       {tipoEntrega === 'domicilio' && (
                         <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 overflow-hidden shadow-sm flex flex-col gap-3">
                           
-                          {/* Botón de Auto-ubicación */}
-                          <motion.button whileTap={{ scale: 0.95 }} onClick={obtenerUbicacionGPS} className="w-full bg-slate-900 hover:bg-black text-white py-3 rounded-[12px] font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-md">
-                            <MapPin size={16} /> Encontrar mi ubicación automáticamente
-                          </motion.button>
-
                           {/* MAPA INTERACTIVO */}
                           <div className="w-full h-48 rounded-[12px] overflow-hidden border border-slate-200 shadow-inner bg-slate-100 relative">
                             {isGoogleMapsLoaded ? (
                               <GoogleMap
                                 mapContainerStyle={{ width: '100%', height: '100%' }}
                                 center={ubicacionGPS || { lat: 19.4326, lng: -99.1332 }}
-                                zoom={ubicacionGPS ? 17 : 5}
+                                zoom={ubicacionGPS ? 15 : 5}
                                 onClick={handleMapClick}
                                 options={{ disableDefaultUI: true, zoomControl: true }}
                               >
-                                {ubicacionGPS && (
-                                  <Marker 
-                                    position={ubicacionGPS} 
-                                    draggable={true}
-                                    onDragEnd={(e) => e.latLng && handleMapClick(e as any)}
+                                {ubicacionGPS && restaurante.direccion && !directionsResponse && (
+                                  <DirectionsService
+                                    options={{
+                                      destination: ubicacionGPS,
+                                      origin: restaurante.direccion,
+                                      travelMode: google.maps.TravelMode.DRIVING
+                                    }}
+                                    callback={(response, status) => {
+                                      if (status === 'OK' && response !== null) {
+                                        setDirectionsResponse(response)
+                                      }
+                                    }}
                                   />
+                                )}
+                                {directionsResponse ? (
+                                  <DirectionsRenderer options={{ directions: directionsResponse, suppressMarkers: false }} />
+                                ) : (
+                                  ubicacionGPS && (
+                                    <Marker 
+                                      position={ubicacionGPS} 
+                                      draggable={true}
+                                      onDragEnd={(e) => e.latLng && handleMapClick(e as any)}
+                                    />
+                                  )
                                 )}
                               </GoogleMap>
                             ) : (
@@ -1317,8 +1352,18 @@ export function PublicMenuView() {
                             )}
                           </div>
 
+                          {directionsResponse && (
+                            <div className="bg-green-50 border border-green-200 p-3 rounded-xl flex gap-3 items-center">
+                              <div className="bg-green-500 w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0"><CheckCircle2 size={16}/></div>
+                              <p className="text-green-800 text-xs font-bold leading-tight">¡Listo! Tenemos tu dirección y sabemos exactamente cómo llegar a entregarte.</p>
+                            </div>
+                          )}
+
                           <div>
-                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Dirección de Entrega</label>
+                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
+                              <span>Dirección de Entrega</span>
+                              <button onClick={obtenerUbicacionGPS} className="text-[#FA4A0C] normal-case flex items-center gap-1 hover:underline"><MapPin size={12}/> Autodetectar</button>
+                            </label>
                             <textarea 
                               value={direccionEntrega} 
                               onChange={(e) => setDireccionEntrega(e.target.value)} 
@@ -1333,8 +1378,8 @@ export function PublicMenuView() {
                   </motion.div>
                 )}
 
-                {/* PASO 3: PAGO */}
-                {checkoutStep === 3 && (
+                {/* PASO 4: PAGO */}
+                {checkoutStep === 4 && (
                   <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
                     <div>
                       <h3 className="font-black text-slate-900 text-lg mb-4 text-center">Selecciona tu Método de Pago</h3>
@@ -1381,32 +1426,37 @@ export function PublicMenuView() {
                 <span className="text-3xl font-black text-[#FA4A0C]">${total.toFixed(2)}</span>
               </div>
               
-              {checkoutStep < 3 ? (
+              {checkoutStep < 4 ? (
                 <motion.button 
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
-                    if (checkoutStep === 2 && clienteTel.replace(/\D/g, '').length !== 10) {
-                      setTelError(true);
-                      showToast('Atención', 'Ingresa un número a 10 dígitos', 'error');
-                      return;
+                    if (checkoutStep === 2) {
+                      const telLimpio = clienteTel.replace(/\D/g, '')
+                      if (telLimpio.length !== 10) {
+                        setTelError(true);
+                        showToast('Atención', 'Ingresa un número a 10 dígitos', 'error');
+                        return;
+                      }
+                      if (!clienteNombre.trim()) {
+                        showToast('Atención', 'Dinos tu nombre', 'error');
+                        return;
+                      }
                     }
-                    if (checkoutStep === 2 && !clienteNombre.trim()) {
-                      showToast('Atención', 'Dinos tu nombre', 'error');
-                      return;
-                    }
-                    if (checkoutStep === 2 && !tipoEntrega) {
-                      showToast('Atención', 'Selecciona cómo quieres recibir tu pedido', 'error');
-                      return;
-                    }
-                    if (checkoutStep === 2 && tipoEntrega === 'domicilio' && !direccionEntrega.trim()) {
-                      showToast('Atención', 'Ingresa tu dirección de entrega', 'error');
-                      return;
+                    if (checkoutStep === 3) {
+                      if (!tipoEntrega) {
+                        showToast('Atención', 'Selecciona cómo quieres recibir tu pedido', 'error');
+                        return;
+                      }
+                      if (tipoEntrega === 'domicilio' && !direccionEntrega.trim()) {
+                        showToast('Atención', 'Ingresa tu dirección de entrega', 'error');
+                        return;
+                      }
                     }
                     setCheckoutStep(prev => prev + 1)
                   }} 
                   className="w-full bg-slate-900 text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xl shadow-slate-900/20"
                 >
-                  {checkoutStep === 1 ? 'Continuar a Tus Datos' : 'Ir al Pago'}
+                  {checkoutStep === 1 ? 'Continuar a Tus Datos' : checkoutStep === 2 ? 'Continuar a Entrega' : 'Ir al Pago'}
                 </motion.button>
               ) : (
                 <motion.button whileTap={{ scale: 0.95 }} onClick={handlePedir} disabled={procesando} className="w-full bg-[#FA4A0C] text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20">
