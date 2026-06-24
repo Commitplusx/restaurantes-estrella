@@ -186,7 +186,7 @@ export function PublicMenuView() {
     async function calcularEnvio() {
       if (tipoEntrega !== 'domicilio' || !ubicacionGPS) {
         setCostoEnvio(0)
-        setZonaEnvioNombre('')
+
         setFueraDeCobertura(false)
         return
       }
@@ -207,10 +207,10 @@ export function PublicMenuView() {
           
         if (data && data.precio !== undefined) {
           setCostoEnvio(data.precio)
-          setZonaEnvioNombre(data.nombre || 'Zona Estrella')
+
         } else {
           setCostoEnvio(0)
-          setZonaEnvioNombre('')
+
           setFueraDeCobertura(true)
         }
       } catch (err) {
