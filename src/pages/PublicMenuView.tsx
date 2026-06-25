@@ -1366,7 +1366,6 @@ export function PublicMenuView() {
                               whileTap={{ scale: 0.95 }}
                               onClick={() => {
                                 setTipoEntrega(tipoEntrega === 'domicilio' ? null : 'domicilio')
-                                setShouldLoadMaps(true)
                               }}
                               className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
                             >
