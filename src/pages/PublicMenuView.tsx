@@ -154,7 +154,10 @@ export function PublicMenuView() {
   const [telError, setTelError] = useState(false)
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null)
   const [procesando, setProcesando] = useState(false)
-  const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(null)
+  const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(() => {
+    const saved = sessionStorage.getItem('est_ubicacion')
+    return saved ? JSON.parse(saved) : null
+  })
   const [buscandoGPS, setBuscandoGPS] = useState(false)
   const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null)
   // Nota: useLoadScript no soporta cambiar la API key dinámicamente o iniciar vacía,
@@ -191,6 +194,7 @@ export function PublicMenuView() {
   useEffect(() => { sessionStorage.setItem('est_checkoutstep', checkoutStep.toString()) }, [checkoutStep])
   useEffect(() => { if (tipoEntrega) sessionStorage.setItem('est_tipoentrega', tipoEntrega) }, [tipoEntrega])
   useEffect(() => { sessionStorage.setItem('est_direccion', direccionEntrega) }, [direccionEntrega])
+  useEffect(() => { if (ubicacionGPS) sessionStorage.setItem('est_ubicacion', JSON.stringify(ubicacionGPS)) }, [ubicacionGPS])
 
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : true);
 
@@ -541,15 +545,26 @@ export function PublicMenuView() {
   const handlePedir = async () => {
     if (!restaurante || carrito.length === 0) return
     if (submittingRef.current) return // BUG 5 fix: prevent double-submit
+    
     if (!clienteNombre.trim()) {
       showToast('Falta el nombre', 'Por favor ingresa tu nombre para continuar', 'error')
       return
     }
-    // Bloqueo si está fuera de cobertura
-    if (tipoEntrega === 'domicilio' && fueraDeCobertura) {
-      showToast('Fuera de cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error')
-      return
+    
+    // Validación estricta final de envío a domicilio
+    if (tipoEntrega === 'domicilio') {
+      if (!direccionEntrega.trim() || !ubicacionGPS) {
+        showToast('Ubicación requerida', 'Por favor confirma tu ubicación en el mapa', 'error')
+        setCheckoutStep(3)
+        return
+      }
+      if (fueraDeCobertura) {
+        showToast('Fuera de cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error')
+        setCheckoutStep(3)
+        return
+      }
     }
+
     // Bug #1: proper phone validation
     const telLimpio = clienteTel.replace(/\D/g, '')
     if (telLimpio.length < 10) {
@@ -595,8 +610,9 @@ export function PublicMenuView() {
 
       if (insertError) throw insertError
 
-      // Notificar al admin sobre la nueva orden SOLO si es a domicilio
-      if (tipoEntrega === 'domicilio') {
+      // Notificar al admin sobre la nueva orden SOLO si es a domicilio y el pago es en efectivo.
+      // Si es pago en línea, la notificación se envía desde el webhook cuando se apruebe.
+      if (tipoEntrega === 'domicilio' && metodoPago === 'efectivo') {
         supabase.functions.invoke('notificar-whatsapp', {
           body: {
             tipo: 'nueva_orden_admin',
@@ -617,26 +633,7 @@ export function PublicMenuView() {
 
     if (metodoPago === 'en_linea') {
       try {
-        // Bug 1 fix: aplicar descuento proporcional en los lineItems para que Conekta cobre el total correcto
-        const subtotalBruto = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
-        const factorDescuento = subtotalBruto > 0 ? (total - (tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0)) / subtotalBruto : 1
-        
-        const lineItems = carrito.map(p => ({
-          name: p.item.nombre,
-          price: parseFloat((p.item.precio * factorDescuento).toFixed(2)),
-          quantity: p.cantidad
-        }))
-
-        if (tipoEntrega === 'domicilio' && costoEnvio > 0 && !fueraDeCobertura) {
-          lineItems.push({
-            name: 'Costo de Envío',
-            price: costoEnvio,
-            quantity: 1
-          })
-        }
-
-        
-        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/conekta-checkout'
+        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/mercadopago-checkout'
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
         
         const res = await fetch(edgeUrl, {
@@ -646,28 +643,25 @@ export function PublicMenuView() {
             'Authorization': `Bearer ${anonKey}`
           },
           body: JSON.stringify({
-            pedidoId: ticketId,
-            clienteNombre: clienteNombre.trim(),
-            clienteTel: telLimpio,
-            restauranteNombre: restaurante.nombre,
-            lineItems: lineItems,
-            subtotal: total,
-            returnUrl: window.location.origin + `/success?pedido=${ticketId}&success=true`
+            pedidoId: ticketId, // Pasamos el ticketId para enlazar con la tabla pedidos
+            items: carrito,
+            costo_envio: tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0,
+            descuento: descuento,
+            total: total,
+            originUrl: window.location.origin
           })
         })
         
         const data = await res.json()
         if (!res.ok) {
-          throw new Error(data.error || 'Error al generar link de Conekta')
+          throw new Error(data.error || 'Error al generar link de Mercado Pago')
         }
         
-        // Bug 7 fix: detectar si el URL llegó vacío y avisar al usuario
-        if (data.checkoutUrl) {
-          await supabase.from('pedidos').update({ conekta_order_id: data.conektaOrderId }).eq('wb_message_id', ticketId)
-          window.location.href = data.checkoutUrl
+        if (data.url) {
+          window.location.href = data.url
           return
         } else {
-          throw new Error('Conekta no devolvió un link de pago válido. Intenta nuevamente.')
+          throw new Error('Mercado Pago no devolvió un link de pago válido. Intenta nuevamente.')
         }
       } catch (err: any) {
         showToast('Error', err.message || 'No se pudo generar el pago en línea', 'error')
@@ -1540,16 +1534,14 @@ export function PublicMenuView() {
                           </div>
                           {metodoPago === 'efectivo' && <CheckCircle2 size={24} className="text-green-500" />}
                         </button>
-                        {/* OCULTADO TEMPORALMENTE 
                         <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-5 px-6 rounded-[24px] border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${metodoPago === 'en_linea' ? 'bg-[#FA4A0C]/20' : 'bg-slate-100'}`}>💳</div>
                           <div className="text-left flex-1">
-                            <span className="block text-base">Tarjeta o SPEI</span>
-                            <span className="block text-xs opacity-70 mt-0.5">Pago seguro en línea por Conekta</span>
+                            <span className="block text-base">Tarjeta o Mercado Pago</span>
+                            <span className="block text-xs opacity-70 mt-0.5">Pago seguro en línea</span>
                           </div>
                           {metodoPago === 'en_linea' && <CheckCircle2 size={24} className="text-[#FA4A0C]" />}
                         </button>
-                        */}
                       </div>
                     </div>
                   </motion.div>

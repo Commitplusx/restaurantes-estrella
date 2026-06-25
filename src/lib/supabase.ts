@@ -29,6 +29,9 @@ export interface HorariosRestaurante {
 
 export interface Restaurante {
   stripe_account_id?: string
+  mp_access_token?: string
+  mp_refresh_token?: string
+  mp_user_id?: string
   id: string
   nombre: string
   telefono: string

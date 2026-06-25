@@ -60,13 +60,13 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
   const [showPassword, setShowPassword] = useState(false)
   const [loadingStripe, setLoadingStripe] = useState(false)
 
-  const handleStripeConnect = async () => {
+  const handleMPConnect = async () => {
     try {
       setLoadingStripe(true)
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-onboarding`, {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercadopago-onboarding`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
       if (data.url) {
         window.location.href = data.url
       } else {
-        alert(data.error || 'Error al conectar con Stripe')
+        alert(data.error || 'Error al conectar con Mercado Pago')
       }
     } catch (error) {
       console.error(error)
@@ -226,30 +226,30 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
       <div className="max-w-3xl">
         <form onSubmit={handleSave} className="space-y-8">
 
-          {/* PAGOS (STRIPE) */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-indigo-100 shadow-sm">
+          {/* PAGOS (MERCADO PAGO) */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-[#009EE3]/20 shadow-sm">
             <h2 className="text-lg font-black flex items-center gap-2 mb-2">
-              <span className="text-indigo-600">💸</span>
-              Pagos con Tarjeta (Stripe)
+              <span className="text-[#009EE3]">🤝</span>
+              Pagos con Mercado Pago
             </h2>
-            <p className="text-sm text-slate-500 mb-6">Vincula tu cuenta bancaria para recibir el dinero de tus ventas de comida directamente. (Nosotros nos quedamos únicamente con el cargo por envío).</p>
+            <p className="text-sm text-slate-500 mb-6">Vincula tu cuenta de Mercado Pago para recibir el dinero de tus ventas directamente y al instante.</p>
             <div className="flex flex-col sm:flex-row items-center justify-between bg-slate-50 p-5 rounded-2xl border border-slate-200">
               <div>
                 <p className="font-bold text-slate-800">
-                  {restaurante.stripe_account_id ? 'Cuenta Vinculada' : 'Cuenta No Vinculada'}
+                  {restaurante.mp_access_token ? 'Cuenta Vinculada' : 'Cuenta No Vinculada'}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {restaurante.stripe_account_id ? 'Ya puedes recibir pagos con tarjeta.' : 'Los clientes solo podrán pagar en efectivo por ahora.'}
+                  {restaurante.mp_access_token ? 'Ya puedes recibir pagos con tarjeta y SPEI directamente.' : 'Los clientes solo podrán pagar en efectivo o al cajero general por ahora.'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={handleStripeConnect}
+                onClick={handleMPConnect}
                 disabled={loadingStripe}
-                className={`mt-4 sm:mt-0 px-6 py-2.5 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2 ${loadingStripe ? 'bg-slate-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                className={`mt-4 sm:mt-0 px-6 py-2.5 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2 ${loadingStripe ? 'bg-slate-400' : 'bg-[#009EE3] hover:bg-[#0089C5]'}`}
               >
                 {loadingStripe && <Loader2 className="animate-spin" size={16} />}
-                {restaurante.stripe_account_id ? 'Ver mi Panel de Pagos' : 'Vincular mi Banco'}
+                {restaurante.mp_access_token ? 'Volver a Vincular' : 'Vincular Mercado Pago'}
               </button>
             </div>
           </div>
