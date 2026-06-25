@@ -116,7 +116,7 @@ export interface MenuPromocion {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Helper para comprimir imágenes antes de subir */
-async function compressImage(file: File, maxWidth: number = 800): Promise<File> {
+async function compressImage(file: File, maxWidth: number = 1200): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
@@ -143,7 +143,7 @@ async function compressImage(file: File, maxWidth: number = 800): Promise<File> 
           lastModified: Date.now(),
         });
         resolve(compressedFile);
-      }, 'image/webp', 0.8); // 80% calidad, formato WebP
+      }, 'image/webp', 0.9); // 90% calidad, formato WebP
     };
     img.onerror = (error) => reject(error);
   });
