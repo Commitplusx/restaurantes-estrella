@@ -27,10 +27,12 @@ export default function App() {
     </div>
   );
 
+  const isPartnerDomain = window.location.hostname.includes('restaurantes-app') || window.location.hostname.includes('socio');
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PublicLandingPage />} />
+        <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
         <Route path="/menu/:id" element={<PublicMenuView />} />
         <Route path="/success" element={<SuccessPage />} />
         <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />

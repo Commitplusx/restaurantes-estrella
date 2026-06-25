@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
-import { Store, Search, MapPin, Clock, Ticket } from 'lucide-react'
+import { Store, Search, MapPin, Clock, Ticket, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 
@@ -30,6 +30,8 @@ export function PublicLandingPage() {
   const [hasMore, setHasMore] = useState(true)
   const [activeTab, setActiveTab] = useState<'todos' | 'cerca' | 'promos'>('todos')
   const [isScrolled, setIsScrolled] = useState(false)
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
+  const [locationLoading, setLocationLoading] = useState(false)
   const PAGE_SIZE = 12 // Cargamos de 12 en 12
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export function PublicLandingPage() {
     // ⚡ Optimizacion: Hacemos una sola peticion en background.
     let query = supabase
       .from('restaurantes')
-      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
+      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
       .eq('activo', true)
       .order('nombre')
       .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
@@ -65,7 +67,7 @@ export function PublicLandingPage() {
     if (error && error.code === '42703') { 
         const { data: fallbackData } = await supabase
           .from('restaurantes')
-          .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
+          .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
           .eq('activo', true)
           .order('nombre')
           .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
@@ -195,14 +197,71 @@ export function PublicLandingPage() {
     }
   }
 
-  // Cerca de ti: Los ordenamos para que los abiertos salgan primero
+  function calculaDistancia(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371; // Radio de la Tierra en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  const handleTabClick = (tab: 'todos' | 'cerca' | 'promos') => {
+    if (tab === 'cerca' && !userLocation) {
+      setLocationLoading(true);
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            setActiveTab('cerca');
+            setLocationLoading(false);
+          },
+          (err) => {
+            console.error("Error obteniendo ubicación:", err);
+            alert("No pudimos obtener tu ubicación GPS. Por favor actívala en tu navegador.");
+            setActiveTab('cerca');
+            setLocationLoading(false);
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+      } else {
+        alert("Tu navegador no soporta geolocalización.");
+        setLocationLoading(false);
+      }
+    } else {
+      setActiveTab(tab);
+    }
+  }
+
+  // Cerca de ti: Filtra a max 2km y ordena por distancia si hay GPS
   const restaurantesCerca = useMemo(() => {
-    return [...filteredRestaurants].sort((a, b) => {
-      const aAbierto = estaAbierto(a) ? 1 : 0;
-      const bAbierto = estaAbierto(b) ? 1 : 0;
-      return bAbierto - aAbierto;
-    })
-  }, [filteredRestaurants]);
+    let result = [...filteredRestaurants];
+    
+    if (userLocation) {
+      result = result.filter(r => {
+        if (!r.lat || !r.lng) return false;
+        const dist = calculaDistancia(userLocation.lat, userLocation.lng, r.lat, r.lng);
+        return dist <= 2; // Máximo 2 kilómetros
+      });
+      
+      result.sort((a, b) => {
+        const distA = calculaDistancia(userLocation.lat, userLocation.lng, a.lat!, a.lng!);
+        const distB = calculaDistancia(userLocation.lat, userLocation.lng, b.lat!, b.lng!);
+        return distA - distB;
+      });
+    } else {
+      result.sort((a, b) => {
+        const aAbierto = estaAbierto(a) ? 1 : 0;
+        const bAbierto = estaAbierto(b) ? 1 : 0;
+        return bAbierto - aAbierto;
+      });
+    }
+    
+    return result;
+  }, [filteredRestaurants, userLocation]);
 
   const filteredPromos = useMemo(() => 
     promosGlobales.filter(p => 
@@ -260,10 +319,10 @@ export function PublicLandingPage() {
             <Store size={18} /> Todos los comercios
           </button>
           <button 
-            onClick={() => setActiveTab('cerca')}
+            onClick={() => handleTabClick('cerca')}
             className={`px-6 py-3 rounded-full text-[15px] font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'cerca' ? 'bg-white text-slate-900 shadow-[0_4px_20px_rgb(0,0,0,0.08)] scale-105 border border-transparent' : 'bg-slate-200/50 text-slate-500 hover:bg-slate-200 border border-transparent'}`}
           >
-            <MapPin size={18} /> Cerca de ti
+            {locationLoading ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />} Cerca de ti
           </button>
           <button 
             onClick={() => setActiveTab('promos')}

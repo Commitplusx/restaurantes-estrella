@@ -115,6 +115,7 @@ export function PublicMenuView() {
   const [loading, setLoading] = useState(true)
 
   const [activeTab, setActiveTab] = useState<'menu' | 'combos' | 'promos'>('menu')
+  const [activeCategoryId, setActiveCategoryId] = useState<string>('todos')
 
   const [selectedItemDetail, setSelectedItemDetail] = useState<any | null>(null)
 
@@ -925,18 +926,17 @@ export function PublicMenuView() {
                 {/* STICKY CATEGORY NAV */}
                 {categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 1 && (
                   <div className="sticky top-[60px] md:top-[70px] z-30 bg-white/95 backdrop-blur-md py-3 -mx-4 px-4 overflow-x-auto flex gap-2 border-b border-slate-100 shadow-[0_4px_12px_rgba(0,0,0,0.02)] mb-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    <button 
+                      onClick={() => setActiveCategoryId('todos')}
+                      className={`whitespace-nowrap px-5 py-2 font-bold rounded-full text-sm transition-all border shrink-0 ${activeCategoryId === 'todos' ? 'bg-orange-500 text-white border-orange-500 shadow-md scale-105' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
+                    >
+                      Todos
+                    </button>
                     {categorias.filter(c => items.some(i => i.categoria_id === c.id)).map(cat => (
                       <button 
                         key={`nav-${cat.id}`}
-                        onClick={() => {
-                          const el = document.getElementById(`cat-${cat.id}`);
-                          // Restamos un poco más de offset para el header
-                          if (el) {
-                            const y = el.getBoundingClientRect().top + window.scrollY - 130;
-                            window.scrollTo({ top: y, behavior: 'smooth' });
-                          }
-                        }}
-                        className="whitespace-nowrap px-5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-full text-sm transition-colors border border-slate-200 shrink-0"
+                        onClick={() => setActiveCategoryId(cat.id)}
+                        className={`whitespace-nowrap px-5 py-2 font-bold rounded-full text-sm transition-all border shrink-0 ${activeCategoryId === cat.id ? 'bg-orange-500 text-white border-orange-500 shadow-md scale-105' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
                       >
                         {cat.nombre}
                       </button>
@@ -944,21 +944,27 @@ export function PublicMenuView() {
                   </div>
                 )}
 
-                {categorias.map(cat => {
-                  const catItems = items.filter(i => i.categoria_id === cat.id)
-                  if (catItems.length === 0) return null
-                  return (
-                    <motion.div
-                      id={`cat-${cat.id}`}
-                      key={cat.id}
-                      className="mb-10 scroll-mt-[140px]"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
-                      <h3 className="text-xl font-bold text-slate-900 mb-4 px-2 tracking-tight">
-                        {cat.nombre}
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <AnimatePresence mode="popLayout">
+                  {categorias.filter(cat => activeCategoryId === 'todos' || cat.id === activeCategoryId).map(cat => {
+                    const catItems = items.filter(i => i.categoria_id === cat.id)
+                    if (catItems.length === 0) return null
+                    return (
+                      <motion.div
+                        layout
+                        id={`cat-${cat.id}`}
+                        key={cat.id}
+                        className="mb-10 scroll-mt-[140px]"
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                        transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 25 }}
+                      >
+                        {activeCategoryId === 'todos' && (
+                          <h3 className="text-xl font-bold text-slate-900 mb-4 px-2 tracking-tight">
+                            {cat.nombre}
+                          </h3>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {catItems.map((item) => {
                           const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
                           // Filtrar por horario si tiene horario configurado
@@ -1008,10 +1014,11 @@ export function PublicMenuView() {
                             </div>
                           )
                         })}
-                      </div>
-                    </motion.div>
-                  )
-                })}
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </AnimatePresence>
               </div>
             )}
 
@@ -1299,40 +1306,44 @@ export function PublicMenuView() {
               <div className="w-full h-full relative">
                 {/* PASO 1: RESUMEN */}
                 {checkoutStep === 1 && (
-                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
-                    {carrito.map((p, i) => (
-                      <div key={i} className="flex gap-4 p-4 rounded-[24px] bg-white border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="w-16 h-16 rounded-[12px] overflow-hidden bg-slate-50 shrink-0">
-                          <LazyImage src={p.item.foto_url} className="w-full h-full" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-bold text-slate-900 text-sm leading-tight mb-1">{p.item.nombre}</h4>
-                          {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                            <div className="mb-2">
-                              {p.item.opcionesSeleccionadas.map((opt, idx) => (
-                                <p key={idx} className="text-[10px] text-slate-500">+ {opt.opcion} {opt.precio_extra > 0 && `(+$${opt.precio_extra})`}</p>
-                              ))}
+                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="flex flex-col h-full">
+                    <div className="space-y-0 divide-y divide-slate-100">
+                      {carrito.map((p, i) => (
+                        <div key={i} className="flex gap-3 py-3.5 bg-white group">
+                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[12px] overflow-hidden bg-slate-50 shrink-0 border border-slate-100 relative">
+                            {p.item.foto_url ? (
+                              <img src={p.item.foto_url} alt={p.item.nombre} className="w-full h-full object-cover" loading="lazy" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-300"><Store size={20} /></div>
+                            )}
+                          </div>
+                          <div className="flex-1 flex flex-col justify-center min-w-0">
+                            <div className="flex justify-between items-start mb-0.5">
+                              <h4 className="font-bold text-slate-800 text-[13px] sm:text-[14px] leading-tight pr-2 truncate">{p.item.nombre}</h4>
+                              <span className="font-black text-slate-900 text-[13px] sm:text-[14px]">${(p.item.precio * p.cantidad).toFixed(2)}</span>
                             </div>
-                          )}
-                          <div className="flex justify-between items-center mt-2">
-                            <span className="font-black text-[#FA4A0C]">${(p.item.precio * p.cantidad).toFixed(2)}</span>
-                            <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-[12px] px-1 py-1">
-                              <button onClick={() => removeFromCart(p.item.cartItemId)} className="p-1 rounded-md text-slate-400 hover:text-[#FA4A0C]"><Minus size={12} /></button>
-                              <span className="font-bold text-xs w-3 text-center">{p.cantidad}</span>
-                              <button onClick={() => addToCart(p.item)} className="p-1 bg-[#FA4A0C] rounded-md text-white"><Plus size={12} /></button>
+                            {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
+                              <p className="text-[10px] sm:text-[11px] text-slate-400 leading-tight mb-2 truncate">
+                                {p.item.opcionesSeleccionadas.map(o => o.opcion).join(', ')}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full p-0.5 w-max mt-auto">
+                              <button onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-red-500 transition-colors"><Minus size={12} /></button>
+                              <span className="font-bold text-[12px] w-5 text-center text-slate-800">{p.cantidad}</span>
+                              <button onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-green-600 transition-colors"><Plus size={12} /></button>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                     
-                    <div className="bg-[#FA4A0C]/5 rounded-[24px] p-5 border border-[#FA4A0C]/10 mt-6">
-                      <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2"><Ticket size={16} className="text-[#FA4A0C]"/> ¿Tienes un cupón?</h4>
+                    <div className="mt-8 bg-slate-50 rounded-[24px] p-5 border border-slate-100">
+                      <h4 className="font-bold text-slate-800 mb-3 text-[13px] flex items-center gap-2 uppercase tracking-widest"><Ticket size={16} className="text-[#FA4A0C]"/> ¿Tienes un cupón?</h4>
                       <div className="flex gap-2">
-                        <input type="text" placeholder="Código" value={cuponCliente} onChange={e => {setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0)}} className="flex-1 bg-white border border-slate-200 rounded-[12px] px-3 py-2 text-sm uppercase outline-none focus:border-[#FA4A0C] font-bold" disabled={validandoCupon} />
-                        <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-slate-900 text-white px-4 py-2 rounded-[12px] text-xs font-bold disabled:opacity-50">{validandoCupon ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Aplicar'}</button>
+                        <input type="text" placeholder="Código de descuento" value={cuponCliente} onChange={e => {setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0)}} className="flex-1 bg-white border border-slate-200 rounded-[16px] px-4 py-3 text-sm uppercase outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 font-bold shadow-sm transition-all" disabled={validandoCupon} />
+                        <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-slate-900 text-white px-6 py-3 rounded-[16px] text-sm font-bold disabled:opacity-50 hover:bg-black transition-colors">{validandoCupon ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Aplicar'}</button>
                       </div>
-                      {cuponValido && <p className="text-green-600 text-[11px] font-bold mt-2 flex items-center gap-1"><CheckCircle2 size={12}/> Cupón aplicado: -$${descuento.toFixed(2)}</p>}
+                      {cuponValido && <p className="text-green-600 text-xs font-bold mt-3 flex items-center gap-1.5 bg-green-50 p-2 rounded-lg"><CheckCircle2 size={14}/> Cupón aplicado exitosamente: -$${descuento.toFixed(2)}</p>}
                     </div>
                   </motion.div>
                 )}
@@ -1564,36 +1575,42 @@ export function PublicMenuView() {
           </div>
 
           {carrito.length > 0 && (
-            <div className="p-4 border-t border-slate-100/50 shrink-0 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.03)] z-10 relative">
-              <div className="flex flex-col gap-3">
-                {tipoEntrega === 'domicilio' && (
-                  <div className="flex justify-between items-center bg-[#FA4A0C]/5 border border-[#FA4A0C]/20 px-3 py-2 rounded-xl mb-1 shadow-sm">
-                    <span className="text-[#FA4A0C] font-black flex items-center gap-2 text-[11px] uppercase tracking-wider">
-                      <Truck size={16} /> Costo de Envío
-                    </span>
-                    <AnimatePresence mode="wait">
-                      <motion.span 
-                        key={calculandoEnvio ? 'calc' : fueraDeCobertura ? 'out' : 'price'}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 10 }}
-                        className={`font-black text-sm ${fueraDeCobertura ? 'text-red-500' : 'text-[#FA4A0C]'}`}
-                      >
-                        {calculandoEnvio ? (
-                          <span className="flex items-center gap-1"><Loader2 size={14} className="animate-spin inline" /> ...</span>
-                        ) : fueraDeCobertura ? (
-                          'Sin cobertura'
-                        ) : (
-                          `+ $${costoEnvio.toFixed(2)}`
-                        )}
-                      </motion.span>
-                    </AnimatePresence>
+            <div className="p-6 border-t border-slate-100/50 shrink-0 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-10 relative rounded-t-[32px] sm:rounded-none">
+              <div className="flex flex-col gap-4">
+                
+                {/* Desglose de totales premium */}
+                <div className="flex flex-col gap-2.5 mb-2 px-1">
+                  <div className="flex justify-between text-slate-500 text-[13px] font-bold tracking-wide">
+                    <span>Subtotal</span>
+                    <span className="text-slate-800">${carrito.reduce((s, p) => s + (p.item.precio * p.cantidad), 0).toFixed(2)}</span>
                   </div>
-                )}
-                <div className="flex justify-between items-end px-2 mt-1">
-                  <span className="text-slate-900 font-bold">Total a pagar</span>
-                  <span className="text-3xl font-black text-[#FA4A0C]">${total.toFixed(2)}</span>
+                  {descuento > 0 && (
+                    <div className="flex justify-between text-green-500 text-[13px] font-bold tracking-wide">
+                      <span>Descuento</span>
+                      <span>-${descuento.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {tipoEntrega === 'domicilio' && (
+                    <div className="flex justify-between text-slate-500 text-[13px] font-bold tracking-wide">
+                      <span className="flex items-center gap-1.5"><Truck size={14} className="text-[#FA4A0C]"/> Envío</span>
+                      <AnimatePresence mode="wait">
+                        <motion.span 
+                          key={calculandoEnvio ? 'calc' : fueraDeCobertura ? 'out' : 'price'}
+                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                          className={fueraDeCobertura ? 'text-red-500' : 'text-slate-800'}
+                        >
+                          {calculandoEnvio ? <Loader2 size={12} className="animate-spin inline" /> : fueraDeCobertura ? 'Sin cobertura' : `+$${costoEnvio.toFixed(2)}`}
+                        </motion.span>
+                      </AnimatePresence>
+                    </div>
+                  )}
+                  <div className="h-px bg-slate-100 my-1 w-full" />
+                  <div className="flex justify-between items-end mt-1">
+                    <span className="text-slate-900 font-black text-[15px]">Total a pagar</span>
+                    <span className="text-3xl font-black text-slate-900 tracking-tight">${total.toFixed(2)}</span>
+                  </div>
                 </div>
+
                 {checkoutStep < 4 ? (
                   <motion.button 
                     whileTap={{ scale: 0.95 }}
@@ -1628,13 +1645,20 @@ export function PublicMenuView() {
                       }
                       setCheckoutStep(prev => prev + 1)
                     }} 
-                    className="w-full bg-slate-900 text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xl shadow-slate-900/20"
+                    className="w-full bg-slate-900 text-white py-4 rounded-[20px] font-black text-[17px] flex items-center justify-between px-6 hover:bg-black transition-all shadow-xl shadow-slate-900/20"
                   >
-                    {checkoutStep === 1 ? 'Continuar a Tus Datos' : checkoutStep === 2 ? 'Continuar a Entrega' : 'Ir al Pago'}
+                    <span>{checkoutStep === 1 ? 'Continuar' : checkoutStep === 2 ? 'Continuar a Entrega' : 'Ir al Pago'}</span>
+                    <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase">Paso {checkoutStep}/4</span>
                   </motion.button>
                 ) : (
-                  <motion.button whileTap={{ scale: 0.95 }} onClick={handlePedir} disabled={procesando || calculandoEnvio} className="w-full bg-[#FA4A0C] text-white py-4 rounded-[20px] font-black text-lg flex items-center justify-center gap-2 hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20">
-                    {procesando ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Confirmar Pedido</>}
+                  <motion.button 
+                    whileTap={{ scale: 0.95 }} 
+                    onClick={handlePedir} 
+                    disabled={procesando || calculandoEnvio} 
+                    className="w-full bg-[#FA4A0C] text-white py-4 px-6 rounded-[20px] font-black text-[17px] flex items-center justify-between hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20"
+                  >
+                    <span>Confirmar Pedido</span>
+                    {procesando ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
                   </motion.button>
                 )}
               </div>
