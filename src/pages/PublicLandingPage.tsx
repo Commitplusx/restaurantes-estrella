@@ -29,7 +29,14 @@ export function PublicLandingPage() {
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [activeTab, setActiveTab] = useState<'todos' | 'cerca' | 'promos'>('todos')
+  const [isScrolled, setIsScrolled] = useState(false)
   const PAGE_SIZE = 12 // Cargamos de 12 en 12
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   async function loadRestaurants(pageIndex: number) {
     // SWR Cache: Mostrar datos instantáneos si existen
@@ -208,19 +215,17 @@ export function PublicLandingPage() {
     <div className="min-h-screen bg-[#F6F6F9] text-slate-900 selection:bg-orange-100 font-sans pb-20">
 
       {/* Navbar Minimalista */}
-      <header className="sticky top-0 bg-[#F6F6F9]/80 backdrop-blur-xl z-50 py-4 px-6 md:px-12 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-200">
-            <Store className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-xl text-slate-800 tracking-tight">
-            Estrella
-          </span>
+      <header className={`fixed top-0 left-0 right-0 z-50 h-16 md:h-20 flex justify-between items-center transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-100' : 'bg-transparent border-b border-transparent'}`}>
+        <div className={`relative flex items-center h-full px-6 md:px-12 transition-transform duration-300 ${isScrolled ? 'scale-[0.8] origin-top-left' : 'scale-100 origin-top-left'}`}>
+          <img 
+            src="/logo.png" 
+            alt="Mascota Estrella Eats" 
+            className="h-20 md:h-24 w-auto object-contain drop-shadow-md scale-[1.8] md:scale-[2] origin-top-left translate-y-2 md:translate-y-4"
+          />
         </div>
-
       </header>
 
-      <main className="px-6 md:px-12 max-w-[1400px] mx-auto mt-6">
+      <main className="px-6 md:px-12 max-w-[1400px] mx-auto mt-6 pt-28 md:pt-36">
 
         {/* Hero Section (Clean Dribbble Style) */}
         <motion.div 
@@ -229,9 +234,9 @@ export function PublicLandingPage() {
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="mb-10 max-w-2xl"
         >
-          <h1 className="text-[40px] md:text-6xl font-extrabold text-slate-900 mb-8 leading-[1.15] tracking-tight">
-            Tus favoritos, <br/>
-            donde quieras.
+          <h1 className="text-3xl md:text-5xl font-extrabold text-slate-900 mb-6 leading-tight tracking-tight">
+            La mejor comida, <br/>
+            <span className="text-orange-500">hasta tu puerta.</span>
           </h1>
           
           <div className="relative w-full max-w-md shadow-sm rounded-full bg-white group hover:shadow-md transition-shadow">

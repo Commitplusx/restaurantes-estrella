@@ -806,8 +806,13 @@ export function PublicMenuView() {
         >
           <ChevronLeft size={20} />
         </Link>
-        <div className={`flex-1 min-w-0 transition-opacity duration-300 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>
-          <h1 className="text-[16px] md:text-[20px] font-brother font-normal uppercase tracking-widest text-slate-900 truncate mt-1">{restaurante.nombre}</h1>
+        <div className={`flex-1 min-w-0 transition-all duration-500 ease-out flex items-center gap-3 ${isScrolled ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          {restaurante.foto_fachada_url && (
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-sm">
+              <img src={restaurante.foto_fachada_url} alt="Logo" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <h1 className="text-[16px] md:text-[18px] font-brother font-bold uppercase tracking-widest text-slate-900 truncate mt-0.5">{restaurante.nombre}</h1>
         </div>
       </header>
 
@@ -1793,16 +1798,19 @@ export function PublicMenuView() {
       {toastMsg && (
         <motion.div 
           key="global-toast"
-          initial={{ y: -50, opacity: 0, x: "-50%" }} 
-          animate={{ y: 0, opacity: 1, x: "-50%" }} 
-          exit={{ y: -50, opacity: 0, x: "-50%", scale: 0.9 }} 
-          transition={{ type: "spring", bounce: 0.3, duration: 0.5 }}
-          className={`fixed top-8 sm:top-12 left-1/2 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-full shadow-2xl backdrop-blur-xl border ${toastMsg.type === 'error' ? 'bg-red-500/95 border-red-400' : toastMsg.type === 'loading' ? 'bg-slate-900/95 border-slate-700' : 'bg-green-600/95 border-green-500 text-white'}`}
+          style={{ originY: 0, originX: 0.5 }}
+          initial={{ y: -20, opacity: 0, x: "-50%", scaleX: 0.3, scaleY: 0.1, filter: "blur(10px)" }} 
+          animate={{ y: 0, opacity: 1, x: "-50%", scaleX: 1, scaleY: 1, filter: "blur(0px)" }} 
+          exit={{ y: -20, opacity: 0, x: "-50%", scaleX: 0.3, scaleY: 0.1, filter: "blur(10px)" }} 
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="fixed top-2 sm:top-4 left-1/2 z-[300] flex items-center justify-between w-[92%] max-w-[380px] px-4 py-3.5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.12)] bg-white/95 backdrop-blur-md border border-slate-100"
         >
-          {toastMsg.type === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : toastMsg.type === 'loading' ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <CheckCircle2 className="w-5 h-5 text-white" />}
-          <div>
-            <p className="text-white text-sm font-bold leading-none mb-0.5">{toastMsg.title}</p>
-            {toastMsg.message && <p className="text-white/80 text-[11px] leading-none">{toastMsg.message}</p>}
+          <div className="flex items-center gap-3 overflow-hidden">
+            {toastMsg.type === 'error' ? <AlertCircle className="w-5 h-5 text-red-500 shrink-0" /> : toastMsg.type === 'loading' ? <Loader2 className="w-5 h-5 text-indigo-500 animate-spin shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
+            <div className="flex flex-col min-w-0">
+              <p className="text-slate-800 text-[14px] font-bold leading-tight tracking-wide truncate">{toastMsg.title}</p>
+              {toastMsg.message && <p className="text-slate-500 text-[12px] leading-tight mt-0.5 truncate">{toastMsg.message}</p>}
+            </div>
           </div>
         </motion.div>
       )}
