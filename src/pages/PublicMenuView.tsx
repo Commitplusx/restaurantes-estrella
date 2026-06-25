@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import * as h3 from 'h3-js'
+// import * as h3 from 'h3-js' (movido al hook)
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
+import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation'
 import {
   Store,
   Plus,
@@ -179,53 +180,8 @@ export function PublicMenuView() {
   const [tipoEntrega, setTipoEntrega] = useState<'domicilio' | 'tienda' | null>(() => (sessionStorage.getItem('est_tipoentrega') as 'domicilio' | 'tienda' | null) || null)
   const [direccionEntrega, setDireccionEntrega] = useState(() => sessionStorage.getItem('est_direccion') || '')
 
-  // Estados de cálculo H3
-  const [costoEnvio, setCostoEnvio] = useState(0)
-  const [fueraDeCobertura, setFueraDeCobertura] = useState(false)
-  const [calculandoEnvio, setCalculandoEnvio] = useState(false)
-
-  // Calcular tarifa H3 automáticamente cuando cambia la ubicación
-  useEffect(() => {
-    async function calcularEnvio() {
-      if (tipoEntrega !== 'domicilio' || !ubicacionGPS) {
-        setCostoEnvio(0)
-
-        setFueraDeCobertura(false)
-        return
-      }
-
-      setCalculandoEnvio(true)
-      setFueraDeCobertura(false)
-      try {
-        const hexIndex = h3.latLngToCell(ubicacionGPS.lat, ubicacionGPS.lng, 10)
-        
-        // Artificial delay for better UX (so the animation isn't just a flash)
-        await new Promise(resolve => setTimeout(resolve, 1500))
-
-        const { data } = await supabase
-          .from('h3_zonas')
-          .select('precio, nombre')
-          .eq('h3_index', hexIndex)
-          .maybeSingle()
-          
-        if (data && data.precio !== undefined) {
-          setCostoEnvio(data.precio)
-
-        } else {
-          setCostoEnvio(0)
-
-          setFueraDeCobertura(true)
-        }
-      } catch (err) {
-        console.error("Error calculando envío H3:", err)
-      } finally {
-        setCalculandoEnvio(false)
-      }
-    }
-    
-    calcularEnvio()
-  }, [ubicacionGPS, tipoEntrega])
-
+  // Estados de cálculo H3 abstraídos
+  const { costoEnvioBase, fueraDeCobertura, calculandoEnvio } = useDeliveryCalculation(ubicacionGPS, tipoEntrega);
   useEffect(() => {
     sessionStorage.setItem('est_carrito', JSON.stringify(carrito))
   }, [carrito])
@@ -477,6 +433,12 @@ export function PublicMenuView() {
       })
     }
   }, [id])
+
+  // --- Lógica de subsidio cruzado (Promoción Envío a $15) ---
+  const tieneComboOPromo = carrito.some(p => p.item.tipo === 'combo' || p.item.tipo === 'promo');
+  const cantidadTotalItems = carrito.reduce((sum, p) => sum + p.cantidad, 0);
+  const aplicaSubsidio = tieneComboOPromo || cantidadTotalItems >= 3;
+  const costoEnvio = (costoEnvioBase > 0 && aplicaSubsidio) ? Math.min(costoEnvioBase, 15) : costoEnvioBase;
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
     if (restaurante && !estaAbierto(restaurante)) {
@@ -1345,6 +1307,28 @@ export function PublicMenuView() {
                       </div>
                       {cuponValido && <p className="text-green-600 text-xs font-bold mt-3 flex items-center gap-1.5 bg-green-50 p-2 rounded-lg"><CheckCircle2 size={14}/> Cupón aplicado exitosamente: -$${descuento.toFixed(2)}</p>}
                     </div>
+
+                    {/* Toast Promocional del Envío Subsidiado */}
+                    {!aplicaSubsidio && cantidadTotalItems > 0 && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-blue-50/80 border border-blue-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <span className="text-xl">🛵</span>
+                        </div>
+                        <p className="text-[13px] text-blue-800 font-medium leading-tight">
+                          Agrega <span className="font-bold">{3 - cantidadTotalItems} producto{3 - cantidadTotalItems > 1 ? 's' : ''} más</span> o un <span className="font-bold">combo</span> y tu envío costará solo <span className="font-black">$15.00</span>
+                        </p>
+                      </motion.div>
+                    )}
+                    {aplicaSubsidio && costoEnvioBase > 15 && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-green-50/80 border border-green-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                          <span className="text-xl">🎉</span>
+                        </div>
+                        <p className="text-[13px] text-green-800 font-medium leading-tight">
+                          ¡Genial! Tu envío bajó a <span className="font-black">$15.00</span> gracias a los artículos en tu carrito.
+                        </p>
+                      </motion.div>
+                    )}
                   </motion.div>
                 )}
 
