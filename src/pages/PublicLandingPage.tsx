@@ -319,9 +319,9 @@ export function PublicLandingPage() {
         ) : (
           /* Render Todos or Cerca */
           loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-20 mt-24">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-16 md:gap-y-20 mt-20 pb-12">
               {[1,2,3,4,5,6].map(i => (
-                <div key={i} className="bg-white rounded-[30px] pt-[70px] pb-8 px-4 flex flex-col items-center relative shadow-sm">
+                <div key={i} className="bg-white/50 rounded-[30px] pt-[65px] md:pt-[75px] pb-8 px-3 md:px-5 flex flex-col items-center relative shadow-sm">
                   <div className="absolute -top-14 w-[120px] h-[120px] rounded-full bg-slate-200 animate-pulse border-[6px] border-[#F6F6F9]" />
                   <div className="w-3/4 h-6 bg-slate-200 animate-pulse rounded-md mb-3" />
                   <div className="w-1/2 h-4 bg-slate-200 animate-pulse rounded-md" />

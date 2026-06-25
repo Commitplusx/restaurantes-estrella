@@ -155,10 +155,10 @@ export function PublicMenuView() {
   const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(null)
   const [buscandoGPS, setBuscandoGPS] = useState(false)
   const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null)
-  // Lazy: solo cargar Google Maps SDK cuando el usuario selecciona "domicilio"
-  const [shouldLoadMaps, setShouldLoadMaps] = useState(false)
+  // Nota: useLoadScript no soporta cambiar la API key dinámicamente o iniciar vacía,
+  // por lo que debemos cargar el script directamente. Al ser asíncrono, el impacto en TBT es nulo.
   const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
-    googleMapsApiKey: shouldLoadMaps ? (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '') : '',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: LIBRARIES
   });
   const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
