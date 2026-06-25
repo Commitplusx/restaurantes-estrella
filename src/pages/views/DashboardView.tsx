@@ -184,7 +184,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   useEffect(() => {
     async function generateQR() {
       try {
-        const url = `https://restaurantes-app-estrella.shop/menu/${restaurante.slug || restaurante.id}`
+        const url = `https://estrella-eats.shop/menu/${restaurante.slug || restaurante.id}`
         const dataUrl = await QRCode.toDataURL(url, {
           width: 800,
           margin: 2,
@@ -603,7 +603,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
 
               <button
                 className="w-full bg-[#F8F9FA] hover:bg-[#F0F2F5] text-slate-700 font-bold py-3.5 rounded-2xl transition-colors text-sm border border-slate-200"
-                onClick={() => window.open(`https://restaurantes-app-estrella.shop/menu/${restaurante.slug || restaurante.id}`, '_blank')}
+                onClick={() => window.open(`https://estrella-eats.shop/menu/${restaurante.slug || restaurante.id}`, '_blank')}
               >
                 Ver enlace del menú
               </button>

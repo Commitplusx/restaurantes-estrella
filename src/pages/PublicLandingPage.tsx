@@ -207,9 +207,7 @@ export function PublicLandingPage() {
             Estrella
           </span>
         </div>
-        <Link to="/login" className="text-sm font-bold text-slate-400 hover:text-orange-500 transition-colors">
-          Acceso Socios
-        </Link>
+
       </header>
 
       <main className="px-6 md:px-12 max-w-[1400px] mx-auto mt-6">
