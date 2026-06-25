@@ -17,6 +17,8 @@ interface Restaurante {
   categorias?: string[]
   slug?: string
   activo?: boolean
+  lat?: number
+  lng?: number
 }
 
 export function PublicLandingPage() {
