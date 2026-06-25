@@ -39,6 +39,7 @@ export type CartItem = {
   tipo: 'item' | 'combo' | 'promo';
   opcionesSeleccionadas?: OpcionSeleccionada[];
   cartItemId: string;
+  aplica_subsidio?: boolean;
 }
 
 // CACHE GLOBAL PARA CARGA INSTANTÁNEA
@@ -440,7 +441,6 @@ export function PublicMenuView() {
 
   // --- Lógica de Subsidio Dinámico ($8 por artículo) ---
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
-  const cantidadTotalItems = carrito.reduce((sum, p) => sum + p.cantidad, 0);
   
   // Filtrar los items que sí aplican para el subsidio (por defecto true)
   const itemsSubsidio = carrito.filter(p => p.item.aplica_subsidio !== false);
@@ -451,8 +451,6 @@ export function PublicMenuView() {
   
   // El costo de envío se reduce usando la bolsa de subsidio (nunca baja de 0)
   const costoEnvio = costoEnvioBase > 0 ? Math.max(0, costoEnvioBase - bolsaSubsidio) : 0;
-  
-  const descuentoAplicadoEnvio = costoEnvioBase - costoEnvio;
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
     if (restaurante && !estaAbierto(restaurante)) {
@@ -662,17 +660,24 @@ export function PublicMenuView() {
         })
         
         const data = await res.json()
+        console.log("MP_DEBUG - Respuesta raw del servidor:", data)
+        console.log("MP_DEBUG - Código de estado HTTP:", res.status)
+
         if (!res.ok) {
+          console.error("MP_DEBUG - Error detectado por HTTP status. Status:", res.status, "Body:", data)
           throw new Error(data.error || 'Error al generar link de Mercado Pago')
         }
         
         if (data.url) {
+          console.log("MP_DEBUG - URL de pago generada correctamente:", data.url)
           window.location.href = data.url
           return
         } else {
+          console.error("MP_DEBUG - No vino la URL en el payload exitoso:", data)
           throw new Error('Mercado Pago no devolvió un link de pago válido. Intenta nuevamente.')
         }
       } catch (err: any) {
+        console.error("MP_DEBUG - Excepción atrapada en el catch:", err)
         showToast('Error', err.message || 'No se pudo generar el pago en línea', 'error')
         submittingRef.current = false // BUG 5 fix
         setProcesando(false)
