@@ -35,28 +35,28 @@ export function PublicLandingPage() {
     if (pageIndex === 0) setLoading(true)
     else setLoadingMore(true)
 
-    // Intentar con filtro perfil_completo (requiere migración SQL ejecutada)
+    // ⚡ Optimizacion: Hacemos una sola peticion. 
+    // Si la columna perfil_completo no existe, Supabase mandara un error, pero lo ignoramos y cargamos todos los activos.
     let query = supabase
       .from('restaurantes')
       .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
       .eq('activo', true)
-
-    // Solo filtrar por perfil_completo si la columna existe
-    const { data, error } = await query
-      .eq('perfil_completo', true)
       .order('nombre')
       .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
 
-    // Fallback: si la columna no existe aún, mostrar todos los activos
-    const finalData = error
-      ? (await supabase
+    const { data, error } = await query.eq('perfil_completo', true)
+    let finalData = data;
+    if (error && error.code === '42703') { // 42703 is undefined_column in Postgres
+        const { data: fallbackData } = await supabase
           .from('restaurantes')
           .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
           .eq('activo', true)
           .order('nombre')
           .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
-        ).data
-      : data
+        finalData = fallbackData;
+    } else if (error) {
+       console.error("Error fetching restaurants:", error)
+    }
     
     if (error) {
       console.error("Error fetching restaurants:", error)

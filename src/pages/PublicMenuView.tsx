@@ -155,8 +155,10 @@ export function PublicMenuView() {
   const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(null)
   const [buscandoGPS, setBuscandoGPS] = useState(false)
   const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null)
+  // Lazy: solo cargar Google Maps SDK cuando el usuario selecciona "domicilio"
+  const [shouldLoadMaps, setShouldLoadMaps] = useState(false)
   const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: shouldLoadMaps ? (import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '') : '',
     libraries: LIBRARIES
   });
   const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
@@ -326,19 +328,12 @@ export function PublicMenuView() {
     async function fetchMenuData(silently = false) {
       if (!id) return
 
+      // ⚡ Query única: busca por slug primero (el caso más común),
+      // si parece UUID busca por id. Una sola petición al servidor.
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-      
-      let rest = null
-      
-      if (isUUID) {
-        const { data } = await supabase.from('restaurantes').select('*').eq('id', id).maybeSingle()
-        rest = data
-      }
-      
-      if (!rest) {
-        const { data } = await supabase.from('restaurantes').select('*').eq('slug', id).maybeSingle()
-        rest = data
-      }
+      const { data: rest } = isUUID
+        ? await supabase.from('restaurantes').select('*').eq('id', id).maybeSingle()
+        : await supabase.from('restaurantes').select('*').eq('slug', id).maybeSingle()
 
       if (!rest) {
         if (isMounted && !silently) {
@@ -1369,7 +1364,10 @@ export function PublicMenuView() {
                               animate={{ opacity: 1, scale: 1 }}
                               exit={{ opacity: 0, scale: 0.8, display: 'none' }}
                               whileTap={{ scale: 0.95 }}
-                              onClick={() => setTipoEntrega(tipoEntrega === 'domicilio' ? null : 'domicilio')} 
+                              onClick={() => {
+                                setTipoEntrega(tipoEntrega === 'domicilio' ? null : 'domicilio')
+                                setShouldLoadMaps(true)
+                              }}
                               className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
                             >
                               <span className="text-2xl">🛵</span>
