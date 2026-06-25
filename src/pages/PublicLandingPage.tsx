@@ -32,11 +32,20 @@ export function PublicLandingPage() {
   const PAGE_SIZE = 12 // Cargamos de 12 en 12
 
   async function loadRestaurants(pageIndex: number) {
-    if (pageIndex === 0) setLoading(true)
-    else setLoadingMore(true)
+    // SWR Cache: Mostrar datos instantáneos si existen
+    if (pageIndex === 0) {
+      const cached = sessionStorage.getItem('cache_restaurantes')
+      if (cached) {
+        setRestaurantes(JSON.parse(cached))
+        setLoading(false) // Ya tenemos algo que mostrar, no bloqueamos la UI
+      } else {
+        setLoading(true)
+      }
+    } else {
+      setLoadingMore(true)
+    }
 
-    // ⚡ Optimizacion: Hacemos una sola peticion. 
-    // Si la columna perfil_completo no existe, Supabase mandara un error, pero lo ignoramos y cargamos todos los activos.
+    // ⚡ Optimizacion: Hacemos una sola peticion en background.
     let query = supabase
       .from('restaurantes')
       .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
@@ -46,7 +55,7 @@ export function PublicLandingPage() {
 
     const { data, error } = await query.eq('perfil_completo', true)
     let finalData = data;
-    if (error && error.code === '42703') { // 42703 is undefined_column in Postgres
+    if (error && error.code === '42703') { 
         const { data: fallbackData } = await supabase
           .from('restaurantes')
           .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug')
@@ -58,18 +67,19 @@ export function PublicLandingPage() {
        console.error("Error fetching restaurants:", error)
     }
     
-    if (error) {
-      console.error("Error fetching restaurants:", error)
-    }
-    
     if (finalData) {
       if (finalData.length < PAGE_SIZE) setHasMore(false)
       if (pageIndex === 0) {
         setRestaurantes(finalData)
+        // Guardamos en caché para la próxima vez
+        sessionStorage.setItem('cache_restaurantes', JSON.stringify(finalData))
       } else {
         setRestaurantes(prev => {
           const newIds = finalData.map(d => d.id)
-          return [...prev.filter(p => !newIds.includes(p.id)), ...finalData]
+          const combined = [...prev.filter(p => !newIds.includes(p.id)), ...finalData]
+          // Actualizamos el caché también al cargar más
+          sessionStorage.setItem('cache_restaurantes', JSON.stringify(combined))
+          return combined
         })
       }
     }
