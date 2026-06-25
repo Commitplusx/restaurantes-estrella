@@ -104,7 +104,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     if (item) {
       setEditingItem(item)
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0 })
+      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, aplica_subsidio: true })
     }
     setIsModalOpen(true)
   }
@@ -383,6 +383,14 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
           <div className="flex items-center gap-3 mt-4 bg-orange-50 p-4 rounded-xl">
             <input type="checkbox" id="pop" checked={editingItem.es_popular || false} onChange={e => setEditingItem({...editingItem, es_popular: e.target.checked})} className="w-5 h-5 accent-orange-500 rounded cursor-pointer" />
             <label htmlFor="pop" className="m-0 cursor-pointer text-sm font-bold text-orange-900">Destacar como "Más Popular"</label>
+          </div>
+
+          <div className="flex items-start gap-3 mt-4 bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
+            <input type="checkbox" id="subsidio" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-500 rounded cursor-pointer mt-1" />
+            <label htmlFor="subsidio" className="m-0 cursor-pointer text-sm font-bold text-blue-900 flex flex-col">
+              <span>Aplica para subsidio de envío</span>
+              <span className="text-[11px] font-medium text-blue-700/80 mt-0.5">Si está activado, este producto sumará al descuento del envío del cliente. Asegúrate de haberle subido $8 al precio base.</span>
+            </label>
           </div>
 
           {/* Opciones y Modificadores */}

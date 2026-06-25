@@ -62,7 +62,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
       setEditingItem(item)
       setIncluyeInput(item.incluye?.join(', ') || '')
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, incluye: [] })
+      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, incluye: [], aplica_subsidio: true })
       setIncluyeInput('')
     }
     setIsModalOpen(true)
@@ -234,6 +234,14 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
               </div>
             </div>
           </div>
+
+          <div className="flex items-start gap-3 mt-4 bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
+              <input type="checkbox" id="subsidioCombo" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-500 rounded cursor-pointer mt-1" />
+              <label htmlFor="subsidioCombo" className="m-0 cursor-pointer text-sm font-bold text-blue-900 flex flex-col">
+                <span>Aplica para subsidio de envío</span>
+                <span className="text-[11px] font-medium text-blue-700/80 mt-0.5">Si está activado, este combo sumará al descuento del envío del cliente. Asegúrate de haberle subido $8 al precio base.</span>
+              </label>
+            </div>
 
           <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-emerald-500 shadow-xl shadow-slate-900/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
             {saving ? (

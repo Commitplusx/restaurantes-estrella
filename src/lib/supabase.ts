@@ -52,6 +52,8 @@ export interface Restaurante {
   programa_lealtad_activo?: boolean
   lat?: number | null
   lng?: number | null
+  envio_gratis_monto_minimo?: number
+  envio_gratis_tope?: number
 }
 
 export interface MenuCategoria {
@@ -91,6 +93,7 @@ export interface MenuItem {
   hora_fin_disponible?: string | null     // formato 'HH:MM'
   agotado_hoy?: boolean
   agotado_hasta?: string | null
+  aplica_subsidio?: boolean
 }
 
 export interface MenuCombo {
@@ -102,6 +105,7 @@ export interface MenuCombo {
   foto_url: string | null
   incluye: string[]
   disponible: boolean
+  aplica_subsidio?: boolean
 }
 
 export interface MenuPromocion {

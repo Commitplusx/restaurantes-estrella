@@ -438,11 +438,21 @@ export function PublicMenuView() {
     }
   }, [id])
 
-  // --- Lógica de subsidio cruzado (Promoción Envío a $15) ---
-  const tieneComboOPromo = carrito.some(p => p.item.tipo === 'combo' || p.item.tipo === 'promo');
+  // --- Lógica de Subsidio Dinámico ($8 por artículo) ---
+  const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
   const cantidadTotalItems = carrito.reduce((sum, p) => sum + p.cantidad, 0);
-  const aplicaSubsidio = tieneComboOPromo || cantidadTotalItems >= 3;
-  const costoEnvio = (costoEnvioBase > 0 && aplicaSubsidio) ? Math.min(costoEnvioBase, 15) : costoEnvioBase;
+  
+  // Filtrar los items que sí aplican para el subsidio (por defecto true)
+  const itemsSubsidio = carrito.filter(p => p.item.aplica_subsidio !== false);
+  const cantidadSubsidio = itemsSubsidio.reduce((sum, p) => sum + p.cantidad, 0);
+  
+  // Por cada artículo calificable, el restaurante recauda $8 pesos extra que se usan para subsidiar el envío
+  const bolsaSubsidio = cantidadSubsidio * 8;
+  
+  // El costo de envío se reduce usando la bolsa de subsidio (nunca baja de 0)
+  const costoEnvio = costoEnvioBase > 0 ? Math.max(0, costoEnvioBase - bolsaSubsidio) : 0;
+  
+  const descuentoAplicadoEnvio = costoEnvioBase - costoEnvio;
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
     if (restaurante && !estaAbierto(restaurante)) {
@@ -529,7 +539,6 @@ export function PublicMenuView() {
   }
 
 
-  const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
 
   // BUG 4 fix: reset coupon if cart subtotal drops to 0 or below discount amount
@@ -1300,29 +1309,29 @@ export function PublicMenuView() {
                         <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-slate-900 text-white px-6 py-3 rounded-[16px] text-sm font-bold disabled:opacity-50 hover:bg-black transition-colors">{validandoCupon ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Aplicar'}</button>
                       </div>
                       {cuponValido && <p className="text-green-600 text-xs font-bold mt-3 flex items-center gap-1.5 bg-green-50 p-2 rounded-lg"><CheckCircle2 size={14}/> Cupón aplicado exitosamente: -$${descuento.toFixed(2)}</p>}
+                      
+                      {/* Toast Promocional del Envío Dinámico */}
+                      {costoEnvioBase > 0 && costoEnvio > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-blue-50/80 border border-blue-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                            <span className="text-xl">🛵</span>
+                          </div>
+                          <p className="text-[13px] text-blue-800 font-medium leading-tight">
+                            ¡Tu envío está bajando gracias a tu compra! 🛵 Agrega un antojito más para que tu envío salga aún más barato... <span className="font-bold">¡o hasta GRATIS!</span>
+                          </p>
+                        </motion.div>
+                      )}
+                      {costoEnvioBase > 0 && costoEnvio === 0 && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-green-50/80 border border-green-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                            <span className="text-xl">🎉</span>
+                          </div>
+                          <p className="text-[13px] text-green-800 font-medium leading-tight">
+                            ¡Magia! ✨ Has agregado tantos productos que tu envío ahora es <span className="font-black">TOTALMENTE GRATIS</span>.
+                          </p>
+                        </motion.div>
+                      )}
                     </div>
-
-                    {/* Toast Promocional del Envío Subsidiado */}
-                    {!aplicaSubsidio && cantidadTotalItems > 0 && (
-                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-blue-50/80 border border-blue-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                          <span className="text-xl">🛵</span>
-                        </div>
-                        <p className="text-[13px] text-blue-800 font-medium leading-tight">
-                          Agrega <span className="font-bold">{3 - cantidadTotalItems} producto{3 - cantidadTotalItems > 1 ? 's' : ''} más</span> o un <span className="font-bold">combo</span> y tu envío costará solo <span className="font-black">$15.00</span>
-                        </p>
-                      </motion.div>
-                    )}
-                    {aplicaSubsidio && costoEnvioBase > 15 && (
-                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-green-50/80 border border-green-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
-                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                          <span className="text-xl">🎉</span>
-                        </div>
-                        <p className="text-[13px] text-green-800 font-medium leading-tight">
-                          ¡Genial! Tu envío bajó a <span className="font-black">$15.00</span> gracias a los artículos en tu carrito.
-                        </p>
-                      </motion.div>
-                    )}
                   </motion.div>
                 )}
 
@@ -1554,6 +1563,20 @@ export function PublicMenuView() {
             <div className="p-6 border-t border-slate-100/50 shrink-0 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-10 relative rounded-t-[32px] sm:rounded-none">
               <div className="flex flex-col gap-4">
                 
+                {/* Banner Motivacional Envío en Paso 3 */}
+                {checkoutStep === 3 && tipoEntrega === 'domicilio' && costoEnvioBase > 0 && !fueraDeCobertura && !calculandoEnvio && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[16px] p-3 flex items-center gap-3 border ${costoEnvio === 0 ? 'bg-green-50/80 border-green-200/50' : 'bg-blue-50/80 border-blue-200/50'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${costoEnvio === 0 ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {costoEnvio === 0 ? <span className="text-sm">🎉</span> : <span className="text-sm">🛵</span>}
+                    </div>
+                    <p className={`text-[12px] font-medium leading-tight ${costoEnvio === 0 ? 'text-green-800' : 'text-blue-800'}`}>
+                      {costoEnvio === 0 
+                        ? <>¡Magia! ✨ Tu envío es <span className="font-black">TOTALMENTE GRATIS</span>. ¡Aprovecha ese ahorro para pedir un postre!</>
+                        : <>¡Tu envío está bajando gracias a tu compra! 🛵 Agrega un antojito más para que tu envío salga aún más barato... <span className="font-bold">¡o hasta GRATIS!</span></>}
+                    </p>
+                  </motion.div>
+                )}
+
                 {/* Desglose de totales premium */}
                 <div className="flex flex-col gap-2.5 mb-2 px-1">
                   <div className="flex justify-between text-slate-500 text-[13px] font-bold tracking-wide">
