@@ -83,12 +83,15 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
   }
 
   const updateEstado = async (id: string, nuevoEstado: string) => {
+    // Guardar estado previo para rollback
+    const estadoPrevio = pedidos.find(p => p.id === id)?.estado
     try {
-      // Optimizacion optimista
+      // Actualización optimista del UI
       setPedidos((prev) =>
         prev.map((p) => (p.id === id ? { ...p, estado: nuevoEstado } : p))
       )
-      await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', id)
+      const { error } = await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', id)
+      if (error) throw error
       
       // Si cambia a listo, notificar al repartidor
       if (nuevoEstado === 'listo_para_recoger') {
@@ -97,12 +100,20 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
         })
       }
     } catch (e) {
-      console.error(e)
+      console.error('Error actualizando estado, revirtiendo:', e)
+      // Rollback: restaurar el estado previo en el UI
+      if (estadoPrevio) {
+        setPedidos((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, estado: estadoPrevio } : p))
+        )
+      }
     }
   }
 
-  const nuevos = pedidos.filter(p => p.estado === 'pendiente' || p.estado === 'asignado' || p.estado === 'pagado' || p.estado === 'aceptado')
-  const enCocina = pedidos.filter(p => p.estado === 'en_cocina')
+  // 'asignado' se mueve a En Cocina: cuando el repartidor acepta un pedido que
+  // ya está en cocina, NO debe regresar a la columna de Nuevos.
+  const nuevos = pedidos.filter(p => p.estado === 'pendiente' || p.estado === 'pagado' || p.estado === 'aceptado')
+  const enCocina = pedidos.filter(p => p.estado === 'en_cocina' || p.estado === 'asignado')
   const listos = pedidos.filter(p => p.estado === 'listo_para_recoger')
 
   if (loading) {
@@ -229,7 +240,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: an
     >
       <div className="flex justify-between items-start mb-3">
         <div>
-          <span className="text-xs font-bold text-slate-400 tracking-wider">PEDIDO #{pedido.id.substring(0,6).toUpperCase()}</span>
+          <span className="text-xs font-bold text-slate-400 tracking-wider">EST-{pedido.id.replace(/-/g, '').slice(-5).toUpperCase()}</span>
           <h5 className="font-bold text-slate-800 mt-1">{pedido.cliente_nombre || 'Cliente Web'}</h5>
         </div>
         <span className="text-sm font-bold text-[#FF7A6A]">${pedido.total}</span>

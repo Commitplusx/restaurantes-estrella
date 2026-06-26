@@ -79,7 +79,7 @@ export function SuccessPage() {
             query = query.eq('wb_message_id', pedidoId);
           }
         } else if (orderId) {
-          query = query.eq('conekta_order_id', orderId);
+          query = query.eq('id', orderId);  // orderId viene de la URL cuando se usa flujo de pago externo
         }
         
         const { data: pedidoData, error } = await query.single();
@@ -179,6 +179,14 @@ export function SuccessPage() {
     };
   }, [pedidoId, orderId, isSuccess]);
 
+  const getShortTicket = (id: string) => {
+    if (!id) return '000000';
+    if (id.includes('-')) {
+      return id.split('-').pop()?.toUpperCase().slice(-6) || '000000';
+    }
+    return id.toUpperCase().slice(-6);
+  };
+
   const fireConfetti = () => {
     const duration = 3 * 1000;
     const end = Date.now() + duration;
@@ -213,7 +221,7 @@ export function SuccessPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex flex-col items-center justify-center pt-2 pb-2 px-3 sm:px-6 relative overflow-x-hidden font-sans">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-start pt-4 pb-4 px-3 sm:px-6 relative overflow-x-hidden font-sans">
       
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
@@ -282,7 +290,7 @@ export function SuccessPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-              className="bg-white rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] w-full flex flex-col overflow-hidden border border-slate-100/50"
+              className="bg-white/80 backdrop-blur-xl rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] w-full flex flex-col overflow-hidden border border-white/40"
             >
               {/* TOP TICKET: Success Status */}
               <div className="p-4 pb-4 flex flex-col items-center text-center relative bg-gradient-to-b from-white to-slate-50/30">
@@ -346,19 +354,15 @@ export function SuccessPage() {
                 {/* Info Grid */}
                 <div className="grid grid-cols-2 gap-y-2 gap-x-2">
                   <div className="flex flex-col">
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Ticket de Orden</span>
-                    <span className="text-slate-800 font-black font-mono text-xs bg-slate-100/80 px-2 py-0.5 rounded w-max border border-slate-200/50">#{pedidoId || orderId || pedido?.id?.substring(0,8)}</span>
-                  </div>
-                  <div className="flex flex-col items-end text-right">
                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Restaurante</span>
                     <span className="text-slate-800 font-bold text-xs truncate max-w-full">{pedido?.restaurante}</span>
                   </div>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col items-end text-right">
                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Cliente</span>
                     <span className="text-slate-800 font-bold text-xs truncate max-w-full">{pedido?.cliente_nombre}</span>
                   </div>
                   {pedido?.notas && (
-                    <div className="flex flex-col items-end text-right">
+                    <div className="flex flex-col col-span-2">
                       <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Pago</span>
                       <span className="text-slate-800 font-bold text-xs capitalize">{pedido.notas}</span>
                     </div>
@@ -369,9 +373,15 @@ export function SuccessPage() {
 
                 {/* Total */}
                 {pedido?.total && (
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-slate-500 font-black text-xs uppercase tracking-wider">Total</span>
-                    <span className="text-[#FA4A0C] font-black text-lg">${pedido.total.toFixed(2)}</span>
+                  <div className="mt-5 w-full border-t-2 border-dashed border-slate-200/70 pt-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ticket de Orden</p>
+                      <p className="text-xl font-black text-slate-800 tracking-tight">#{getShortTicket(pedido.id)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                      <span className="text-[#FA4A0C] font-black text-2xl">${pedido.total.toFixed(2)}</span>
+                    </div>
                   </div>
                 )}
 
