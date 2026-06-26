@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, Loader2, MessageCircle, AlertCircle, ShoppingBag, Star } from 'lucide-react';
+import { CheckCircle2, Loader2, MessageCircle, AlertCircle, ShoppingBag, Star, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { OrderProgressBar } from '../components/OrderProgressBar';
@@ -26,7 +26,7 @@ export function SuccessPage() {
   const pollIntervalRef = useRef<any>(null);
 
   useEffect(() => {
-    if ((!pedidoId && !orderId) || !isSuccess) {
+    if (!pedidoId && !orderId) {
       setStatus('error');
       return;
     }
@@ -58,15 +58,27 @@ export function SuccessPage() {
       sessionStorage.removeItem('est_carrito');
       sessionStorage.removeItem('est_checkoutstep');
       sessionStorage.removeItem('est_tipoentrega');
+      
+      // Guardar el pedido en localStorage para el Floating Tracker
+      if (newPedido && !['entregado', 'cancelado', 'rechazado'].includes(newPedido.estado)) {
+        localStorage.setItem('est_active_order', newPedido.id);
+      } else {
+        localStorage.removeItem('est_active_order');
+      }
     };
 
     const RESOLVED_STATES = ['pendiente', 'pagado', 'asignado', 'recibido', 'preparando', 'en_camino', 'entregado', 'en_cocina', 'listo_para_recoger'];
 
-    const fetchPedido = async (retries = 3) => {
+      const fetchPedido = async (retries = 3) => {
       try {
         let query = supabase.from('pedidos').select('*');
         if (pedidoId) {
-          query = query.eq('wb_message_id', pedidoId);
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pedidoId);
+          if (isUUID) {
+            query = query.eq('id', pedidoId);
+          } else {
+            query = query.eq('wb_message_id', pedidoId);
+          }
         } else if (orderId) {
           query = query.eq('conekta_order_id', orderId);
         }
@@ -124,8 +136,15 @@ export function SuccessPage() {
                 clearInterval(pollIntervalRef.current);
                 pollIntervalRef.current = null;
               }
+              // Si pasaron 8 segundos y no llegó el webhook, pero la URL dice que pagó, 
+              // forzamos el éxito para no dejar al usuario atascado.
+              if (isSuccess) {
+                resolveSuccess(pedidoData);
+              } else {
+                setStatus('error');
+              }
             }
-          }, 15000);
+          }, 8000);
         }
 
         // UNIFICADO: Un solo canal de realtime que siempre actualiza la UI
@@ -135,6 +154,13 @@ export function SuccessPage() {
             { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
             (payload) => {
               setPedido(payload.new); // ¡ESTO ARREGLA EL BUG DE NO ACTUALIZAR!
+              
+              if (['entregado', 'cancelado', 'rechazado'].includes(payload.new.estado)) {
+                localStorage.removeItem('est_active_order');
+              } else {
+                localStorage.setItem('est_active_order', payload.new.id);
+              }
+
               if (RESOLVED_STATES.includes(payload.new.estado)) {
                 resolveSuccess(payload.new);
               }
@@ -206,20 +232,18 @@ export function SuccessPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center pt-8 pb-12 px-4 sm:px-6 relative overflow-hidden font-sans">
+    <div className="min-h-[100dvh] bg-slate-50 flex flex-col items-center justify-center pt-2 pb-2 px-3 sm:px-6 relative overflow-x-hidden font-sans">
       
-      {/* Brand Logo Header */}
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="w-full max-w-md mx-auto flex flex-col items-center justify-center mb-6"
+        className="w-full max-w-md mx-auto flex flex-row items-center justify-start mb-4 px-1 gap-4"
       >
-        <div className="w-14 h-14 bg-[#FA4A0C] rounded-[18px] flex items-center justify-center shadow-lg shadow-[#FA4A0C]/30 mb-3 relative overflow-hidden">
-           <Star className="text-white w-7 h-7 relative z-10" fill="currentColor" />
-           <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent"></div>
+        <div className="w-20 h-20 flex items-center justify-center drop-shadow-md">
+           <img src="/logo.png" alt="Estrella Eats" className="w-full h-full object-contain" />
         </div>
-        <h1 className="text-xl font-black text-slate-800 tracking-tight">Estrella Eats</h1>
+        <h1 className="text-2xl font-black text-slate-800 tracking-tight">Estrella Eats</h1>
       </motion.div>
 
       <div className="w-full max-w-md md:max-w-2xl mx-auto relative z-10">
@@ -232,11 +256,24 @@ export function SuccessPage() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-white rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] p-10 w-full flex flex-col items-center text-center border border-slate-100"
             >
-              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 overflow-hidden">
+                {isSuccess ? (
+                  <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+                ) : (
+                  <motion.div
+                    animate={{ x: [-15, 15, -15] }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  >
+                    <Truck className="w-10 h-10 text-[#FA4A0C]" />
+                  </motion.div>
+                )}
               </div>
-              <h2 className="text-2xl font-black text-slate-800 mb-2">Validando Pago</h2>
-              <p className="text-slate-500 font-medium">Estamos confirmando tu depósito con el banco. Por favor no cierres esta ventana.</p>
+              <h2 className="text-2xl font-black text-slate-800 mb-2">
+                {isSuccess ? 'Validando Pago' : 'Cargando tu recibo'}
+              </h2>
+              <p className="text-slate-500 font-medium">
+                {isSuccess ? 'Estamos confirmando tu depósito con el banco. Por favor no cierres esta ventana.' : 'Estamos obteniendo los detalles de tu envío...'}
+              </p>
             </motion.div>
           ) : status === 'error' ? (
             <motion.div
@@ -267,39 +304,39 @@ export function SuccessPage() {
               className="bg-white rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] w-full flex flex-col overflow-hidden border border-slate-100/50"
             >
               {/* TOP TICKET: Success Status */}
-              <div className="p-8 pb-10 flex flex-col items-center text-center relative bg-gradient-to-b from-white to-slate-50/30">
+              <div className="p-4 pb-4 flex flex-col items-center text-center relative bg-gradient-to-b from-white to-slate-50/30">
                 <motion.div 
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
-                  className="w-16 h-16 bg-gradient-to-tr from-emerald-400 to-emerald-500 text-white rounded-full flex items-center justify-center mb-4 shadow-[0_10px_30px_rgba(16,185,129,0.3)] relative"
+                  className="w-12 h-12 bg-gradient-to-tr from-emerald-400 to-emerald-500 text-white rounded-full flex items-center justify-center mb-2 shadow-[0_4px_15px_rgba(16,185,129,0.3)] relative"
                 >
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.5, type: 'spring' }}>
-                    <CheckCircle2 className="w-8 h-8" strokeWidth={3} />
+                    <CheckCircle2 className="w-6 h-6" strokeWidth={3} />
                   </motion.div>
                 </motion.div>
-                <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight mb-2">
+                <h1 className="text-xl font-black text-slate-800 tracking-tight mb-1">
                   {pedido?.estado === 'cancelado' || pedido?.estado === 'rechazado' ? 'Pedido Cancelado' : pedido?.estado === 'entregado' ? '¡Disfruta tu comida!' : '¡Orden Confirmada!'}
                 </h1>
                 
                 {pedido?.tipo_pedido === 'tienda' ? (
                   <>
-                    <p className="text-emerald-600 font-bold text-sm md:text-base mb-2">¡Éxito! Te esperamos pronto en la tienda.</p>
-                    <p className="text-slate-500 text-sm leading-tight">Tu pedido ha sido recibido y comenzaremos a prepararlo para que pases a recogerlo.</p>
+                    <p className="text-emerald-600 font-bold text-xs mb-1">¡Éxito! Te esperamos pronto en la tienda.</p>
+                    <p className="text-slate-500 text-xs leading-tight">Comenzaremos a preparar tu pedido.</p>
                   </>
                 ) : pedido?.estado === 'entregado' ? (
                   <>
-                    <p className="text-emerald-600 font-bold text-lg md:text-xl mt-2 mb-2">¡Pedido Entregado! 🎉</p>
-                    <p className="text-slate-500 text-sm leading-tight">Esperamos que disfrutes tu comida. ¡Gracias por tu preferencia!</p>
+                    <p className="text-emerald-600 font-bold text-base mt-1 mb-1">¡Pedido Entregado! 🎉</p>
+                    <p className="text-slate-500 text-xs leading-tight">Esperamos que disfrutes tu comida.</p>
                   </>
                 ) : pedido?.estado === 'cancelado' || pedido?.estado === 'rechazado' ? (
                   <>
-                    <p className="text-red-500 font-bold text-lg md:text-xl mt-2 mb-2">Pedido Cancelado ❌</p>
-                    <p className="text-slate-500 text-sm leading-tight">Tu pedido no pudo ser procesado o fue cancelado.</p>
+                    <p className="text-red-500 font-bold text-base mt-1 mb-1">Pedido Cancelado ❌</p>
+                    <p className="text-slate-500 text-xs leading-tight">Tu pedido no pudo ser procesado.</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-slate-500 font-medium text-sm md:text-base mb-5">
+                    <p className="text-slate-500 font-medium text-xs mb-2">
                       {pedido?.estado === 'aceptado' || pedido?.estado === 'en_cocina' ? '¡El restaurante está preparando tu comida! 🍳'
                       : pedido?.estado === 'listo_para_recoger' ? '¡Tu orden está lista para ser recogida! 🏃‍♂️'
                       : pedido?.estado === 'recibido' || pedido?.estado === 'en_camino' ? '¡Tu repartidor recogió la orden y va en camino! 🛵'
@@ -307,7 +344,7 @@ export function SuccessPage() {
                     </p>
                     {/* Progress Bar Injection */}
                     {pedido && (
-                      <div className="w-full px-2 max-w-sm mx-auto">
+                      <div className="w-full px-1 max-w-sm mx-auto scale-90 origin-top">
                         <OrderProgressBar currentStatus={pedido.estado} />
                       </div>
                     )}
@@ -316,70 +353,66 @@ export function SuccessPage() {
               </div>
 
               {/* TICKET DIVIDER CUTOUT */}
-              <div className="relative flex items-center justify-center w-full h-8 -my-4 z-10">
-                <div className="absolute left-[-16px] w-8 h-8 bg-slate-50 rounded-full border-r border-slate-100 shadow-inner" />
-                <div className="absolute right-[-16px] w-8 h-8 bg-slate-50 rounded-full border-l border-slate-100 shadow-inner" />
-                <div className="w-full border-t-[3px] border-dashed border-slate-200/80 mx-8" />
+              <div className="relative flex items-center justify-center w-full h-4 -my-2 z-10">
+                <div className="absolute left-[-8px] w-4 h-4 bg-slate-50 rounded-full border-r border-slate-100 shadow-inner" />
+                <div className="absolute right-[-8px] w-4 h-4 bg-slate-50 rounded-full border-l border-slate-100 shadow-inner" />
+                <div className="w-full border-t-[2px] border-dashed border-slate-200/80 mx-4" />
               </div>
 
               {/* BOTTOM TICKET: Details */}
-              <div className="p-8 pt-10 flex flex-col space-y-4 bg-white relative">
+              <div className="p-4 pt-4 flex flex-col space-y-2 bg-white relative">
                 
                 {/* Info Grid */}
-                <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+                <div className="grid grid-cols-2 gap-y-2 gap-x-2">
                   <div className="flex flex-col">
-                    <span className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Ticket de Orden</span>
-                    <span className="text-slate-800 font-black font-mono bg-slate-100/80 px-2 py-1 rounded-md w-max border border-slate-200/50">#{pedidoId || orderId || pedido?.id?.substring(0,8)}</span>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Ticket de Orden</span>
+                    <span className="text-slate-800 font-black font-mono text-xs bg-slate-100/80 px-2 py-0.5 rounded w-max border border-slate-200/50">#{pedidoId || orderId || pedido?.id?.substring(0,8)}</span>
                   </div>
                   <div className="flex flex-col items-end text-right">
-                    <span className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Restaurante</span>
-                    <span className="text-slate-800 font-bold truncate max-w-full">{pedido?.restaurante}</span>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Restaurante</span>
+                    <span className="text-slate-800 font-bold text-xs truncate max-w-full">{pedido?.restaurante}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Cliente</span>
-                    <span className="text-slate-800 font-bold truncate max-w-full">{pedido?.cliente_nombre}</span>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Cliente</span>
+                    <span className="text-slate-800 font-bold text-xs truncate max-w-full">{pedido?.cliente_nombre}</span>
                   </div>
                   {pedido?.notas && (
                     <div className="flex flex-col items-end text-right">
-                      <span className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Método de Pago</span>
-                      <span className="text-slate-800 font-bold capitalize">{pedido.notas}</span>
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Pago</span>
+                      <span className="text-slate-800 font-bold text-xs capitalize">{pedido.notas}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="h-px bg-slate-100 my-2 w-full" />
+                <div className="h-px bg-slate-100 my-1 w-full" />
 
                 {/* Total */}
                 {pedido?.total && (
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-slate-500 font-black text-sm uppercase tracking-wider">Total Pagado</span>
-                    <span className="text-[#FA4A0C] font-black text-2xl">${pedido.total.toFixed(2)}</span>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-slate-500 font-black text-xs uppercase tracking-wider">Total</span>
+                    <span className="text-[#FA4A0C] font-black text-lg">${pedido.total.toFixed(2)}</span>
                   </div>
                 )}
 
                 {/* Summary Card */}
-                <div className="bg-slate-50/50 p-4 rounded-[20px] mb-2 border border-slate-100">
-                  <div className="flex items-center gap-2 text-slate-800 font-bold mb-3">
-                    <ShoppingBag className="w-4 h-4 text-[#FA4A0C]" />
-                    <span className="text-sm tracking-tight">Resumen de tu pedido</span>
+                <div className="bg-slate-50/50 p-2.5 rounded-xl mb-1 border border-slate-100">
+                  <div className="flex items-center gap-1.5 text-slate-800 font-bold mb-1.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-[#FA4A0C]" />
+                    <span className="text-xs tracking-tight">Resumen</span>
                   </div>
                   <div className="pl-1">
-                    {pedido?.descripcion ? renderDetalles(pedido.descripcion) : <p className="text-xs text-slate-500">Sin detalles</p>}
+                    {pedido?.descripcion ? renderDetalles(pedido.descripcion) : <p className="text-[10px] text-slate-500">Sin detalles</p>}
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
-                    onClick={handleWhatsApp}
-                    className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white py-4 px-6 rounded-[20px] font-black text-[15px] shadow-lg shadow-[#25D366]/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+                    onClick={() => navigate('/')}
+                    className="w-full flex items-center justify-center gap-1.5 bg-[#FA4A0C] hover:bg-[#e0400b] text-white py-2.5 px-4 rounded-xl font-black text-sm shadow-sm shadow-[#FA4A0C]/20 transition-all active:scale-95"
                   >
-                    <MessageCircle className="w-5 h-5" />
-                    Avisar al Restaurante
+                    Aceptar y Volver al Inicio
                   </button>
-                  <p className="text-center text-[11px] text-slate-400 mt-3 font-medium">
-                    Al presionar el botón se abrirá WhatsApp con un mensaje preescrito.
-                  </p>
                 </div>
 
               </div>

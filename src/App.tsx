@@ -5,6 +5,7 @@ import { PortalPage } from './pages/PortalPage'
 import { PublicLandingPage } from './pages/PublicLandingPage'
 import { PublicMenuView } from './pages/PublicMenuView'
 import { SuccessPage } from './pages/SuccessPage'
+import { FloatingOrderTracker } from './components/FloatingOrderTracker'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
@@ -31,6 +32,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <FloatingOrderTracker />
       <Routes>
         <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
         <Route path="/menu/:id" element={<PublicMenuView />} />
