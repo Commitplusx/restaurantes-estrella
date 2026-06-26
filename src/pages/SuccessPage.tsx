@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, Loader2, MessageCircle, AlertCircle, ShoppingBag, Star, Truck } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, ShoppingBag, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { OrderProgressBar } from '../components/OrderProgressBar';
@@ -188,15 +188,6 @@ export function SuccessPage() {
       }
     };
   }, [pedidoId, orderId, isSuccess]);
-
-  const handleWhatsApp = () => {
-    if (!restauranteInfo || !pedido) return;
-    const numeroRestaurante = restauranteInfo.telefono ? restauranteInfo.telefono.replace(/\D/g, '') : '';
-    const ticketIdFinal = pedidoId || orderId || pedido.id;
-    const mensaje = `¡Hola *${restauranteInfo.nombre}*! 👋\nSoy *${pedido.cliente_nombre?.trim()}* y acabo de pagar en línea el siguiente pedido:\n\n${pedido.descripcion}\n\n*Forma de pago:* En Línea (Conekta) 💳\n\n_(Ticket Web: #${ticketIdFinal})_`;
-    const waUrl = `https://wa.me/${numeroRestaurante}?text=${encodeURIComponent(mensaje)}`;
-    window.open(waUrl, '_blank');
-  };
 
   const fireConfetti = () => {
     const duration = 3 * 1000;
