@@ -22,7 +22,7 @@ import {
   LocateFixed
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useLoadScript, GoogleMap, Marker, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
+import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
 
@@ -160,7 +160,12 @@ export function PublicMenuView() {
     return saved ? JSON.parse(saved) : null
   })
   const [buscandoGPS, setBuscandoGPS] = useState(false)
-  const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null)
+  
+  // Nuevos estados para el rediseño del mapa tipo Rappi
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false)
+  const [realLocation, setRealLocation] = useState<{lat: number, lng: number} | null>(null) // Punto azul GPS
+  const [draftUbicacion, setDraftUbicacion] = useState<{lat: number, lng: number} | null>(null) // Centro del mapa al moverlo
+  const [draftDireccion, setDraftDireccion] = useState('') // Dirección temporal al mover el mapa
   // Nota: useLoadScript no soporta cambiar la API key dinámicamente o iniciar vacía,
   // por lo que debemos cargar el script directamente. Al ser asíncrono, el impacto en TBT es nulo.
   const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
@@ -487,19 +492,26 @@ export function PublicMenuView() {
       if (center) {
         const lat = center.lat();
         const lng = center.lng();
-        setUbicacionGPS({ lat, lng });
-        setDirectionsResponse(null);
+        setDraftUbicacion({ lat, lng });
         
-        // Reverse geocoding silencioso para obtener la colonia
+        // Reverse geocoding silencioso para obtener la colonia al mover
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
           if (status === 'OK' && results && results.length > 0 && results[0]) {
-            setDireccionEntrega(results[0].formatted_address);
+            setDraftDireccion(results[0].formatted_address);
           } else {
-            setDireccionEntrega(`Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+            setDraftDireccion(`Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
           }
         });
       }
+    }
+  }
+
+  const handleConfirmarUbicacion = () => {
+    if (draftUbicacion) {
+      setUbicacionGPS(draftUbicacion);
+      setDireccionEntrega(draftDireccion);
+      setIsMapModalOpen(false);
     }
   }
 
@@ -565,9 +577,20 @@ export function PublicMenuView() {
       console.warn('[GPS] Timeout — intentando geolocalización por IP')
       const ipLoc = await obtenerUbicacionPorIP()
       if (ipLoc) {
-        setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng })
-        setDireccionEntrega(ipLoc.ciudad)
-        setDirectionsResponse(null)
+        setRealLocation({ lat: ipLoc.lat, lng: ipLoc.lng })
+        setDraftUbicacion({ lat: ipLoc.lat, lng: ipLoc.lng })
+        setDraftDireccion(ipLoc.ciudad)
+        
+        // Si el modal está abierto, el dragEnd hará el resto. Si no, pero se llamó por primera vez:
+        if (!isMapModalOpen) {
+           setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng })
+           setDireccionEntrega(ipLoc.ciudad)
+        }
+        
+        if (mapInstance) {
+          mapInstance.panTo({ lat: ipLoc.lat, lng: ipLoc.lng })
+          mapInstance.setZoom(16)
+        }
         showToast('Ubicación aproximada', `Detectamos que estás en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`, 'success')
       } else {
         showToast(
@@ -587,23 +610,32 @@ export function PublicMenuView() {
 
         const lat = position.coords.latitude
         const lng = position.coords.longitude
-        setUbicacionGPS({ lat, lng })
-        setDirectionsResponse(null)
+        setRealLocation({ lat, lng })
+        setDraftUbicacion({ lat, lng })
+        
+        if (mapInstance) {
+          mapInstance.panTo({ lat, lng })
+          mapInstance.setZoom(17)
+        }
 
         if (window.google) {
           const geocoder = new window.google.maps.Geocoder()
           geocoder.geocode({ location: { lat, lng } }, (results, status) => {
             setBuscandoGPS(false)
             if (status === 'OK' && results && results[0]) {
-              setDireccionEntrega(results[0].formatted_address)
+              setDraftDireccion(results[0].formatted_address)
+              if (!isMapModalOpen) {
+                setUbicacionGPS({ lat, lng })
+                setDireccionEntrega(results[0].formatted_address)
+              }
               showToast('Ubicación encontrada', 'Confirma que el punto en el mapa sea correcto', 'success')
             } else {
-              setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+              setDraftDireccion(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
             }
           })
         } else {
           setBuscandoGPS(false)
-          setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+          setDraftDireccion(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
         }
       },
       async (err) => {
@@ -615,14 +647,25 @@ export function PublicMenuView() {
         // Intentar IP como segundo fallback
         const ipLoc = await obtenerUbicacionPorIP()
         if (ipLoc) {
-          setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng })
-          setDireccionEntrega(ipLoc.ciudad)
-          setDirectionsResponse(null)
-          showToast(
-            'Ubicación aproximada por red',
-            `No pudimos usar tu GPS. Te ubicamos en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`,
-            'success'
-          )
+          setRealLocation({ lat: ipLoc.lat, lng: ipLoc.lng })
+          setDraftUbicacion({ lat: ipLoc.lat, lng: ipLoc.lng })
+          setDraftDireccion(ipLoc.ciudad)
+          
+          if (!isMapModalOpen) {
+            setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng })
+            setDireccionEntrega(ipLoc.ciudad)
+          }
+
+          if (mapInstance) {
+            mapInstance.panTo({ lat: ipLoc.lat, lng: ipLoc.lng })
+            mapInstance.setZoom(16)
+          }
+          const tituloToast = err.code === 1 ? 'Tu navegador bloqueó el GPS' : 'Ubicación aproximada por red';
+          const msjToast = err.code === 1 
+            ? `Por favor dale permisos o ajusta el pin manualmente. Te ubicamos en ${ipLoc.ciudad} por ahora.`
+            : `No pudimos usar tu GPS. Te ubicamos en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`
+
+          showToast(tituloToast, msjToast, err.code === 1 ? 'error' : 'success')
         } else {
           // Último fallback: pedir que escriban la dirección
           const mensajeError =
@@ -1522,123 +1565,22 @@ export function PublicMenuView() {
                       )}
 
                       {tipoEntrega === 'domicilio' && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-4 rounded-[20px] border border-slate-200 mt-2 overflow-hidden shadow-sm flex flex-col gap-4">
-                          
-                          {/* MAPA INTERACTIVO CON BOTON INTEGRADO */}
-                          <div className="w-full h-56 rounded-[16px] overflow-hidden border border-slate-200 shadow-inner bg-slate-100 relative">
-                            
-                            {/* Botón Flotante de Auto-ubicación vibrante (Estilo Rappi) */}
-                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[80%] max-w-[250px]">
-                              <motion.button 
-                                whileTap={{ scale: 0.95 }} 
-                                onClick={obtenerUbicacionGPS} 
-                                disabled={buscandoGPS}
-                                className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-3 rounded-full font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(250,74,12,0.4)] disabled:opacity-80 transition-colors"
-                              >
-                                {buscandoGPS ? (
-                                  <>
-                                    <Loader2 size={18} className="animate-spin" /> 
-                                    <span>Ubicando...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <LocateFixed size={18} className="animate-pulse" /> 
-                                    Mi Ubicación
-                                  </>
-                                )}
-                              </motion.button>
-                            </div>
-
-                            {isGoogleMapsLoaded ? (
-                              <div className="relative w-full h-full">
-                                <GoogleMap
-                                  mapContainerStyle={{ width: '100%', height: '100%' }}
-                                  center={ubicacionGPS || (restaurante?.lat && restaurante?.lng ? { lat: restaurante.lat, lng: restaurante.lng } : { lat: 16.2516, lng: -92.1332 })}
-                                  zoom={ubicacionGPS ? 16 : 14}
-                                  onLoad={(map) => setMapInstance(map)}
-                                  onDragEnd={handleMapDragEnd}
-                                  options={{ 
-                                    disableDefaultUI: true, 
-                                    zoomControl: false, // Desactivado para vista más limpia
-                                    gestureHandling: 'greedy'
-                                  }}
-                                >
-                                  {ubicacionGPS && !directionsResponse && (
-                                    <DirectionsService
-                                      options={{
-                                        destination: ubicacionGPS,
-                                        origin: (restaurante.lat && restaurante.lng)
-                                          ? { lat: restaurante.lat, lng: restaurante.lng }
-                                          : (restaurante.direccion || `${restaurante.nombre}, México`),
-                                        travelMode: google.maps.TravelMode.DRIVING
-                                      }}
-                                      callback={(response, status) => {
-                                        if (status === 'OK' && response !== null) {
-                                          setDirectionsResponse(response)
-                                        }
-                                      }}
-                                    />
-                                  )}
-                                  {directionsResponse && (
-                                    <DirectionsRenderer options={{ directions: directionsResponse, suppressMarkers: true, preserveViewport: true }} />
-                                  )}
-                                  {directionsResponse && restaurante.lat && restaurante.lng && (
-                                    <Marker 
-                                      position={{ lat: restaurante.lat, lng: restaurante.lng }}
-                                      icon={{ url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" }}
-                                      title="Restaurante"
-                                    />
-                                  )}
-                                </GoogleMap>
-                                
-                                {/* Pin fijo central (Estilo Rappi/Uber) */}
-                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
-                                  <MapPin className="text-[#FA4A0C] w-12 h-12 fill-[#FA4A0C] animate-bounce-short" style={{ filter: 'drop-shadow(0px 5px 5px rgba(0,0,0,0.3))' }} />
-                                  <div className="w-3 h-1 bg-black/40 rounded-[100%] mx-auto -mt-1 blur-[1px]"></div>
-                                </div>
-                                
-                                {/* Overlay text superior */}
-                                <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/90 text-slate-800 text-xs font-bold px-4 py-2 rounded-full shadow-md backdrop-blur-md pointer-events-none z-10 text-center whitespace-nowrap border border-slate-200">
-                                  Mueve el mapa para ajustar el pin
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Cargando mapa...</div>
-                            )}
-
-                            {/* Animación premium de calculandoEnvio */}
-                            <AnimatePresence>
-                              {(calculandoEnvio || buscandoGPS || (ubicacionGPS && !directionsResponse)) && (
-                                <motion.div 
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="absolute inset-0 bg-white/40 backdrop-blur-sm z-20 flex flex-col items-center justify-center"
-                                >
-                                  <motion.div
-                                    animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                                    transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                                    className="w-14 h-14 bg-white rounded-full shadow-[0_10px_30px_rgba(250,74,12,0.3)] flex items-center justify-center mb-3 border-2 border-[#FA4A0C]/20 relative"
-                                  >
-                                    <div className="absolute inset-0 rounded-full border-2 border-[#FA4A0C] border-t-transparent animate-spin opacity-50"></div>
-                                    <Truck size={24} className="text-[#FA4A0C]" />
-                                  </motion.div>
-                                  <motion.div 
-                                    initial={{ y: 10, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    className="bg-slate-900/90 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2"
-                                  >
-                                    <Loader2 size={14} className="animate-spin text-[#FA4A0C]" />
-                                    <span>Calculando envío...</span>
-                                  </motion.div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-
-
-
-
+                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 flex flex-col items-center text-center shadow-sm">
+                           <MapPin className="text-[#FA4A0C] mb-2 w-8 h-8" />
+                           <p className="text-sm text-slate-800 font-bold mb-1">
+                             {ubicacionGPS ? 'Dirección de Entrega' : '¿A dónde enviamos tu pedido?'}
+                           </p>
+                           {ubicacionGPS && (
+                             <p className="text-xs text-slate-500 mb-4 line-clamp-2 px-2">
+                               {direccionEntrega}
+                             </p>
+                           )}
+                           <button 
+                             onClick={() => setIsMapModalOpen(true)}
+                             className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-3.5 rounded-[12px] font-bold text-sm flex items-center justify-center transition-colors shadow-md mt-2"
+                           >
+                             {ubicacionGPS ? 'Modificar Ubicación' : 'Establecer Ubicación'}
+                           </button>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1977,6 +1919,125 @@ export function PublicMenuView() {
                 className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0"
               >
                 <X size={16} className="text-slate-400" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* MODAL DEL MAPA (FULL SCREEN) ESTILO RAPPI */}
+      <AnimatePresence>
+        {isMapModalOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: '100%' }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed inset-0 z-[200] bg-white flex flex-col"
+          >
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white shadow-sm z-20 relative">
+              <button 
+                onClick={() => setIsMapModalOpen(false)}
+                className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <h2 className="text-lg font-black text-slate-800">Ubicación de entrega</h2>
+              <div className="w-10"></div> {/* Spacer for center alignment */}
+            </div>
+
+            {/* Cuerpo del Mapa */}
+            <div className="flex-1 relative bg-slate-100">
+              
+              {/* Botón Flotante "Mi Ubicación" */}
+              <div className="absolute top-4 right-4 z-20">
+                <button 
+                  onClick={obtenerUbicacionGPS} 
+                  disabled={buscandoGPS}
+                  className="w-12 h-12 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center text-slate-700 hover:text-[#FA4A0C] transition-colors disabled:opacity-50"
+                >
+                  {buscandoGPS ? <Loader2 size={20} className="animate-spin" /> : <LocateFixed size={20} />}
+                </button>
+              </div>
+
+              {/* Hint superior */}
+              <div className="absolute top-4 left-4 right-20 z-20 pointer-events-none">
+                <div className="bg-white/95 backdrop-blur-sm px-4 py-3 rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.1)] border border-slate-100 pointer-events-auto">
+                  <p className="text-xs text-slate-500 font-bold mb-1">Entregar en:</p>
+                  <p className="text-sm text-slate-800 font-medium line-clamp-2 leading-tight">
+                    {draftDireccion || 'Mueve el mapa para ubicar tu dirección'}
+                  </p>
+                </div>
+              </div>
+
+              {isGoogleMapsLoaded ? (
+                <div className="relative w-full h-full">
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={draftUbicacion || ubicacionGPS || (restaurante?.lat && restaurante?.lng ? { lat: restaurante.lat, lng: restaurante.lng } : { lat: 16.2516, lng: -92.1332 })}
+                    zoom={draftUbicacion || ubicacionGPS ? 17 : 14}
+                    onLoad={(map) => setMapInstance(map)}
+                    onDragEnd={handleMapDragEnd}
+                    options={{ 
+                      disableDefaultUI: true, 
+                      zoomControl: false,
+                      gestureHandling: 'greedy'
+                    }}
+                  >
+                    {/* Punto Azul de ubicación GPS real detectada */}
+                    {realLocation && (
+                      <Marker 
+                        position={realLocation}
+                        icon={{
+                          path: window.google.maps.SymbolPath.CIRCLE,
+                          scale: 8,
+                          fillColor: '#4285F4',
+                          fillOpacity: 1,
+                          strokeColor: '#ffffff',
+                          strokeWeight: 2,
+                        }}
+                        zIndex={1}
+                      />
+                    )}
+                    {realLocation && (
+                      <Marker 
+                        position={realLocation}
+                        icon={{
+                          path: window.google.maps.SymbolPath.CIRCLE,
+                          scale: 18,
+                          fillColor: '#4285F4',
+                          fillOpacity: 0.15,
+                          strokeWeight: 0,
+                        }}
+                        zIndex={0}
+                      />
+                    )}
+                  </GoogleMap>
+                  
+                  {/* Pin fijo central estilo Rappi */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
+                    <div className="relative">
+                      <MapPin className="text-[#FA4A0C] w-14 h-14 fill-[#FA4A0C] animate-bounce-short" style={{ filter: 'drop-shadow(0px 5px 5px rgba(0,0,0,0.3))' }} />
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full"></div>
+                    </div>
+                    <div className="w-4 h-1 bg-black/40 rounded-[100%] mx-auto -mt-1 blur-[1px]"></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                  <Loader2 size={32} className="animate-spin text-slate-300" />
+                </div>
+              )}
+            </div>
+
+            {/* Footer del Modal (Botón de Confirmar) */}
+            <div className="p-4 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-20">
+              <button 
+                onClick={handleConfirmarUbicacion}
+                disabled={!draftUbicacion && !ubicacionGPS}
+                className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] disabled:bg-slate-300 disabled:text-slate-500 text-white py-4 rounded-[16px] font-black text-[16px] flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(250,74,12,0.3)] disabled:shadow-none transition-all active:scale-95"
+              >
+                Confirmar Ubicación
               </button>
             </div>
           </motion.div>
