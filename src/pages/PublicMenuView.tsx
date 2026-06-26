@@ -503,37 +503,113 @@ export function PublicMenuView() {
     }
   }
 
+  // ── Fallback: geolocalización por IP (no requiere permisos del navegador) ──
+  const obtenerUbicacionPorIP = async () => {
+    try {
+      // ip-api.com — gratis, sin API key, ~1000 req/min
+      const res = await fetch('http://ip-api.com/json/?fields=lat,lon,city,regionName,status')
+      const data = await res.json()
+      if (data.status === 'success' && data.lat && data.lon) {
+        return { lat: data.lat, lng: data.lon, ciudad: `${data.city}, ${data.regionName}` }
+      }
+    } catch (_) { /* ignorar si falla */ }
+    return null
+  }
+
   const obtenerUbicacionGPS = () => {
-    if ("geolocation" in navigator) {
-      setBuscandoGPS(true);
-      navigator.geolocation.getCurrentPosition((position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setUbicacionGPS({ lat, lng });
-        setDirectionsResponse(null);
-        
-        if (window.google) {
-          const geocoder = new window.google.maps.Geocoder();
-          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-            setBuscandoGPS(false);
-            if (status === "OK" && results && results[0]) {
-              setDireccionEntrega(results[0].formatted_address);
-              showToast('Ubicación encontrada', 'Confirma que el punto en el mapa sea correcto', 'success');
-            } else {
-              setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-            }
-          });
-        } else {
-          setBuscandoGPS(false);
-          setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-        }
-      }, () => {
-        setBuscandoGPS(false);
-        showToast('Error de Ubicación', 'No pudimos acceder a tu GPS. Por favor escribe tu dirección.', 'error')
-      }, { enableHighAccuracy: true })
-    } else {
-      showToast('Error', 'Tu navegador no soporta geolocalización', 'error')
+    const TIMEOUT_GPS_MS = 8000 // 8 segundos máximo para el GPS
+
+    if (!('geolocation' in navigator)) {
+      showToast('GPS no disponible', 'Escribe tu dirección manualmente en el campo de abajo 👇', 'error')
+      return
     }
+
+    setBuscandoGPS(true)
+    let yaResuelto = false
+
+    // Timer de timeout — si el GPS tarda demasiado, intentamos IP
+    const timeoutId = setTimeout(async () => {
+      if (yaResuelto) return
+      yaResuelto = true
+      console.warn('[GPS] Timeout — intentando geolocalización por IP')
+      const ipLoc = await obtenerUbicacionPorIP()
+      if (ipLoc) {
+        setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng })
+        setDireccionEntrega(ipLoc.ciudad)
+        setDirectionsResponse(null)
+        showToast('Ubicación aproximada', `Detectamos que estás en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`, 'success')
+      } else {
+        showToast(
+          'No pudimos detectar tu ubicación',
+          'Escribe tu dirección manualmente o arrastra el pin en el mapa 📍',
+          'error'
+        )
+      }
+      setBuscandoGPS(false)
+    }, TIMEOUT_GPS_MS)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (yaResuelto) return
+        yaResuelto = true
+        clearTimeout(timeoutId)
+
+        const lat = position.coords.latitude
+        const lng = position.coords.longitude
+        setUbicacionGPS({ lat, lng })
+        setDirectionsResponse(null)
+
+        if (window.google) {
+          const geocoder = new window.google.maps.Geocoder()
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            setBuscandoGPS(false)
+            if (status === 'OK' && results && results[0]) {
+              setDireccionEntrega(results[0].formatted_address)
+              showToast('Ubicación encontrada', 'Confirma que el punto en el mapa sea correcto', 'success')
+            } else {
+              setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+            }
+          })
+        } else {
+          setBuscandoGPS(false)
+          setDireccionEntrega(`Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+        }
+      },
+      async (err) => {
+        if (yaResuelto) return
+        yaResuelto = true
+        clearTimeout(timeoutId)
+        console.warn('[GPS] Error:', err.code, err.message)
+
+        // Intentar IP como segundo fallback
+        const ipLoc = await obtenerUbicacionPorIP()
+        if (ipLoc) {
+          setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng })
+          setDireccionEntrega(ipLoc.ciudad)
+          setDirectionsResponse(null)
+          showToast(
+            'Ubicación aproximada por red',
+            `No pudimos usar tu GPS. Te ubicamos en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`,
+            'success'
+          )
+        } else {
+          // Último fallback: pedir que escriban la dirección
+          const mensajeError =
+            err.code === 1 // PERMISSION_DENIED
+              ? 'Bloqueaste el GPS. Escribe tu dirección en el campo de abajo 👇'
+              : err.code === 2 // POSITION_UNAVAILABLE
+              ? 'GPS no disponible. Escribe tu dirección manualmente 👇'
+              : 'GPS tardó demasiado. Escribe tu dirección manualmente 👇'
+          showToast('No pudimos obtener tu ubicación', mensajeError, 'error')
+        }
+        setBuscandoGPS(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: TIMEOUT_GPS_MS - 500, // Dejar 500ms de margen para el timeout manual
+        maximumAge: 60000 // Aceptar ubicación cacheada de hasta 1 min
+      }
+    )
   }
 
 
