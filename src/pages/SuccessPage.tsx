@@ -179,12 +179,13 @@ export function SuccessPage() {
     };
   }, [pedidoId, orderId, isSuccess]);
 
+  /** Genera el número corto de orden: EST-XXXXX
+   *  Misma lógica que generarNumeroOrden() en utils.ts y PedidosView.
+   *  Fuente de verdad: últimos 5 caracteres del UUID sin guiones.
+   */
   const getShortTicket = (id: string) => {
-    if (!id) return '000000';
-    if (id.includes('-')) {
-      return id.split('-').pop()?.toUpperCase().slice(-6) || '000000';
-    }
-    return id.toUpperCase().slice(-6);
+    if (!id) return 'EST-00000';
+    return 'EST-' + id.replace(/-/g, '').slice(-5).toUpperCase();
   };
 
   const fireConfetti = () => {
@@ -376,7 +377,7 @@ export function SuccessPage() {
                   <div className="mt-5 w-full border-t-2 border-dashed border-slate-200/70 pt-5 flex items-center justify-between">
                     <div>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ticket de Orden</p>
-                      <p className="text-xl font-black text-slate-800 tracking-tight">#{getShortTicket(pedido.id)}</p>
+                      <p className="text-xl font-black text-slate-800 tracking-tight">{getShortTicket(pedido.id)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total</p>
