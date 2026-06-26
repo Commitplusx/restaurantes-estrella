@@ -504,15 +504,26 @@ export function PublicMenuView() {
   }
 
   // ── Fallback: geolocalización por IP (no requiere permisos del navegador) ──
+  // IMPORTANTE: debe ser HTTPS porque el sitio corre en HTTPS (mixed content policy)
   const obtenerUbicacionPorIP = async () => {
+    // Intento 1: ipapi.co — gratis, HTTPS, sin API key
     try {
-      // ip-api.com — gratis, sin API key, ~1000 req/min
-      const res = await fetch('http://ip-api.com/json/?fields=lat,lon,city,regionName,status')
+      const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) })
       const data = await res.json()
-      if (data.status === 'success' && data.lat && data.lon) {
-        return { lat: data.lat, lng: data.lon, ciudad: `${data.city}, ${data.regionName}` }
+      if (data.latitude && data.longitude) {
+        return { lat: data.latitude, lng: data.longitude, ciudad: `${data.city}, ${data.region}` }
       }
-    } catch (_) { /* ignorar si falla */ }
+    } catch (_) { /* continuar con el siguiente */ }
+
+    // Intento 2: freeipapi.com — gratis, HTTPS, sin API key
+    try {
+      const res = await fetch('https://freeipapi.com/api/json', { signal: AbortSignal.timeout(5000) })
+      const data = await res.json()
+      if (data.latitude && data.longitude) {
+        return { lat: data.latitude, lng: data.longitude, ciudad: `${data.cityName}, ${data.regionName}` }
+      }
+    } catch (_) { /* ignorar */ }
+
     return null
   }
 
