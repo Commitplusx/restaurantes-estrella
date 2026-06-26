@@ -503,19 +503,39 @@ export function PublicMenuView() {
     }
   }
 
-  // ── Fallback: geolocalización por IP (no requiere permisos del navegador) ──
-  // IMPORTANTE: debe ser HTTPS porque el sitio corre en HTTPS (mixed content policy)
+  // ── Fallback: geolocalización sin permiso GPS ──────────────────────────────
+  // IMPORTANTE: todo en HTTPS (el sitio corre en HTTPS, mixed content bloqueado)
   const obtenerUbicacionPorIP = async () => {
-    // Intento 1: ipapi.co — gratis, HTTPS, sin API key
-    try {
-      const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) })
-      const data = await res.json()
-      if (data.latitude && data.longitude) {
-        return { lat: data.latitude, lng: data.longitude, ciudad: `${data.city}, ${data.region}` }
-      }
-    } catch (_) { /* continuar con el siguiente */ }
+    const googleKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 
-    // Intento 2: freeipapi.com — gratis, HTTPS, sin API key
+    // Intento 1: Google Geolocation API — usa WiFi + torres celulares, muy precisa
+    // Funciona sin permiso de GPS. Ya tenemos la key habilitada.
+    if (googleKey) {
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/geolocation/v1/geolocate?key=${googleKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(6000) }
+        )
+        const data = await res.json()
+        if (data.location?.lat && data.location?.lng) {
+          // Reverse geocode para obtener la dirección
+          let ciudad = 'Tu ubicación aproximada'
+          try {
+            const geoRes = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${data.location.lat},${data.location.lng}&key=${googleKey}&language=es`,
+              { signal: AbortSignal.timeout(5000) }
+            )
+            const geoData = await geoRes.json()
+            if (geoData.results?.[0]?.formatted_address) {
+              ciudad = geoData.results[0].formatted_address
+            }
+          } catch (_) { /* usar ciudad genérica */ }
+          return { lat: data.location.lat, lng: data.location.lng, ciudad }
+        }
+      } catch (_) { /* continuar con el siguiente */ }
+    }
+
+    // Intento 2: freeipapi.com — HTTPS, gratis, sin API key (respaldo si Google falla)
     try {
       const res = await fetch('https://freeipapi.com/api/json', { signal: AbortSignal.timeout(5000) })
       const data = await res.json()
