@@ -13,8 +13,9 @@ export function SuccessPage() {
   const orderId = searchParams.get('order_id');
   const successParam = searchParams.get('success');
   const paymentStatus = searchParams.get('payment_status');
+  const statusParam = searchParams.get('status');
   
-  const isSuccess = successParam === 'true' || paymentStatus === 'paid';
+  const isSuccess = successParam === 'true' || paymentStatus === 'paid' || statusParam === 'approved';
 
   const [status, setStatus] = useState<'loading' | 'validating' | 'success' | 'error'>('loading');
   const [pedido, setPedido] = useState<any>(null);
@@ -71,6 +72,8 @@ export function SuccessPage() {
         }
         
         const { data: pedidoData, error } = await query.single();
+        console.log("SuccessPage DEBUG - ID buscado:", pedidoId || orderId);
+        console.log("SuccessPage DEBUG - Resultado query:", pedidoData, "Error:", error);
 
         if (error || !pedidoData) {
           if (retries > 0) {

@@ -1218,16 +1218,20 @@ export function PublicMenuView() {
 {/* Drawer de Carrito y modal de opciones */}
   <AnimatePresence>
     {isCartOpen && (
-      <>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100]" onClick={closeCart} />
-        <motion.div 
-          initial={{ [isMobile ? 'y' : 'x']: '100%' }} 
-          animate={{ x: 0, y: 0 }} 
-          exit={{ [isMobile ? 'y' : 'x']: '100%' }} 
-          transition={{ type: 'spring', damping: 28, stiffness: 350 }} 
-          style={{ willChange: "transform" }}
-          className="fixed bottom-0 left-0 w-full h-[92vh] rounded-t-[32px] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-full sm:w-[440px] sm:max-w-md sm:rounded-none bg-white z-[110] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] sm:shadow-2xl flex flex-col overflow-hidden"
-        >
+      <motion.div key="cart-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100]" onClick={closeCart} />
+    )}
+  </AnimatePresence>
+  <AnimatePresence>
+    {isCartOpen && (
+      <motion.div 
+        key="cart-drawer"
+        initial={{ [isMobile ? 'y' : 'x']: '100%' }} 
+        animate={{ x: 0, y: 0 }} 
+        exit={{ [isMobile ? 'y' : 'x']: '100%' }} 
+        transition={{ type: 'spring', damping: 28, stiffness: 350 }} 
+        style={{ willChange: "transform" }}
+        className="fixed bottom-0 left-0 w-full h-[92vh] rounded-t-[32px] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-full sm:w-[440px] sm:max-w-md sm:rounded-none bg-white z-[110] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] sm:shadow-2xl flex flex-col overflow-hidden"
+      >
           
           {/* Grabber bar for mobile */}
           <div className="w-full flex justify-center pt-3 pb-1 sm:bottom-10 sm:right-10 sm:left-auto sm:justify-end">
@@ -1669,8 +1673,8 @@ export function PublicMenuView() {
             </div>
           )}
         </motion.div>
-      </>
     )}
+  </AnimatePresence>
 
       {/* MODAL DE OPCIONES DE PRODUCTO */}
       <AnimatePresence>
@@ -1843,7 +1847,6 @@ export function PublicMenuView() {
         </motion.div>
       )}
     </AnimatePresence>
-  </AnimatePresence>
 
       {/* PREMIUM CLOSED TOAST */}
       <AnimatePresence>
