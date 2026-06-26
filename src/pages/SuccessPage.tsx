@@ -19,7 +19,6 @@ export function SuccessPage() {
 
   const [status, setStatus] = useState<'loading' | 'validating' | 'success' | 'error'>('loading');
   const [pedido, setPedido] = useState<any>(null);
-  const [restauranteInfo, setRestauranteInfo] = useState<any>(null);
   // Ref to avoid stale closure bugs in async callbacks (BUG 1 fix)
   const resolvedRef = useRef(false);
   const confettiFiredRef = useRef(false);
@@ -97,15 +96,6 @@ export function SuccessPage() {
         }
 
         setPedido(pedidoData);
-
-        if (pedidoData.restaurante) {
-          const { data: restData } = await supabase
-            .from('restaurantes')
-            .select('*')
-            .ilike('nombre', pedidoData.restaurante)
-            .single();
-          if (restData) setRestauranteInfo(restData);
-        }
 
         if (RESOLVED_STATES.includes(pedidoData.estado)) {
           // Ya estaba confirmado, configuramos el canal de progreso continuo
