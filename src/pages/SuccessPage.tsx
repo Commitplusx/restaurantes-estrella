@@ -210,7 +210,7 @@ export function SuccessPage() {
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-green-400 to-emerald-600 rounded-b-[3rem] shadow-xl transform -translate-y-10" />
       
-      <div className="flex-1 flex flex-col items-center pt-12 md:pt-20 px-4 pb-12 relative z-10 max-w-[360px] md:max-w-4xl mx-auto w-full">
+      <div className="flex-1 flex flex-col items-center pt-10 md:pt-20 px-4 sm:px-8 pb-12 relative z-10 w-full max-w-[420px] md:max-w-4xl mx-auto">
         <AnimatePresence mode="wait">
           {status === 'validating' || status === 'loading' ? (
             <motion.div
@@ -251,10 +251,10 @@ export function SuccessPage() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-              className="bg-white/90 backdrop-blur-xl rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50 p-5 sm:p-8 w-full flex flex-col md:flex-row md:items-center mt-4"
+              className="w-full flex flex-col md:flex-row gap-4 sm:gap-6 mt-4"
             >
               {/* Columna Izquierda (Icono, Estado y Progress Bar) */}
-              <div className="flex flex-col items-center text-center pb-6 md:pb-0 border-b-2 md:border-b-0 md:border-r-2 border-dashed border-gray-200 md:pr-8 md:w-1/2">
+              <div className="bg-white/90 backdrop-blur-xl rounded-[32px] shadow-xl border border-white p-6 sm:p-8 flex flex-col items-center text-center md:w-1/2">
                 <motion.div 
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
@@ -305,7 +305,7 @@ export function SuccessPage() {
               </div>
 
               {/* Columna Derecha (Detalles y Acciones) */}
-              <div className="md:w-1/2 flex flex-col md:pl-8 pt-4 md:pt-0 space-y-3">
+              <div className="bg-white/90 backdrop-blur-xl rounded-[32px] shadow-xl border border-white p-6 sm:p-8 flex flex-col md:w-1/2 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400 text-sm font-medium">Ticket de Orden</span>
                   <span className="text-gray-800 font-bold bg-gray-100 px-3 py-1 rounded-lg">#{pedidoId || orderId || pedido?.id?.substring(0,8)}</span>
