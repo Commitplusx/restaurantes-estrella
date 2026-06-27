@@ -17,10 +17,10 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
 
     // Suscribirse a cambios en tiempo real
     const channel = supabase
-      .channel('public:pedidos')
+      .channel(`public:pedidos:${restaurante.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante=eq.${restaurante.nombre}` },
+        { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             playBellSound()
@@ -44,13 +44,13 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [restaurante])
+  }, [restaurante.id])
 
   const loadPedidos = async () => {
     const { data } = await supabase
       .from('pedidos')
       .select('*')
-      .eq('restaurante', restaurante.nombre)
+      .eq('restaurante_id', restaurante.id)
       // Solo mostramos pedidos activos (los entregados/cancelados los filtramos, o los mostramos aparte)
       .in('estado', ['pendiente', 'pagado', 'aceptado', 'asignado', 'en_cocina', 'listo_para_recoger'])
       .order('created_at', { ascending: false })
@@ -95,9 +95,13 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       
       // Si cambia a listo, notificar al repartidor
       if (nuevoEstado === 'listo_para_recoger') {
-        await supabase.functions.invoke('notificar-whatsapp', {
+        const { error: invokeErr } = await supabase.functions.invoke('notificar-whatsapp', {
           body: { tipo: 'comida_lista', pedido_id: id, restaurante: restaurante.nombre }
         })
+        if (invokeErr) {
+          console.error('Error al notificar repartidor:', invokeErr)
+          alert('El pedido cambió a listo, pero hubo un error al notificar al repartidor.')
+        }
       }
     } catch (e) {
       console.error('Error actualizando estado, revirtiendo:', e)
@@ -240,7 +244,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: an
     >
       <div className="flex justify-between items-start mb-3">
         <div>
-          <span className="text-xs font-bold text-slate-400 tracking-wider">EST-{pedido.id.replace(/-/g, '').slice(-5).toUpperCase()}</span>
+          <span className="text-xs font-bold text-slate-400 tracking-wider">EST-{pedido?.id?.replace(/-/g, '').slice(-5).toUpperCase() || 'N/A'}</span>
           <h5 className="font-bold text-slate-800 mt-1">{pedido.cliente_nombre || 'Cliente Web'}</h5>
         </div>
         <span className="text-sm font-bold text-[#FF7A6A]">${pedido.total}</span>

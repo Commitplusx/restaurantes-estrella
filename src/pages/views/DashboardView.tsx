@@ -112,26 +112,30 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
 
   // ── Countdown ticker ─────────────────────────────────────────────
   useEffect(() => {
+    let isMounted = true
     if (!pauseUntil) { setCountdown(''); return }
 
     const tick = () => {
       const remaining = pauseUntil - Date.now()
       if (remaining <= 0) {
-        setCountdown('')
-        setPauseUntil(null)
+        if (isMounted) setCountdown('')
+        if (isMounted) setPauseUntil(null)
         localStorage.removeItem(pauseKey)
         // Reactivate
         supabase.from('restaurantes').update({ activo: true }).eq('id', restaurante.id).then(() => {
-          setIsActive(true)
+          if (isMounted) setIsActive(true)
         })
       } else {
-        setCountdown(formatCountdown(remaining))
+        if (isMounted) setCountdown(formatCountdown(remaining))
       }
     }
 
     tick()
     const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
+    return () => {
+      isMounted = false
+      clearInterval(id)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pauseUntil])
 
@@ -202,15 +206,16 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   // ── Menu stats (platillos / combos / promos) ──────────────────────
   const loadStats = async () => {
     const [
-      { count: platillos },
-      { count: combos },
-      { count: promos }
+      { count: platillos, error: e1 },
+      { count: combos, error: e2 },
+      { count: promos, error: e3 }
     ] = await Promise.all([
       supabase.from('menu_items').select('*', { count: 'exact', head: true }).eq('restaurante_id', restaurante.id),
       supabase.from('menu_combos').select('*', { count: 'exact', head: true }).eq('restaurante_id', restaurante.id),
       supabase.from('menu_promociones').select('*', { count: 'exact', head: true }).eq('restaurante_id', restaurante.id)
     ])
 
+    if (e1 || e2 || e3) console.error('Error cargando stats:', e1 || e2 || e3)
     setStats({ platillos: platillos || 0, combos: combos || 0, promos: promos || 0 })
     setLoading(false)
   }
@@ -262,6 +267,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
     }
 
     for (const row of rows) {
+      if (row.estado === 'cancelado' || row.estado === 'rechazado') continue
       const rowDate = new Date(row.created_at)
       rowDate.setHours(0, 0, 0, 0)
       const diffDays = Math.floor((today.getTime() - rowDate.getTime()) / 86400000)
@@ -273,11 +279,11 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
     // Month total
     const monthStart = startOfMonth()
     const monthTotal = rows
-      .filter(r => new Date(r.created_at) >= monthStart)
+      .filter(r => new Date(r.created_at) >= monthStart && r.estado !== 'cancelado' && r.estado !== 'rechazado')
       .reduce((acc, r) => acc + (Number(r.total) || 0), 0)
 
     // Today orders
-    const todayOrders = rows.filter(r => new Date(r.created_at) >= today).length
+    const todayOrders = rows.filter(r => new Date(r.created_at) >= today && r.estado !== 'cancelado' && r.estado !== 'rechazado').length
 
     setSalesStats({ weeklyData, weeklyLabels, monthTotal, todayOrders })
     setSalesEmpty(false)
@@ -291,13 +297,15 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
 
   // ── Realtime: pedidos (live sales stats + new-order alert) ────────
   useEffect(() => {
+    let alertTimeout: number
     const channel = supabase
       .channel(`dashboard:pedidos:${restaurante.id}`)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
         () => {
           setNuevoPedidoAlert(true)
-          setTimeout(() => setNuevoPedidoAlert(false), 4000)
+          clearTimeout(alertTimeout)
+          alertTimeout = window.setTimeout(() => setNuevoPedidoAlert(false), 4000)
           loadSales()
         }
       )
@@ -310,7 +318,10 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
         () => { loadSales() }
       )
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      clearTimeout(alertTimeout)
+      supabase.removeChannel(channel)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurante.id])
 

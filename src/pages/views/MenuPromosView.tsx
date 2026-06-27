@@ -38,7 +38,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     
     const url = await subirFoto(file, filePath)
     if (url) {
-      setEditingItem({...editingItem, foto_url: url})
+      setEditingItem(prev => ({...prev, foto_url: url}))
     } else {
       setErrorModal('Hubo un error al subir la foto. Intenta de nuevo.')
     }
@@ -100,15 +100,26 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
 
   const confirmDelete = async () => {
     if (!itemToDelete) return
-    await supabase.from('menu_promociones').delete().eq('id', itemToDelete)
+    const idToDelete = itemToDelete
+    setItemToDelete(null) // hide modal early
+    const { error } = await supabase.from('menu_promociones').delete().eq('id', idToDelete)
+    if (error) {
+      setErrorModal('Error al eliminar: ' + error.message)
+    }
     await loadData()
-    setItemToDelete(null)
   }
 
   const toggleActiva = async (item: MenuPromocion) => {
     const newVal = !item.activa
+    // Optimistic UI
     setPromos(promos.map(i => i.id === item.id ? { ...i, activa: newVal } : i))
-    await supabase.from('menu_promociones').update({ activa: newVal }).eq('id', item.id)
+    
+    const { error } = await supabase.from('menu_promociones').update({ activa: newVal }).eq('id', item.id)
+    if (error) {
+      // Rollback
+      setPromos(promos.map(i => i.id === item.id ? { ...i, activa: item.activa } : i))
+      setErrorModal('Error al cambiar disponibilidad: ' + error.message)
+    }
   }
 
   if (loading) return <div className="text-muted text-center py-10">Cargando promociones...</div>
@@ -275,7 +286,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
             </div>
           </div>
 
-          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
+          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving || editingItem.dias_aplicacion?.length === 0}>
             {saving ? (
               <>
                 <Loader2 size={20} className="animate-spin" />

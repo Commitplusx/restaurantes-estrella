@@ -59,6 +59,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
   const [passwordMsg, setPasswordMsg] = useState({ type: '', text: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [loadingStripe, setLoadingStripe] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState<string | null>(null)
 
   const handleMPConnect = async () => {
     try {
@@ -144,6 +145,17 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
     e.preventDefault()
     setSaving(true)
     setSuccess(false)
+    setErrorGuardar(null)
+
+    // Validar que los horarios de cierre sean mayores a los de apertura
+    for (const { key, label } of DIAS_SEMANA) {
+      const dia = horarios[key]
+      if (dia?.activo && dia.abre && dia.cierra && dia.abre >= dia.cierra) {
+        setErrorGuardar(`Error en el día ${label}: La hora de cierre debe ser posterior a la de apertura.`)
+        setSaving(false)
+        return
+      }
+    }
 
     const { error } = await supabase
       .from('restaurantes')
@@ -167,7 +179,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
       setTimeout(() => setSuccess(false), 3500)
     } else {
       console.error(error)
-      alert('Hubo un error al guardar los cambios.')
+      setErrorGuardar('Hubo un error al guardar los cambios: ' + error.message)
     }
   }
 
@@ -354,7 +366,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-500">Abre</span>
                           <input
-                            type="time"
+                            type="time" required
                             value={dia.abre}
                             onChange={e => updateHorario(key, 'abre', e.target.value)}
                             className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-slate-700"
@@ -364,7 +376,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-500">Cierra</span>
                           <input
-                            type="time"
+                            type="time" required
                             value={dia.cierra}
                             onChange={e => updateHorario(key, 'cierra', e.target.value)}
                             className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-slate-700"
@@ -429,6 +441,12 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
               <p className="text-center text-sm text-amber-600 font-semibold mt-3">
                 ⚠️ Completa los campos marcados para aparecer en el listado público.
               </p>
+            )}
+            {errorGuardar && (
+              <div className="mt-4 p-4 rounded-xl bg-red-50 text-red-600 border border-red-100 flex items-center gap-2 text-sm font-bold">
+                <AlertCircle size={18} />
+                {errorGuardar}
+              </div>
             )}
           </div>
         </form>

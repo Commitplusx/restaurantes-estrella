@@ -14,6 +14,8 @@ export function useDeliveryCalculation(ubicacionGPS: UbicacionGPS | null, tipoEn
   const [calculandoEnvio, setCalculandoEnvio] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function calcularEnvio() {
       if (tipoEntrega !== 'domicilio' || !ubicacionGPS) {
         setCostoEnvioBase(0);
@@ -28,6 +30,8 @@ export function useDeliveryCalculation(ubicacionGPS: UbicacionGPS | null, tipoEn
         
         // Artificial delay for UX
         await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        if (!isMounted) return;
 
         const { data } = await supabase
           .from('h3_zonas')
@@ -35,6 +39,8 @@ export function useDeliveryCalculation(ubicacionGPS: UbicacionGPS | null, tipoEn
           .eq('h3_index', hexIndex)
           .maybeSingle();
           
+        if (!isMounted) return;
+
         if (data && data.precio !== undefined) {
           setCostoEnvioBase(data.precio);
         } else {
@@ -42,13 +48,20 @@ export function useDeliveryCalculation(ubicacionGPS: UbicacionGPS | null, tipoEn
           setFueraDeCobertura(true);
         }
       } catch (err) {
+        if (!isMounted) return;
         console.error("Error calculando envío H3:", err);
       } finally {
-        setCalculandoEnvio(false);
+        if (isMounted) {
+          setCalculandoEnvio(false);
+        }
       }
     }
     
     calcularEnvio();
+
+    return () => {
+      isMounted = false;
+    };
   }, [ubicacionGPS, tipoEntrega]);
 
   return {

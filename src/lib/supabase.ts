@@ -140,9 +140,13 @@ async function compressImage(file: File, maxWidth: number = 1200): Promise<File>
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return resolve(file);
+      if (!ctx) {
+        URL.revokeObjectURL(img.src);
+        return resolve(file);
+      }
 
       ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(img.src);
       canvas.toBlob((blob) => {
         if (!blob) return resolve(file);
         const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
@@ -152,7 +156,10 @@ async function compressImage(file: File, maxWidth: number = 1200): Promise<File>
         resolve(compressedFile);
       }, 'image/webp', 0.9); // 90% calidad, formato WebP
     };
-    img.onerror = (error) => reject(error);
+    img.onerror = (error) => {
+      URL.revokeObjectURL(img.src);
+      reject(error);
+    };
   });
 }
 
@@ -173,7 +180,8 @@ export async function subirFoto(file: File, path: string): Promise<string | null
 }
 
 export async function getMyRestaurante(): Promise<Restaurante | null> {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError) throw authError
   if (!user) return null
 
   // Intentar con todos los campos nuevos

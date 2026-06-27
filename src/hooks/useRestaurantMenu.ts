@@ -84,7 +84,7 @@ export function useRestaurantMenu(id: string | undefined) {
           supabase.from('restaurantes').select('*').eq('id', actualId).single(),
           supabase.from('menu_categorias').select('*').eq('restaurante_id', actualId).eq('activa', true).order('orden', { ascending: true }),
           supabase.from('menu_items').select('*').eq('restaurante_id', actualId).eq('disponible', true).order('orden'),
-          supabase.from('menu_promociones').select('*').eq('restaurante_id', actualId).eq('activa', true).gte('fecha_fin', new Date().toISOString()),
+          supabase.from('menu_promociones').select('*').eq('restaurante_id', actualId).eq('activa', true).or(`fecha_fin.gte.${new Date().toISOString()},fecha_fin.is.null`),
           supabase.from('menu_combos').select('*').eq('restaurante_id', actualId).eq('disponible', true),
           supabase.from('menu_grupos_opciones').select('*, opciones:menu_opciones(*)').eq('restaurante_id', actualId)
         ]);
@@ -126,6 +126,7 @@ export function useRestaurantMenu(id: string | undefined) {
     }
 
     async function load() {
+      let actualRestId = id;
       // 1. Caché para carga instantánea
       if (id && menuCache[id]) {
         const cached = menuCache[id];
@@ -135,19 +136,17 @@ export function useRestaurantMenu(id: string | undefined) {
         setCombos(cached.combos);
         setPromociones(cached.promos);
         setLoading(false);
+        actualRestId = cached.restaurante.id;
         
         if (Date.now() - cached.timestamp > 60000) {
-          fetchMenuData(true);
+          await fetchMenuData(true);
         }
       } else {
-        await fetchMenuData();
+        const fetchedId = await fetchMenuData();
+        if (fetchedId) actualRestId = fetchedId;
       }
 
       // 2. Realtime Subscriptions
-      let actualRestId = id;
-      if (id && menuCache[id]) actualRestId = menuCache[id].restaurante.id;
-      else if (restaurante) actualRestId = restaurante.id;
-
       if (!actualRestId) return;
 
       const realtimeChannel = supabase.channel(`public:menu_updates:${actualRestId}`)
@@ -175,7 +174,7 @@ export function useRestaurantMenu(id: string | undefined) {
       isMounted = false;
       cleanupRealtime.then(cleanup => {
         if (typeof cleanup === 'function') cleanup();
-      });
+      }).catch(() => {});
     };
   }, [id]);
 

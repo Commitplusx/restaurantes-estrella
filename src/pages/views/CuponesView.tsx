@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, Ticket, ToggleLeft, ToggleRight, Calendar, Loader2, Copy, Check } from 'lucide-react'
 import { BottomSheet } from '../../components/BottomSheet'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -35,6 +35,16 @@ export function CuponesView({ restaurante }: { restaurante: Restaurante }) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [toastMsg, setToastMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  
+  const toastTimeout = useRef<number | null>(null)
+  const copyTimeout = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeout.current) clearTimeout(toastTimeout.current)
+      if (copyTimeout.current) clearTimeout(copyTimeout.current)
+    }
+  }, [])
 
   useEffect(() => {
     loadCupones()
@@ -52,7 +62,8 @@ export function CuponesView({ restaurante }: { restaurante: Restaurante }) {
 
   const showToast = (text: string, ok = true) => {
     setToastMsg({ text, ok })
-    setTimeout(() => setToastMsg(null), 3500)
+    if (toastTimeout.current) clearTimeout(toastTimeout.current)
+    toastTimeout.current = window.setTimeout(() => setToastMsg(null), 3500)
   }
 
   async function loadCupones() {
@@ -73,7 +84,8 @@ export function CuponesView({ restaurante }: { restaurante: Restaurante }) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.codigo.trim() || !form.valor) return
+    const numValor = parseFloat(form.valor)
+    if (!form.codigo.trim() || !form.valor || isNaN(numValor) || numValor <= 0) return
     setSaving(true)
 
     const payload = {
@@ -101,33 +113,46 @@ export function CuponesView({ restaurante }: { restaurante: Restaurante }) {
   }
 
   const handleToggle = async (cupon: CuponRestaurante) => {
+    // Optimistic UI update
+    setCupones(prev => prev.map(c => c.id === cupon.id ? { ...c, activo: !c.activo } : c))
+    
     const { error } = await supabase
       .from('cupones_restaurante')
       .update({ activo: !cupon.activo })
       .eq('id', cupon.id)
-    if (!error) {
-      setCupones(prev => prev.map(c => c.id === cupon.id ? { ...c, activo: !c.activo } : c))
+      
+    if (error) {
+      // Rollback on error
+      setCupones(prev => prev.map(c => c.id === cupon.id ? { ...c, activo: cupon.activo } : c))
+      showToast('Error al cambiar estado del cupón', false)
     }
   }
 
   const handleDelete = async () => {
     if (!deleteId) return
-    await supabase.from('cupones_restaurante').delete().eq('id', deleteId)
-    setDeleteId(null)
-    showToast('Cupón eliminado')
-    loadCupones()
+    const idToDelete = deleteId
+    setDeleteId(null) // hide modal early
+    
+    const { error } = await supabase.from('cupones_restaurante').delete().eq('id', idToDelete)
+    if (error) {
+      showToast('Error al eliminar cupón', false)
+    } else {
+      showToast('Cupón eliminado')
+      loadCupones()
+    }
   }
 
   const handleCopy = (codigo: string, id: string) => {
     navigator.clipboard.writeText(codigo)
     setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
+    if (copyTimeout.current) clearTimeout(copyTimeout.current)
+    copyTimeout.current = window.setTimeout(() => setCopiedId(null), 2000)
   }
 
   const isExpired = (fecha_fin: string | null) => {
     if (!fecha_fin) return false
-    // Agrega T23:59:59 para que expire al final del día en hora local
-    const endOfDay = new Date(`${fecha_fin}T23:59:59`)
+    // Agrega T23:59:59-06:00 para que expire al final del día en hora México
+    const endOfDay = new Date(`${fecha_fin}T23:59:59-06:00`)
     return endOfDay < new Date()
   }
 
@@ -242,7 +267,7 @@ export function CuponesView({ restaurante }: { restaurante: Restaurante }) {
                       <span className="flex items-center gap-1">
                         <Calendar size={11} />
                         Vence: <span className={`font-bold ml-0.5 ${expired ? 'text-red-500' : 'text-slate-600'}`}>
-                          {new Date(cupon.fecha_fin).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {new Date(`${cupon.fecha_fin}T12:00:00`).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </span>
                       </span>
                     )}

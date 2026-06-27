@@ -29,7 +29,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
     
     const url = await subirFoto(file, filePath)
     if (url) {
-      setEditingItem({...editingItem, foto_url: url})
+      setEditingItem(prev => ({...prev, foto_url: url}))
     } else {
       setErrorModal('Hubo un error al subir la foto. Intenta de nuevo.')
     }
@@ -94,15 +94,26 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
 
   const confirmDelete = async () => {
     if (!itemToDelete) return
-    await supabase.from('menu_combos').delete().eq('id', itemToDelete)
+    const idToDelete = itemToDelete
+    setItemToDelete(null) // hide modal early
+    const { error } = await supabase.from('menu_combos').delete().eq('id', idToDelete)
+    if (error) {
+      setErrorModal('Error al eliminar: ' + error.message)
+    }
     await loadData()
-    setItemToDelete(null)
   }
 
   const toggleDisponible = async (item: MenuCombo) => {
     const newVal = !item.disponible
+    // Optimistic UI
     setCombos(combos.map(i => i.id === item.id ? { ...i, disponible: newVal } : i))
-    await supabase.from('menu_combos').update({ disponible: newVal }).eq('id', item.id)
+    
+    const { error } = await supabase.from('menu_combos').update({ disponible: newVal }).eq('id', item.id)
+    if (error) {
+      // Rollback
+      setCombos(combos.map(i => i.id === item.id ? { ...i, disponible: item.disponible } : i))
+      setErrorModal('Error al cambiar disponibilidad: ' + error.message)
+    }
   }
 
   if (loading) return (

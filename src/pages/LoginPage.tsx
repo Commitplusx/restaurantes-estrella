@@ -13,6 +13,7 @@ export function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading || success) return
     if (phone.length < 10) {
       setError('Ingresa un número válido de 10 dígitos.')
       return
@@ -26,7 +27,11 @@ export function LoginPage() {
     
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
     if (err) {
-      setError('Credenciales incorrectas o acceso denegado.')
+      if (err.message === 'Invalid login credentials') {
+        setError('Teléfono o contraseña incorrectos.')
+      } else {
+        setError('Error al iniciar sesión: ' + err.message)
+      }
       setLoading(false)
     } else {
       setSuccess(true)

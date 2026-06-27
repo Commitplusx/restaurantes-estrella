@@ -1,4 +1,4 @@
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function ConfirmDialog({
@@ -14,13 +14,14 @@ export function ConfirmDialog({
   isOpen: boolean;
   title: string;
   message: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   confirmText?: string;
   isDanger?: boolean;
   showCancel?: boolean;
 }) {
   const [show, setShow] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -63,17 +64,27 @@ export function ConfirmDialog({
           {showCancel && (
             <button 
               onClick={onCancel}
-              className="w-full px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors active:scale-[0.98]"
+              disabled={isConfirming}
+              className="w-full px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors active:scale-[0.98] disabled:opacity-50"
             >
               Cancelar
             </button>
           )}
           <button 
-            onClick={() => { onConfirm(); onCancel(); }}
-            className={`w-full px-6 py-4 rounded-xl font-black text-white shadow-xl transition-all active:scale-[0.98]
+            onClick={async () => {
+              setIsConfirming(true);
+              try {
+                await onConfirm();
+              } finally {
+                setIsConfirming(false);
+              }
+            }}
+            disabled={isConfirming}
+            className={`w-full px-6 py-4 rounded-xl font-black text-white shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-75 disabled:pointer-events-none
               ${isDanger ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30'}
             `}
           >
+            {isConfirming && <Loader2 size={18} className="animate-spin" />}
             {confirmText}
           </button>
         </div>

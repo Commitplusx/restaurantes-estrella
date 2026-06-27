@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, ChefHat, Truck, Package, XCircle, ChevronRight, MapPin } from 'lucide-react';
@@ -10,8 +10,15 @@ export function FloatingOrderTracker() {
   const [restaurantName, setRestaurantName] = useState<string>('');
   const [restaurantLogo, setRestaurantLogo] = useState<string>('/logo.png');
   const [isExpanded, setIsExpanded] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const checkOrder = () => {
@@ -79,7 +86,8 @@ export function FloatingOrderTracker() {
             setOrderId(null);
           } else {
              setIsExpanded(true);
-             setTimeout(() => setIsExpanded(false), 5000);
+             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+             timeoutRef.current = setTimeout(() => setIsExpanded(false), 5000);
           }
         }
       )

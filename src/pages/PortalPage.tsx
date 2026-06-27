@@ -19,15 +19,24 @@ export function PortalPage() {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil'>('dashboard')
   const [loading, setLoading] = useState(true)
+  const [networkError, setNetworkError] = useState(false)
 
   useEffect(() => {
     loadRestaurante()
   }, [])
 
   const loadRestaurante = async () => {
-    const res = await getMyRestaurante()
-    setRestaurante(res)
-    setLoading(false)
+    setLoading(true)
+    setNetworkError(false)
+    try {
+      const res = await getMyRestaurante()
+      setRestaurante(res)
+    } catch (e) {
+      console.error(e)
+      setNetworkError(true)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -127,6 +136,31 @@ export function PortalPage() {
       <span className="text-slate-400 font-medium animate-pulse">Cargando tu panel...</span>
     </div>
   )
+
+  if (networkError) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50 p-4">
+        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-8 text-center max-w-sm w-full">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-5">
+            <AlertCircle size={32} className="text-red-500" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">Error de Conexión</h2>
+          <p className="text-slate-500 text-sm leading-relaxed mb-6">
+            No pudimos conectar con el servidor. Por favor revisa tu conexión a internet e intenta nuevamente.
+          </p>
+          <button
+            onClick={loadRestaurante}
+            className="block w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all shadow-lg shadow-slate-900/20 mb-3 text-sm"
+          >
+            Reintentar
+          </button>
+          <button onClick={handleLogout} className="w-full py-3 text-slate-400 hover:text-slate-600 font-semibold text-sm transition-colors">
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (!restaurante) {
     return (

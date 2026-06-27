@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 // import * as h3 from 'h3-js' (movido al hook)
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
@@ -104,8 +104,10 @@ export const estaAbierto = (res: Restaurante) => {
 }
 
 export function PublicMenuView() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
   const [restaurantePausado, setRestaurantePausado] = useState(false)
 
@@ -173,6 +175,7 @@ export function PublicMenuView() {
     libraries: LIBRARIES
   });
   const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
+  const [direccionReferencias, setDireccionReferencias] = useState('')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>('efectivo') // Forzado a efectivo por ahora
   const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
 
@@ -295,12 +298,45 @@ export function PublicMenuView() {
     async function fetchMenuData(silently = false) {
       if (!id) return
 
-      // ⚡ Query única: busca por slug primero (el caso más común),
-      // si parece UUID busca por id. Una sola petición al servidor.
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-      const { data: rest } = isUUID
-        ? await supabase.from('restaurantes').select('*').eq('id', id).maybeSingle()
-        : await supabase.from('restaurantes').select('*').eq('slug', id).maybeSingle()
+
+      let rest: any = null
+      let cats: any[] | null = null
+      let prods: any[] | null = null
+      let cmbs: any[] | null = null
+      let prms: any[] | null = null
+
+      if (isUUID) {
+        // ⚡ UUID: lanzar TODO en paralelo — 1 solo roundtrip
+        const [restRes, catsRes, prodsRes, cmbsRes, prmsRes] = await Promise.all([
+          supabase.from('restaurantes').select('*').eq('id', id).maybeSingle(),
+          supabase.from('menu_categorias').select('*').eq('restaurante_id', id).order('orden'),
+          supabase.from('menu_items').select('*').eq('restaurante_id', id).eq('disponible', true).order('orden'),
+          supabase.from('menu_combos').select('*').eq('restaurante_id', id).eq('disponible', true),
+          supabase.from('menu_promociones').select('*').eq('restaurante_id', id).eq('activa', true)
+        ])
+        rest = restRes.data
+        cats = catsRes.data
+        prods = prodsRes.data
+        cmbs = cmbsRes.data
+        prms = prmsRes.data
+      } else {
+        // Slug: primero resolver el ID real, luego el menú en paralelo
+        const { data: restData } = await supabase.from('restaurantes').select('*').eq('slug', id).maybeSingle()
+        rest = restData
+        if (rest) {
+          const [catsRes, prodsRes, cmbsRes, prmsRes] = await Promise.all([
+            supabase.from('menu_categorias').select('*').eq('restaurante_id', rest.id).order('orden'),
+            supabase.from('menu_items').select('*').eq('restaurante_id', rest.id).eq('disponible', true).order('orden'),
+            supabase.from('menu_combos').select('*').eq('restaurante_id', rest.id).eq('disponible', true),
+            supabase.from('menu_promociones').select('*').eq('restaurante_id', rest.id).eq('activa', true)
+          ])
+          cats = catsRes.data
+          prods = prodsRes.data
+          cmbs = cmbsRes.data
+          prms = prmsRes.data
+        }
+      }
 
       if (!rest) {
         if (isMounted && !silently) {
@@ -310,13 +346,6 @@ export function PublicMenuView() {
       }
 
       const actualId = rest.id;
-
-      const [{ data: cats }, { data: prods }, { data: cmbs }, { data: prms }] = await Promise.all([
-        supabase.from('menu_categorias').select('*').eq('restaurante_id', actualId).order('orden'),
-        supabase.from('menu_items').select('*').eq('restaurante_id', actualId).eq('disponible', true).order('orden'),
-        supabase.from('menu_combos').select('*').eq('restaurante_id', actualId).eq('disponible', true),
-        supabase.from('menu_promociones').select('*').eq('restaurante_id', actualId).eq('activa', true)
-      ])
 
       const currentDay = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'][new Date().getDay()];
       const validPromos = (prms || []).filter(p => {
@@ -349,13 +378,12 @@ export function PublicMenuView() {
         
         if (!silently) {
           setLoading(false)
-          // Solo auto-seleccionar pestaña en la primera carga si no es silencioso
           const hasItems = (prods || []).length > 0
           const hasCombos = (cmbs || []).length > 0
           const hasValidPromos = validPromos.length > 0
           
-          const urlTab = new URLSearchParams(window.location.search).get('tab')
-          if (urlTab === 'promos' && hasValidPromos) setActiveTab('promos')
+          const urlTab = new URLSearchParams(location.search).get('tab')
+          if (urlTab === 'promos') setActiveTab('promos')
           else if (urlTab === 'combos' && hasCombos) setActiveTab('combos')
           else if (urlTab === 'menu') setActiveTab('menu')
           else if (!hasItems && hasCombos) setActiveTab('combos')
@@ -484,6 +512,13 @@ export function PublicMenuView() {
         .filter(p => p.cantidad > 0)
     })
   }
+
+  useEffect(() => {
+    const urlTab = new URLSearchParams(location.search).get('tab')
+    if (urlTab === 'promos') setActiveTab('promos')
+    else if (urlTab === 'combos') setActiveTab('combos')
+    else if (urlTab === 'menu') setActiveTab('menu')
+  }, [location.search])
 
   // Fix Map interaction to be like Rappi/Uber (fixed center pin)
   const handleMapDragEnd = () => {
@@ -693,10 +728,21 @@ export function PublicMenuView() {
   const descuentoAplicable = subtotal > 0 ? Math.min(descuento, subtotal) : 0
   const total = Math.max(0, subtotal - descuentoAplicable) + (tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0)
 
-  // Bug #5: reset fields when closing cart without ordering
+  // Limpiar todos los campos del checkout y volver al paso 1
+  const resetCheckout = () => {
+    setCheckoutStep(1)
+    setTipoEntrega(null)
+    setCuponCliente('')
+    setCuponValido(false)
+    setDescuento(0)
+    setDireccionReferencias('')
+    sessionStorage.removeItem('est_tipoentrega')
+    sessionStorage.removeItem('est_checkoutstep')
+  }
+
   const closeCart = () => {
     setIsCartOpen(false)
-    setTimeout(() => setCheckoutStep(1), 300)
+    setTimeout(() => resetCheckout(), 300)
   }
 
   const handlePedir = async () => {
@@ -744,7 +790,10 @@ export function PublicMenuView() {
     }).join('\n')
 
     const detallesEntregaStr = tipoEntrega === 'domicilio' 
-      ? `\n\n🛵 *Tipo de entrega:* A domicilio` + (costoEnvio > 0 ? `\n🚚 *Costo Envío:* $${costoEnvio}` : '')
+      ? `\n\n🛵 *Tipo de entrega:* A domicilio` + 
+        `\n📍 *Dirección:* ${direccionEntrega}` + 
+        (direccionReferencias.trim() ? `\n📝 *Referencias:* ${direccionReferencias}` : '') +
+        (costoEnvio > 0 ? `\n🚚 *Costo Envío:* $${costoEnvio}` : '')
       : `\n\n🏪 *Tipo de entrega:* Recoger en tienda`
       
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr
@@ -754,8 +803,10 @@ export function PublicMenuView() {
         cliente_tel: telLimpio,
         cliente_nombre: clienteNombre.trim(),
         restaurante: restaurante.nombre,
+        restaurante_id: restaurante.id,
         descripcion: pedidoCompleto,
         direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
+        referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,
         lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
         lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
         estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
@@ -767,9 +818,9 @@ export function PublicMenuView() {
 
       if (insertError) throw insertError
 
-      // Notificar al admin sobre la nueva orden SOLO si es a domicilio y el pago es en efectivo.
-      // Si es pago en línea, la notificación se envía desde el webhook cuando se apruebe.
-      if (tipoEntrega === 'domicilio' && metodoPago === 'efectivo') {
+      // Notificar al admin para TODOS los pedidos en efectivo (domicilio Y tienda)
+      // Si es pago en línea, la notificación se envía desde el webhook de Mercado Pago al aprobarse.
+      if (metodoPago === 'efectivo') {
         supabase.functions.invoke('notificar-whatsapp', {
           body: {
             tipo: 'nueva_orden_admin',
@@ -834,7 +885,7 @@ export function PublicMenuView() {
         return
       }
     } else {
-      // Flujo 100% Web para pagos en Efectivo
+      // Flujo 100% Web para pagos en Efectivo — limpiar todo
       setIsCartOpen(false)
       setCarrito([])
       setClienteNombre('')
@@ -842,6 +893,11 @@ export function PublicMenuView() {
       setCuponCliente('')
       setCuponValido(false)
       setDescuento(0)
+      setDireccionReferencias('')
+      setTipoEntrega(null)
+      setUbicacionGPS(null)
+      setDireccionEntrega('')
+      sessionStorage.clear()
       window.location.href = `/success?pedido=${ticketId}&success=true`
     }
   }
@@ -986,17 +1042,17 @@ export function PublicMenuView() {
               <span>{restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}</span>
             </div>
             
-            {restaurante.maps_url ? (
-              <a href={restaurante.maps_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 transition-colors">
-                <MapPin size={16} className="text-blue-500" /> 
-                <span className="line-clamp-1 max-w-[200px] underline decoration-blue-200">{restaurante.direccion || 'Ver en mapa'}</span>
-              </a>
-            ) : (
-              <div className="flex items-center gap-1.5 text-slate-600">
-                <MapPin size={16} className="text-slate-400" /> 
-                <span className="line-clamp-1 max-w-[200px]">{restaurante.direccion || 'Comitán'}</span>
-              </div>
-            )}
+            <a 
+              href={restaurante.maps_url || (restaurante.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurante.direccion.replace('GPS: ', ''))}` : '#')} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={`flex items-center gap-1.5 transition-colors ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') ? 'text-blue-600 hover:text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
+            >
+              <MapPin size={16} className={restaurante.maps_url || restaurante.direccion?.includes('GPS:') ? 'text-blue-500' : 'text-slate-400'} /> 
+              <span className={`line-clamp-1 max-w-[200px] font-medium ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') ? 'underline decoration-blue-200 underline-offset-2' : ''}`}>
+                {restaurante.direccion?.includes('GPS:') ? 'Ver ubicación en el mapa' : (restaurante.direccion || 'Comitán')}
+              </span>
+            </a>
           </div>
         </div>
 
@@ -1194,19 +1250,23 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
                     >
-                      <div className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: promo.id, nombre: promo.titulo, precio: promo.precio_especial || 0, tipo: 'promo', foto_url: promo.foto_url || undefined, cartItemId: promo.id })}>
+                      <div
+                        className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full"
+                        onClick={() => setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' })}
+                      >
                           <div className="relative">
                             <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[10px] font-black px-4 py-1 rounded-bl-[20px] z-10 shadow-lg">PROMO</div>
                             <LazyImage src={promo.foto_url} alt={promo.titulo} className="w-full h-[220px] rounded-[18px] mb-4" imgClassName="group-hover:scale-105 transition-transform duration-700 ease-out" />
                           </div>
-                          
+
                           <div className="flex-1 flex flex-col px-1">
-                            <div className="cursor-pointer" onClick={() => setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' })}>
-                              <h4 className="font-extrabold text-slate-900 text-lg mb-1 leading-tight">{promo.titulo}</h4>
-                              <p className="text-slate-400 text-xs mb-3 line-clamp-2">{promo.descripcion}</p>
-                            </div>
+                            <h4 className="font-extrabold text-slate-900 text-lg mb-1 leading-tight">{promo.titulo}</h4>
+                            <p className="text-slate-400 text-xs mb-3 line-clamp-2">{promo.descripcion}</p>
                             <div className="flex items-center justify-between mt-auto">
                               <span className="text-[#FA4A0C] font-black text-xl">${promo.precio_especial?.toFixed(2)}</span>
+                              <div className="w-9 h-9 rounded-full bg-[#FA4A0C] flex items-center justify-center shadow-md shadow-[#FA4A0C]/30">
+                                <Plus className="w-5 h-5 text-white" />
+                              </div>
                             </div>
                           </div>
                       </div>
@@ -1565,22 +1625,44 @@ export function PublicMenuView() {
                       )}
 
                       {tipoEntrega === 'domicilio' && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 flex flex-col items-center text-center shadow-sm">
-                           <MapPin className="text-[#FA4A0C] mb-2 w-8 h-8" />
-                           <p className="text-sm text-slate-800 font-bold mb-1">
-                             {ubicacionGPS ? 'Dirección de Entrega' : '¿A dónde enviamos tu pedido?'}
-                           </p>
-                           {ubicacionGPS && (
-                             <p className="text-xs text-slate-500 mb-4 line-clamp-2 px-2">
-                               {direccionEntrega}
-                             </p>
+                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-4 rounded-[20px] border border-slate-200 mt-2 flex flex-col items-center text-center shadow-sm relative">
+                           
+                           {ubicacionGPS ? (
+                             <div className="w-full text-left">
+                               <div className="flex items-center justify-between mb-2">
+                                 <div className="flex items-center gap-1.5">
+                                   <MapPin className="text-[#FA4A0C] w-4 h-4" />
+                                   <p className="text-sm text-slate-800 font-bold">Entregar en</p>
+                                 </div>
+                                 <button onClick={() => setIsMapModalOpen(true)} className="text-[#FA4A0C] text-xs font-bold hover:underline">
+                                   Cambiar
+                                 </button>
+                               </div>
+                               
+                               <p className="text-[12px] text-slate-500 mb-3 line-clamp-2 leading-snug">
+                                 {direccionEntrega}
+                               </p>
+                               
+                               <input 
+                                 type="text" 
+                                 value={direccionReferencias} 
+                                 onChange={(e) => setDireccionReferencias(e.target.value)} 
+                                 placeholder="Referencias: Ej. Casa verde, portón negro..." 
+                                 className="w-full bg-white border border-slate-200 rounded-[12px] px-3 py-2.5 outline-none focus:border-[#FA4A0C] focus:ring-2 focus:ring-[#FA4A0C]/10 transition-all font-medium text-slate-800 text-[12px] placeholder:text-slate-400 shadow-sm" 
+                               />
+                             </div>
+                           ) : (
+                             <>
+                               <MapPin className="text-[#FA4A0C] mb-2 w-8 h-8" />
+                               <p className="text-sm text-slate-800 font-bold mb-3">¿A dónde enviamos tu pedido?</p>
+                               <button 
+                                 onClick={() => setIsMapModalOpen(true)}
+                                 className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-3 rounded-[12px] font-bold text-sm flex items-center justify-center transition-colors shadow-md"
+                               >
+                                 Establecer Ubicación
+                               </button>
+                             </>
                            )}
-                           <button 
-                             onClick={() => setIsMapModalOpen(true)}
-                             className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-3.5 rounded-[12px] font-bold text-sm flex items-center justify-center transition-colors shadow-md mt-2"
-                           >
-                             {ubicacionGPS ? 'Modificar Ubicación' : 'Establecer Ubicación'}
-                           </button>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1654,15 +1736,31 @@ export function PublicMenuView() {
                     </div>
                   )}
                   {tipoEntrega === 'domicilio' && (
-                    <div className="flex justify-between text-slate-500 text-[13px] font-bold tracking-wide">
+                    <div className="flex justify-between items-center text-slate-500 text-[13px] font-bold tracking-wide">
                       <span className="flex items-center gap-1.5"><Truck size={14} className="text-[#FA4A0C]"/> Envío</span>
                       <AnimatePresence mode="wait">
                         <motion.span 
-                          key={calculandoEnvio ? 'calc' : fueraDeCobertura ? 'out' : 'price'}
+                          key={calculandoEnvio ? 'calc' : fueraDeCobertura ? 'out' : `${costoEnvio}-${costoEnvioBase}`}
                           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          className={fueraDeCobertura ? 'text-red-500' : 'text-slate-800'}
+                          className="flex items-center gap-1.5"
                         >
-                          {calculandoEnvio ? <Loader2 size={12} className="animate-spin inline" /> : fueraDeCobertura ? 'Sin cobertura' : `+$${costoEnvio.toFixed(2)}`}
+                          {calculandoEnvio ? (
+                            <Loader2 size={12} className="animate-spin inline" />
+                          ) : fueraDeCobertura ? (
+                            <span className="text-red-500">Sin cobertura</span>
+                          ) : costoEnvio === 0 ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-slate-400 line-through text-[12px] font-medium">${costoEnvioBase.toFixed(2)}</span>
+                              <span className="text-green-500 font-black">¡GRATIS!</span>
+                            </span>
+                          ) : costoEnvio < costoEnvioBase ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-slate-400 line-through text-[12px] font-medium">${costoEnvioBase.toFixed(2)}</span>
+                              <span className="text-[#FA4A0C] font-black">+${costoEnvio.toFixed(2)}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-800">+${costoEnvio.toFixed(2)}</span>
+                          )}
                         </motion.span>
                       </AnimatePresence>
                     </div>
@@ -1696,6 +1794,10 @@ export function PublicMenuView() {
                           return;
                         }
                         if (tipoEntrega === 'domicilio') {
+                          if (calculandoEnvio) {
+                            showToast('Calculando envío', 'Espera un momento mientras calculamos el costo...', 'loading');
+                            return;
+                          }
                           if (!direccionEntrega.trim() || !ubicacionGPS) {
                             showToast('Atención', 'Selecciona tu ubicación en el mapa', 'error');
                             return;
@@ -1705,6 +1807,10 @@ export function PublicMenuView() {
                             return;
                           }
                         }
+                      }
+                      if (checkoutStep === 4 && !metodoPago) {
+                        showToast('Atención', 'Selecciona un método de pago', 'error');
+                        return;
                       }
                       setCheckoutStep(prev => prev + 1)
                     }} 

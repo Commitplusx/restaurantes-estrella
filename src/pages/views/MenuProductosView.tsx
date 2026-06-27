@@ -44,7 +44,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     
     const url = await subirFoto(file, filePath)
     if (url) {
-      setEditingItem({...editingItem, foto_url: url})
+      setEditingItem(prev => ({...prev, foto_url: url}))
     } else {
       setErrorModal('Hubo un error al subir la foto. Intenta de nuevo.')
     }
@@ -77,26 +77,30 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     setCategorias(cats || [])
 
     // Auto-reset agotado_hoy: si el platillo tiene agotado_hasta pasado, lo limpiamos
-    const today = new Date().toISOString().split('T')[0]
+    // Bug 5 fix: usar hora local México (UTC-6) en lugar de UTC del servidor
+    const todayMx = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' })).toISOString().split('T')[0]
     const toReset = (prods || []).filter(p =>
       p.agotado_hoy &&
       p.agotado_hasta &&
-      p.agotado_hasta.split('T')[0] < today
+      p.agotado_hasta.split('T')[0] < todayMx
     )
+    
+    let finalProds = prods ? [...prods] : []
+
     if (toReset.length > 0) {
       await supabase.from('menu_items')
         .update({ agotado_hoy: false, agotado_hasta: null })
         .in('id', toReset.map(p => p.id))
-      // Actualizar los objetos localmente
-      prods?.forEach(p => {
+      // Actualizar los objetos localmente pero en finalProds
+      finalProds = finalProds.map(p => {
         if (toReset.find(r => r.id === p.id)) {
-          p.agotado_hoy = false
-          p.agotado_hasta = null
+          return { ...p, agotado_hoy: false, agotado_hasta: null }
         }
+        return p
       })
     }
 
-    setItems(prods || [])
+    setItems(finalProds)
     setLoading(false)
   }
 
@@ -112,6 +116,52 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+
+    // Bug 1 fix: validar que el precio sea un número válido mayor a 0
+    const precioFinal = parseFloat(String(editingItem.precio))
+    if (isNaN(precioFinal) || precioFinal < 0) {
+      setErrorModal('El precio no es válido. Escribe un número mayor o igual a 0.')
+      setSaving(false)
+      return
+    }
+
+    // Bug 4 fix: validar que el horario tenga sentido (inicio < fin)
+    if (editingItem.hora_inicio_disponible && editingItem.hora_fin_disponible) {
+      if (editingItem.hora_inicio_disponible >= editingItem.hora_fin_disponible) {
+        setErrorModal('El horario "Desde" debe ser menor que el horario "Hasta". El sistema aún no soporta horarios que cruzan la medianoche.')
+        setSaving(false)
+        return
+      }
+    }
+    if ((editingItem.hora_inicio_disponible && !editingItem.hora_fin_disponible) ||
+        (!editingItem.hora_inicio_disponible && editingItem.hora_fin_disponible)) {
+      setErrorModal('Si configuras un horario de disponibilidad, debes indicar tanto la hora de inicio como la hora de fin.')
+      setSaving(false)
+      return
+    }
+
+    // Bug 3 fix: validar que los grupos de opciones no estén vacíos
+    const opciones = editingItem.opciones || []
+    for (let g = 0; g < opciones.length; g++) {
+      const grupo = opciones[g]
+      if (!grupo.titulo?.trim()) {
+        setErrorModal(`El Grupo de Opciones #${g + 1} no tiene nombre. Ponle un nombre o elimínalo.`)
+        setSaving(false)
+        return
+      }
+      if (grupo.opciones.length === 0) {
+        setErrorModal(`El grupo "${grupo.titulo}" no tiene ninguna opción. Agrega al menos una o elimina el grupo.`)
+        setSaving(false)
+        return
+      }
+      for (let o = 0; o < grupo.opciones.length; o++) {
+        if (!grupo.opciones[o].nombre?.trim()) {
+          setErrorModal(`Una opción del grupo "${grupo.titulo}" no tiene nombre. Rellénala o elimínala.`)
+          setSaving(false)
+          return
+        }
+      }
+    }
     
     // Si no hay categorías, creamos una por defecto
     let catId = editingItem.categoria_id
@@ -125,7 +175,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
       catId = categorias[0].id
     }
 
-    const payload = { ...editingItem, restaurante_id: restaurante.id, categoria_id: catId }
+    const payload = { ...editingItem, precio: precioFinal, restaurante_id: restaurante.id, categoria_id: catId }
     
     if (payload.id) {
       const { error } = await supabase.from('menu_items').update(payload).eq('id', payload.id)
@@ -146,6 +196,23 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
 
   const confirmDelete = async () => {
     if (!itemToDelete) return
+    // Bug 2 fix: eliminar la foto del storage antes de borrar el registro
+    const itemToRemove = items.find(i => i.id === itemToDelete)
+    if (itemToRemove?.foto_url) {
+      try {
+        // La URL tiene el formato: .../storage/v1/object/public/BUCKET/PATH
+        const url = new URL(itemToRemove.foto_url)
+        const parts = url.pathname.split('/object/public/')
+        if (parts.length === 2) {
+          const [bucket, ...rest] = parts[1].split('/')
+          const filePath = rest.join('/')
+          await supabase.storage.from(bucket).remove([filePath])
+        }
+      } catch {
+        // No bloqueamos la eliminación del producto si la foto falla
+        console.warn('No se pudo eliminar la foto del storage')
+      }
+    }
     await supabase.from('menu_items').delete().eq('id', itemToDelete)
     await loadData()
     setItemToDelete(null)
@@ -153,19 +220,34 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
 
   const toggleDisponible = async (item: MenuItem) => {
     const newVal = !item.disponible
+    // Optimistic UI
     setItems(items.map(i => i.id === item.id ? { ...i, disponible: newVal } : i))
-    await supabase.from('menu_items').update({ disponible: newVal }).eq('id', item.id)
+    const { error } = await supabase.from('menu_items').update({ disponible: newVal }).eq('id', item.id)
+    if (error) {
+      // Rollback
+      setItems(items.map(i => i.id === item.id ? { ...i, disponible: item.disponible } : i))
+      setErrorModal('Error al cambiar disponibilidad: ' + error.message)
+    }
   }
 
   const handleToggleAgotado = async (item: MenuItem) => {
     const newVal = !item.agotado_hoy
     // Si se marca como agotado, guardar el fin del día de hoy para que mañana se limpie solo
     const endOfToday = newVal ? new Date(new Date().toISOString().split('T')[0] + 'T23:59:59').toISOString() : null
-    await supabase.from('menu_items').update({
+    
+    // Optimistic UI
+    setItems(prev => prev.map(i => i.id === item.id ? {...i, agotado_hoy: newVal, agotado_hasta: endOfToday} : i))
+    
+    const { error } = await supabase.from('menu_items').update({
       agotado_hoy: newVal,
       agotado_hasta: endOfToday
     }).eq('id', item.id)
-    setItems(prev => prev.map(i => i.id === item.id ? {...i, agotado_hoy: newVal, agotado_hasta: endOfToday} : i))
+    
+    if (error) {
+      // Rollback
+      setItems(prev => prev.map(i => i.id === item.id ? {...i, agotado_hoy: item.agotado_hoy, agotado_hasta: item.agotado_hasta} : i))
+      setErrorModal('Error al cambiar estado de agotado: ' + error.message)
+    }
   }
 
   if (loading) return (
