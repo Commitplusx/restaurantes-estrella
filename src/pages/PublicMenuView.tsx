@@ -1601,6 +1601,7 @@ export function PublicMenuView() {
                           </div>
                           {metodoPago === 'efectivo' && <CheckCircle2 size={24} className="text-green-500" />}
                         </button>
+                        {/* 
                         <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-5 px-6 rounded-[24px] border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${metodoPago === 'en_linea' ? 'bg-[#FA4A0C]/20' : 'bg-slate-100'}`}>💳</div>
                           <div className="text-left flex-1">
@@ -1609,6 +1610,7 @@ export function PublicMenuView() {
                           </div>
                           {metodoPago === 'en_linea' && <CheckCircle2 size={24} className="text-[#FA4A0C]" />}
                         </button>
+                        */}
                       </div>
                     </div>
                   </motion.div>
