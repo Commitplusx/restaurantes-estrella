@@ -1611,6 +1611,10 @@ export function PublicMenuView() {
                           {metodoPago === 'en_linea' && <CheckCircle2 size={24} className="text-[#FA4A0C]" />}
                         </button>
                         */}
+                        <div className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-[16px] text-center flex items-center gap-3">
+                          <span className="text-2xl">⏳</span>
+                          <p className="text-sm text-slate-600 font-medium">¡Próximamente tendremos pagos en línea! Por el momento, el pago es exclusivo en efectivo al recibir.</p>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
