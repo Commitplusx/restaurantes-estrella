@@ -164,7 +164,7 @@ export function LoginPage() {
           </form>
 
           <p className="text-center text-zinc-400 text-sm mt-12 font-medium">
-            ¿Problemas de acceso? Solicita soporte en WhatsApp.
+            ¿Problemas de acceso? <a href="https://wa.me/529631539156" target="_blank" rel="noreferrer" className="text-[#FF3B2F] hover:underline font-bold">Contacta al admin (963 153 9156)</a>
           </p>
         </motion.div>
       </div>
