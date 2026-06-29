@@ -23,12 +23,6 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
         { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            playBellSound()
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('¡Nuevo Pedido!', {
-                body: `Se acaba de recibir un nuevo pedido.`,
-              })
-            }
             setPedidos((prev) => [payload.new, ...prev])
           } else if (payload.eventType === 'UPDATE') {
             setPedidos((prev) =>
@@ -51,8 +45,8 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       .from('pedidos')
       .select('*')
       .eq('restaurante_id', restaurante.id)
-      // Solo mostramos pedidos activos (los entregados/cancelados los filtramos, o los mostramos aparte)
-      .in('estado', ['pendiente', 'pagado', 'aceptado', 'asignado', 'en_cocina', 'listo_para_recoger'])
+      // Solo mostramos pedidos activos en base al estado de la cocina
+      .in('estado_cocina', ['pendiente', 'en_cocina', 'listo_para_recoger'])
       .order('created_at', { ascending: false })
 
     if (data) setPedidos(data)
@@ -84,13 +78,13 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
 
   const updateEstado = async (id: string, nuevoEstado: string) => {
     // Guardar estado previo para rollback
-    const estadoPrevio = pedidos.find(p => p.id === id)?.estado
+    const estadoPrevio = pedidos.find(p => p.id === id)?.estado_cocina
     try {
       // Actualización optimista del UI
       setPedidos((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, estado: nuevoEstado } : p))
+        prev.map((p) => (p.id === id ? { ...p, estado_cocina: nuevoEstado } : p))
       )
-      const { error } = await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', id)
+      const { error } = await supabase.from('pedidos').update({ estado_cocina: nuevoEstado }).eq('id', id)
       if (error) throw error
       
       // Si cambia a listo, notificar al repartidor
@@ -108,17 +102,16 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       // Rollback: restaurar el estado previo en el UI
       if (estadoPrevio) {
         setPedidos((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, estado: estadoPrevio } : p))
+          prev.map((p) => (p.id === id ? { ...p, estado_cocina: estadoPrevio } : p))
         )
       }
     }
   }
 
-  // 'asignado' se mueve a En Cocina: cuando el repartidor acepta un pedido que
-  // ya está en cocina, NO debe regresar a la columna de Nuevos.
-  const nuevos = pedidos.filter(p => p.estado === 'pendiente' || p.estado === 'pagado' || p.estado === 'aceptado')
-  const enCocina = pedidos.filter(p => p.estado === 'en_cocina' || p.estado === 'asignado')
-  const listos = pedidos.filter(p => p.estado === 'listo_para_recoger')
+  // Ahora las columnas se basan exclusivamente en el estado_cocina, no se mezclan con el repartidor.
+  const nuevos = pedidos.filter(p => p.estado_cocina === 'pendiente')
+  const enCocina = pedidos.filter(p => p.estado_cocina === 'en_cocina')
+  const listos = pedidos.filter(p => p.estado_cocina === 'listo_para_recoger')
 
   if (loading) {
     return <div className="p-8 text-slate-400">Cargando pedidos...</div>

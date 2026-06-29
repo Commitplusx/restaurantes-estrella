@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, Loader2, AlertCircle, ShoppingBag, Truck } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle, ShoppingBag, Truck, User, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { OrderProgressBar } from '../components/OrderProgressBar';
@@ -19,10 +19,28 @@ export function SuccessPage() {
 
   const [status, setStatus] = useState<'loading' | 'validating' | 'success' | 'error'>('loading');
   const [pedido, setPedido] = useState<any>(null);
+  const [repartidorInfo, setRepartidorInfo] = useState<{ nombre: string; alias?: string } | null>(null);
+  const [repartidorRecienAsignado, setRepartidorRecienAsignado] = useState(false);
   // Ref to avoid stale closure bugs in async callbacks (BUG 1 fix)
   const resolvedRef = useRef(false);
   const confettiFiredRef = useRef(false);
   const pollIntervalRef = useRef<any>(null);
+  const repartidorFetchedRef = useRef(false);
+
+  const fetchRepartidor = useCallback(async (repartidorId: string) => {
+    if (repartidorFetchedRef.current || !repartidorId) return;
+    repartidorFetchedRef.current = true;
+    const { data } = await supabase
+      .from('repartidores')
+      .select('nombre, alias')
+      .eq('user_id', repartidorId)  // repartidor_id en pedidos = auth.uid() = repartidores.user_id
+      .maybeSingle();
+    if (data) {
+      setRepartidorInfo(data);
+      setRepartidorRecienAsignado(true);
+      setTimeout(() => setRepartidorRecienAsignado(false), 5000);
+    }
+  }, []);
 
   useEffect(() => {
     if (!pedidoId && !orderId) {
@@ -143,16 +161,22 @@ export function SuccessPage() {
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
             (payload) => {
-              setPedido(payload.new); // ¡ESTO ARREGLA EL BUG DE NO ACTUALIZAR!
+              const newData = payload.new;
+              setPedido(newData);
+
+              // Si acaba de asignarse un repartidor, hacer fetch de sus datos
+              if (newData.repartidor_id && !repartidorFetchedRef.current) {
+                fetchRepartidor(newData.repartidor_id);
+              }
               
-              if (['entregado', 'cancelado', 'rechazado'].includes(payload.new.estado)) {
+              if (['entregado', 'cancelado', 'rechazado'].includes(newData.estado)) {
                 localStorage.removeItem('est_active_order');
               } else {
-                localStorage.setItem('est_active_order', payload.new.id);
+                localStorage.setItem('est_active_order', newData.id);
               }
 
-              if (RESOLVED_STATES.includes(payload.new.estado)) {
-                resolveSuccess(payload.new);
+              if (RESOLVED_STATES.includes(newData.estado)) {
+                resolveSuccess(newData);
               }
             }
           )
@@ -177,7 +201,7 @@ export function SuccessPage() {
         pollIntervalRef.current = null;
       }
     };
-  }, [pedidoId, orderId, isSuccess]);
+  }, [pedidoId, orderId, isSuccess, fetchRepartidor]);
 
   /** Genera el número corto de orden: EST-XXXXX
    *  Misma lógica que generarNumeroOrden() en utils.ts y PedidosView.
@@ -332,11 +356,80 @@ export function SuccessPage() {
                       : pedido?.estado === 'recibido' || pedido?.estado === 'en_camino' ? '¡Tu repartidor recogió la orden y va en camino! 🛵'
                       : 'Sigue el estado de tu pedido en tiempo real'}
                     </p>
-                    {/* Progress Bar Injection */}
+                    {/* Progress Bar + estado del repartidor */}
                     {pedido && (
                       <div className="w-full px-1 max-w-sm mx-auto scale-90 origin-top">
                         <OrderProgressBar currentStatus={pedido.estado} />
                       </div>
+                    )}
+
+                    {/* Bloque: Buscando repartidor / Repartidor asignado */}
+                    {pedido?.tipo_pedido !== 'tienda' && (
+                      <AnimatePresence mode="wait">
+                        {repartidorInfo ? (
+                          // ✅ Repartidor asignado
+                          <motion.div
+                            key="asignado"
+                            initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+                            className={`mt-3 w-full max-w-sm mx-auto rounded-2xl p-3 flex items-center gap-3 border ${
+                              repartidorRecienAsignado
+                                ? 'bg-emerald-50 border-emerald-200 shadow-md shadow-emerald-100'
+                                : 'bg-slate-50 border-slate-100'
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                              repartidorRecienAsignado ? 'bg-emerald-500' : 'bg-slate-200'
+                            }`}>
+                              <User className={`w-5 h-5 ${repartidorRecienAsignado ? 'text-white' : 'text-slate-500'}`} />
+                            </div>
+                            <div className="flex flex-col text-left">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                {repartidorRecienAsignado ? '¡Repartidor Asignado! 🎉' : 'Tu Repartidor'}
+                              </span>
+                              <span className="text-slate-800 font-black text-sm">
+                                {repartidorInfo.alias || repartidorInfo.nombre}
+                              </span>
+                              <span className="text-slate-500 text-[11px] flex items-center gap-1 mt-0.5">
+                                <MapPin className="w-3 h-3" />
+                                Va en camino al restaurante a recoger tu orden
+                              </span>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          // 🔍 Buscando repartidor (radar)
+                          <motion.div
+                            key="buscando"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="mt-3 w-full max-w-sm mx-auto flex flex-col items-center gap-2"
+                          >
+                            {/* Radar animado */}
+                            <div className="relative w-14 h-14 flex items-center justify-center">
+                              {[0, 1, 2].map((i) => (
+                                <motion.div
+                                  key={i}
+                                  className="absolute rounded-full border-2 border-[#FA4A0C]/40"
+                                  initial={{ width: 20, height: 20, opacity: 0.8 }}
+                                  animate={{ width: 56, height: 56, opacity: 0 }}
+                                  transition={{
+                                    duration: 1.8,
+                                    delay: i * 0.6,
+                                    repeat: Infinity,
+                                    ease: 'easeOut',
+                                  }}
+                                />
+                              ))}
+                              <div className="w-8 h-8 bg-[#FA4A0C] rounded-full flex items-center justify-center z-10 shadow-lg shadow-orange-200">
+                                <Truck className="w-4 h-4 text-white" />
+                              </div>
+                            </div>
+                            <p className="text-slate-500 text-xs font-semibold">Buscando repartidor cercano...</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     )}
                   </>
                 )}

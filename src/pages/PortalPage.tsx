@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2, Ticket, BellRing } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
@@ -20,6 +20,60 @@ export function PortalPage() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil'>('dashboard')
   const [loading, setLoading] = useState(true)
   const [networkError, setNetworkError] = useState(false)
+  const [audioDesbloqueado, setAudioDesbloqueado] = useState(false)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+
+  // 🔊 Desbloquear audio en el primer clic del usuario (política del navegador)
+  const desbloquearAudio = useCallback(() => {
+    if (audioDesbloqueado) return
+    try {
+      const ctx = new AudioContext()
+      // Reproducir silencio para "calentar" el contexto
+      const buf = ctx.createBuffer(1, 1, 22050)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.connect(ctx.destination)
+      src.start(0)
+      audioCtxRef.current = ctx
+      setAudioDesbloqueado(true)
+    } catch (e) {
+      console.warn('No se pudo desbloquear el audio:', e)
+    }
+  }, [audioDesbloqueado])
+
+  // Escuchar el primer clic en cualquier parte de la pantalla
+  useEffect(() => {
+    document.addEventListener('click', desbloquearAudio, { once: true })
+    return () => document.removeEventListener('click', desbloquearAudio)
+  }, [desbloquearAudio])
+
+  // 🎵 Función de reproducción con Web Audio API (sin MP3 externo, instantáneo)
+  const tocarTimbre = useCallback(() => {
+    try {
+      const ctx = audioCtxRef.current ?? new AudioContext()
+      if (!audioCtxRef.current) audioCtxRef.current = ctx
+
+      const tocarTono = (freq: number, inicio: number, duracion: number, volumen: number) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + inicio)
+        gain.gain.setValueAtTime(volumen, ctx.currentTime + inicio)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + inicio + duracion)
+        osc.start(ctx.currentTime + inicio)
+        osc.stop(ctx.currentTime + inicio + duracion)
+      }
+
+      // Secuencia de tonos tipo "ding-dong" de pedido
+      tocarTono(880, 0.0, 0.25, 0.6)   // La5
+      tocarTono(1100, 0.2, 0.25, 0.5)  // Do#6
+      tocarTono(1320, 0.4, 0.4, 0.7)   // Mi6 (tono principal)
+      tocarTono(880, 0.75, 0.3, 0.4)   // La5 (echo)
+    } catch (e) {
+      console.warn('Error al reproducir sonido:', e)
+    }
+  }, [])
 
   useEffect(() => {
     loadRestaurante()
@@ -31,6 +85,11 @@ export function PortalPage() {
     try {
       const res = await getMyRestaurante()
       setRestaurante(res)
+      
+      // Solicitar permisos de notificación si no se han pedido
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission()
+      }
     } catch (e) {
       console.error(e)
       setNetworkError(true)
@@ -38,6 +97,36 @@ export function PortalPage() {
       setLoading(false)
     }
   }
+
+  // 🔔 Escucha global de Nuevos Pedidos (Push + Sonido)
+  useEffect(() => {
+    if (!restaurante) return;
+    
+    const channel = supabase.channel(`global:pedidos:${restaurante.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` }, () => {
+        
+        // 1. Reproducir timbre con Web Audio API (instantáneo, sin descarga externa)
+        tocarTimbre()
+        
+        // 2. Notificación Push nativa
+        if ('Notification' in window && Notification.permission === 'granted') {
+           const notif = new Notification('¡Nuevo Pedido Recibido! 🚨', {
+             body: `Un cliente acaba de realizar un pedido. Revisa tu Monitor de Cocina.`,
+             icon: '/favicon.ico',
+           })
+           notif.onclick = () => {
+             window.focus();
+             setActiveTab('pedidos');
+             notif.close();
+           }
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [restaurante, tocarTimbre])
 
   useEffect(() => {
     if (!restaurante) return
@@ -194,6 +283,22 @@ export function PortalPage() {
 
   return (
     <div className="flex flex-col lg:flex-row h-[100dvh] bg-white text-slate-900 font-sans selection:bg-orange-100 overflow-hidden w-full max-w-[100vw]">
+
+      {/* ── Banner: Audio no desbloqueado ── */}
+      <AnimatePresence>
+        {!audioDesbloqueado && (
+          <motion.button
+            initial={{ y: -60, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -60, opacity: 0 }}
+            onClick={desbloquearAudio}
+            className="fixed top-0 left-0 right-0 z-[999] flex items-center justify-center gap-2 bg-amber-500 text-white text-sm font-bold py-2.5 px-4 shadow-lg cursor-pointer hover:bg-amber-600 transition-colors"
+          >
+            <BellRing size={16} className="animate-bounce" />
+            Toca aquí para activar las alertas de sonido de nuevos pedidos
+          </motion.button>
+        )}
+      </AnimatePresence>
       
       {/* ── Sidebar (Desktop) ── */}
       <aside className="hidden lg:flex flex-col w-[260px] xl:w-[280px] bg-gradient-to-b from-[#FFA08A] to-[#FF6B5B] p-5 xl:p-6 gap-2 z-10 text-white relative shadow-[4px_0_24px_rgba(255,107,91,0.2)] overflow-y-auto custom-scrollbar h-full">
