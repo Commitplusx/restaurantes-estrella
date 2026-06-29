@@ -798,6 +798,8 @@ export function PublicMenuView() {
       
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr
 
+    const pinSeguridad = total > 500 ? Math.floor(1000 + Math.random() * 9000).toString() : null
+
     try {
       const { error: insertError } = await supabase.from('pedidos').insert([{
         cliente_tel: telLimpio,
@@ -813,7 +815,8 @@ export function PublicMenuView() {
         wb_message_id: ticketId,
         metodo_pago: metodoPago,
         total: total,
-        tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda'
+        tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
+        pin_seguridad: pinSeguridad
       }]).select('id').single()
 
       if (insertError) throw insertError

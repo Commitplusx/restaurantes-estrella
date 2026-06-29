@@ -167,7 +167,7 @@ export function SuccessPage() {
             { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
             (payload) => {
               const newData = payload.new;
-              setPedido(newData);
+              setPedido((prev: any) => prev ? { ...prev, ...newData } : newData);
 
               // Si acaba de asignarse un repartidor, hacer fetch de sus datos
               if (newData.repartidor_id && !repartidorFetchedRef.current) {
@@ -212,9 +212,10 @@ export function SuccessPage() {
    *  Misma lógica que generarNumeroOrden() en utils.ts y PedidosView.
    *  Fuente de verdad: últimos 5 caracteres del UUID sin guiones.
    */
-  const getShortTicket = (id: string) => {
-    if (!id) return 'EST-00000';
-    return 'EST-' + id.replace(/-/g, '').slice(-5).toUpperCase();
+  const getShortTicket = (pedidoRef: Pedido | null) => {
+    if (!pedidoRef) return 'EST-00000';
+    if (pedidoRef.wb_message_id) return '#' + pedidoRef.wb_message_id;
+    return 'EST-' + pedidoRef.id.replace(/-/g, '').slice(-5).toUpperCase();
   };
 
   const fireConfetti = () => {
@@ -398,7 +399,13 @@ export function SuccessPage() {
                               </span>
                               <span className="text-slate-500 text-[11px] flex items-center gap-1 mt-0.5">
                                 <MapPin className="w-3 h-3" />
-                                Va en camino al restaurante a recoger tu orden
+                                {pedido?.estado === 'en_camino' 
+                                  ? 'Va en camino hacia tu domicilio' 
+                                  : pedido?.estado === 'entregado'
+                                  ? 'Entregó tu pedido exitosamente'
+                                  : pedido?.estado === 'recibido'
+                                  ? 'Está en el restaurante recolectando tu orden'
+                                  : 'Va en camino al restaurante a recoger tu orden'}
                               </span>
                             </div>
                           </motion.div>
@@ -468,6 +475,13 @@ export function SuccessPage() {
                   )}
                 </div>
 
+                {pedido?.pin_seguridad && (
+                  <div className="flex flex-col items-center justify-center my-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <span className="text-red-400 text-[10px] font-bold uppercase tracking-wider mb-1">PIN de Seguridad (Proporcionar al Repartidor)</span>
+                    <span className="text-red-600 font-black text-2xl tracking-[0.2em]">{pedido.pin_seguridad}</span>
+                  </div>
+                )}
+
                 <div className="h-px bg-slate-100 my-1 w-full" />
 
                 {/* Total */}
@@ -475,7 +489,7 @@ export function SuccessPage() {
                   <div className="mt-5 w-full border-t-2 border-dashed border-slate-200/70 pt-5 flex items-center justify-between">
                     <div>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ticket de Orden</p>
-                      <p className="text-xl font-black text-slate-800 tracking-tight">{getShortTicket(pedido.id)}</p>
+                      <p className="text-xl font-black text-slate-800 tracking-tight">{getShortTicket(pedido)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total</p>

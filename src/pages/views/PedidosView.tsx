@@ -84,7 +84,14 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       setPedidos((prev) =>
         prev.map((p) => (p.id === id ? { ...p, estado_cocina: nuevoEstado } : p))
       )
-      const { error } = await supabase.from('pedidos').update({ estado_cocina: nuevoEstado }).eq('id', id)
+      let estadoDriver = 'asignado';
+      if (nuevoEstado === 'preparando') estadoDriver = 'en_cocina';
+      if (nuevoEstado === 'listo') estadoDriver = 'listo_para_recoger';
+      
+      const { error } = await supabase.from('pedidos').update({ 
+        estado_cocina: nuevoEstado,
+        estado: estadoDriver
+      }).eq('id', id)
       if (error) throw error
       
       // Si cambia de estado en cocina, notificar
@@ -237,7 +244,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: an
     >
       <div className="flex justify-between items-start mb-3">
         <div>
-          <span className="text-xs font-bold text-slate-400 tracking-wider">EST-{pedido?.id?.replace(/-/g, '').slice(-5).toUpperCase() || 'N/A'}</span>
+          <span className="text-xs font-bold text-slate-400 tracking-wider">#{pedido?.wb_message_id || pedido?.id?.replace(/-/g, '').slice(-5).toUpperCase() || 'N/A'}</span>
           <h5 className="font-bold text-slate-800 mt-1">{pedido.cliente_nombre || 'Cliente Web'}</h5>
         </div>
         <span className="text-sm font-bold text-[#FF7A6A]">${pedido.total}</span>
