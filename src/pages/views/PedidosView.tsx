@@ -87,14 +87,14 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       const { error } = await supabase.from('pedidos').update({ estado_cocina: nuevoEstado }).eq('id', id)
       if (error) throw error
       
-      // Si cambia a listo, notificar al repartidor
-      if (nuevoEstado === 'listo_para_recoger') {
+      // Si cambia de estado en cocina, notificar
+      if (nuevoEstado === 'en_cocina' || nuevoEstado === 'listo_para_recoger') {
+        const tipo = nuevoEstado === 'en_cocina' ? 'preparando' : 'comida_lista'
         const { error: invokeErr } = await supabase.functions.invoke('notificar-whatsapp', {
-          body: { tipo: 'comida_lista', pedido_id: id, restaurante: restaurante.nombre }
+          body: { tipo, pedido_id: id, restaurante: restaurante.nombre }
         })
         if (invokeErr) {
-          console.error('Error al notificar repartidor:', invokeErr)
-          alert('El pedido cambió a listo, pero hubo un error al notificar al repartidor.')
+          console.error(`Error al invocar webhook de WA para ${tipo}:`, invokeErr)
         }
       }
     } catch (e) {

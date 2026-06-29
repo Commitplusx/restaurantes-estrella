@@ -33,7 +33,7 @@ export function SuccessPage() {
     const { data } = await supabase
       .from('repartidores')
       .select('nombre, alias')
-      .eq('user_id', repartidorId)  // repartidor_id en pedidos = auth.uid() = repartidores.user_id
+      .or(`user_id.eq.${repartidorId},id.eq.${repartidorId}`) // Busca tanto por UID como por PK directo
       .maybeSingle();
     if (data) {
       setRepartidorInfo(data);
@@ -114,6 +114,11 @@ export function SuccessPage() {
         }
 
         setPedido(pedidoData);
+        
+        // BUG FIX: Si ya tiene repartidor al cargar la página, traer sus datos
+        if (pedidoData.repartidor_id && !repartidorFetchedRef.current) {
+          fetchRepartidor(pedidoData.repartidor_id);
+        }
 
         if (RESOLVED_STATES.includes(pedidoData.estado)) {
           // Ya estaba confirmado, configuramos el canal de progreso continuo
