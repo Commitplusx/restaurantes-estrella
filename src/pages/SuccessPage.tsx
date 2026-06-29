@@ -212,7 +212,7 @@ export function SuccessPage() {
    *  Misma lógica que generarNumeroOrden() en utils.ts y PedidosView.
    *  Fuente de verdad: últimos 5 caracteres del UUID sin guiones.
    */
-  const getShortTicket = (pedidoRef: Pedido | null) => {
+  const getShortTicket = (pedidoRef: any | null) => {
     if (!pedidoRef) return 'EST-00000';
     if (pedidoRef.wb_message_id) return '#' + pedidoRef.wb_message_id;
     return 'EST-' + pedidoRef.id.replace(/-/g, '').slice(-5).toUpperCase();
