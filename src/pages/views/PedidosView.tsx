@@ -84,13 +84,10 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       setPedidos((prev) =>
         prev.map((p) => (p.id === id ? { ...p, estado_cocina: nuevoEstado } : p))
       )
-      let estadoDriver = 'asignado';
-      if (nuevoEstado === 'preparando') estadoDriver = 'en_cocina';
-      if (nuevoEstado === 'listo') estadoDriver = 'listo_para_recoger';
-      
+      // Solo actualiza estado_cocina. El campo 'estado' (logística del repartidor)
+      // lo maneja únicamente la APK de Flutter para no interferir con el flujo del repartidor.
       const { error } = await supabase.from('pedidos').update({ 
-        estado_cocina: nuevoEstado,
-        estado: estadoDriver
+        estado_cocina: nuevoEstado
       }).eq('id', id)
       if (error) throw error
       
