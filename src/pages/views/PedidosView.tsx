@@ -53,6 +53,31 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
     setLoading(false)
   }
 
+  // Alarma continua y título dinámico para pedidos sin aceptar
+  useEffect(() => {
+    const pendientes = pedidos.filter(p => p.estado_cocina === 'pendiente' || p.estado_cocina == null)
+    
+    if (pendientes.length > 0) {
+      document.title = `(${pendientes.length}) ¡NUEVO PEDIDO! 🔔`
+      // Hacemos sonar la campana cada 4 segundos
+      const interval = setInterval(() => {
+        if (notifPermission === 'granted') {
+          playBellSound()
+        }
+      }, 4000)
+      
+      // Reproducir también inmediatamente al detectar
+      if (notifPermission === 'granted') playBellSound()
+
+      return () => {
+        clearInterval(interval)
+        document.title = 'Estrella Restaurantes'
+      }
+    } else {
+      document.title = 'Estrella Restaurantes'
+    }
+  }, [pedidos, notifPermission])
+
   const playBellSound = () => {
     try {
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
