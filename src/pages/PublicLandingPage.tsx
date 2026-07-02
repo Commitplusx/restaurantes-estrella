@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
 import { Store, Search, MapPin, Clock, Ticket, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Restaurante {
   id: string
@@ -34,7 +34,7 @@ export function PublicLandingPage() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
-  const PAGE_SIZE = 12 // Cargamos de 12 en 12
+  const PAGE_SIZE = 8 // Cargamos de 8 en 8
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20)
@@ -276,14 +276,27 @@ export function PublicLandingPage() {
     <div className="min-h-screen bg-[#F6F6F9] text-slate-900 selection:bg-orange-100 font-sans pb-20">
 
       {/* Navbar Minimalista */}
-      <header className={`fixed top-0 left-0 right-0 z-50 h-16 md:h-20 flex justify-between items-center transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-100' : 'bg-transparent border-b border-transparent'}`}>
-        <div className={`relative flex items-center h-full px-6 md:px-12 transition-transform duration-300 ${isScrolled ? 'scale-[0.8] origin-top-left' : 'scale-100 origin-top-left'}`}>
-          <img 
-            src="/logo.png" 
-            alt="Mascota Estrella Eats" 
-            className="h-20 md:h-24 w-auto object-contain drop-shadow-md scale-[1.8] md:scale-[2] origin-top-left translate-y-2 md:translate-y-4"
-          />
-        </div>
+      <header className={`fixed top-0 left-0 right-0 z-50 h-16 md:h-20 flex justify-between items-center px-6 md:px-12 transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-100' : 'bg-transparent border-b border-transparent'}`}>
+        <AnimatePresence>
+          {isScrolled && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              exit={{ opacity: 0, x: -10 }}
+              className="flex items-center gap-3"
+            >
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 border border-slate-100 p-1.5 shadow-sm">
+                <img src="/logo.png" alt="Estrella Eats" className="w-full h-full object-contain" />
+              </div>
+              <div>
+                <h2 className="font-black text-slate-900 text-[15px] md:text-[17px] leading-tight tracking-tight">Estrella Eats</h2>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[10px] md:text-[11px] font-bold text-slate-500">Comida a domicilio</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       <main className="px-6 md:px-12 max-w-[1400px] mx-auto mt-6 pt-28 md:pt-36">
@@ -295,6 +308,7 @@ export function PublicLandingPage() {
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="mb-10 max-w-2xl"
         >
+          <img src="/logo.png" className="w-24 h-24 md:w-32 md:h-32 object-contain mb-6 drop-shadow-lg transform -rotate-2 hover:rotate-0 transition-transform" alt="Estrella Eats" />
           <h1 className="text-3xl md:text-5xl font-extrabold text-slate-900 mb-6 leading-tight tracking-tight">
             La mejor comida, <br/>
             <span className="text-orange-500">hasta tu puerta.</span>
@@ -489,7 +503,7 @@ export function PublicLandingPage() {
                 <Store className="w-3.5 h-3.5 text-white" />
               </div>
               <span className="text-lg font-black text-slate-800 tracking-tighter">
-                Estrella<span className="text-orange-500">Delivery</span>
+                Estrella<span className="text-orange-500">Eats</span>
               </span>
             </div>
             <p className="text-slate-400 text-sm font-medium">La mejor selección gastronómica de Comitán.</p>
@@ -508,7 +522,7 @@ export function PublicLandingPage() {
           </div>
         </div>
         <div className="max-w-[1400px] mx-auto mt-12 pt-8 border-t border-slate-50 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-          © {new Date().getFullYear()} Estrella Delivery · Comitán de Domínguez, Chiapas
+          © {new Date().getFullYear()} Estrella Eats · Comitán de Domínguez, Chiapas
         </div>
       </footer>
     </div>

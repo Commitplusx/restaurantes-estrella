@@ -14,6 +14,14 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Cambio dinámico del título de la pestaña según el dominio
+    const isPartner = window.location.hostname.includes('restaurantes-app') || window.location.hostname.includes('socio');
+    if (isPartner) {
+      document.title = 'Portal Aliados | Estrella Eats';
+    } else {
+      document.title = 'Estrella Eats | Comida a Domicilio';
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setLoading(false)

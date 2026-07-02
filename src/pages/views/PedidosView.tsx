@@ -97,7 +97,12 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       setNotifPermission(perm)
       if (perm === 'granted') {
         playBellSound()
+        alert('✅ Notificaciones activadas correctamente. ¡Ya escucharás el timbre cuando lleguen pedidos!')
+      } else if (perm === 'denied') {
+        alert('⚠️ Tu navegador bloqueó las notificaciones.\n\nPara activarlas, haz clic en el ícono de candado (o configuración) junto a la dirección web en la parte de arriba, busca "Notificaciones", cámbialo a "Permitir" y recarga la página.')
       }
+    } else {
+      alert('Tu navegador no soporta notificaciones.')
     }
   }
 

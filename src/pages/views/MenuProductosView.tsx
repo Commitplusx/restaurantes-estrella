@@ -467,11 +467,16 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
             <label htmlFor="pop" className="m-0 cursor-pointer text-sm font-bold text-orange-900">Destacar como "Más Popular"</label>
           </div>
 
-          <div className="flex items-start gap-3 mt-4 bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
-            <input type="checkbox" id="subsidio" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-500 rounded cursor-pointer mt-1" />
-            <label htmlFor="subsidio" className="m-0 cursor-pointer text-sm font-bold text-blue-900 flex flex-col">
-              <span>Aplica para subsidio de envío</span>
-              <span className="text-[11px] font-medium text-blue-700/80 mt-0.5">Si está activado, este producto sumará al descuento del envío del cliente. Asegúrate de haberle subido $8 al precio base.</span>
+          <div className="flex items-start gap-3 mt-4 bg-blue-50/50 border border-blue-200 p-5 rounded-2xl shadow-sm">
+            <input type="checkbox" id="subsidio" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-600 rounded cursor-pointer mt-0.5" />
+            <label htmlFor="subsidio" className="m-0 cursor-pointer flex flex-col">
+              <span className="text-[15px] font-black text-blue-900">Aplicar Subsidio de Envío ($8.00)</span>
+              <span className="text-[13px] font-medium text-blue-800/90 mt-1.5 leading-relaxed">
+                Si esta casilla <strong className="text-blue-900">está marcada</strong>, el sistema le descontará automáticamente $8.00 al costo de envío del cliente por cada unidad de este producto que agregue al carrito.
+              </span>
+              <div className="mt-3 bg-white/60 p-3 rounded-lg border border-blue-100 text-[12px] text-blue-900">
+                ⚠️ <b>IMPORTANTE:</b> Al marcar esto, tú como restaurante debes sumarle manualmente <b>$8.00</b> al Precio de Venta que ingresaste arriba para recuperar ese dinero. Si lo desmarcas, el cliente pagará su envío completo y tu precio se queda intacto.
+              </div>
             </label>
           </div>
 

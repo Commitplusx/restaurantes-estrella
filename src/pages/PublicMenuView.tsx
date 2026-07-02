@@ -53,19 +53,22 @@ const menuCache: Record<string, {
 }> = {}
 
 // COMPONENTE DE IMAGEN CON SKELETON LOADER
-const LazyImage = ({ src, alt, className, imgClassName }: { src?: string | null, alt?: string, className?: string, imgClassName?: string }) => {
+const LazyImage = ({ src, alt, className, imgClassName, blurBackground }: { src?: string | null, alt?: string, className?: string, imgClassName?: string, blurBackground?: boolean }) => {
   const [loaded, setLoaded] = useState(false);
   if (!src) return <div className={`bg-slate-100 flex items-center justify-center ${className || ''}`}><Store size={24} className="text-slate-300"/></div>;
   return (
-    <div className={`relative overflow-hidden bg-slate-100 ${className || ''}`}>
-      {!loaded && <div className="absolute inset-0 bg-slate-200 animate-pulse" />}
+    <div className={`relative overflow-hidden ${blurBackground ? 'bg-slate-900' : 'bg-slate-100'} ${className || ''}`}>
+      {!loaded && <div className="absolute inset-0 bg-slate-200 animate-pulse z-10" />}
+      {blurBackground && src && (
+        <img src={src} className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-125" alt="" />
+      )}
       <img
         src={src}
         alt={alt || ''}
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full transition-opacity duration-500 ${!imgClassName?.includes('object-') ? 'object-cover' : ''} ${loaded ? 'opacity-100' : 'opacity-0'} ${imgClassName || ''}`}
+        className={`relative z-20 w-full h-full transition-opacity duration-500 ${!imgClassName?.includes('object-') ? 'object-cover' : ''} ${loaded ? 'opacity-100' : 'opacity-0'} ${imgClassName || ''}`}
       />
     </div>
   )
@@ -216,7 +219,8 @@ export function PublicMenuView() {
   }, []);
 
   // Estado del modal de opciones de producto
-  const [selectedItemForOptions, setSelectedItemForOptions] = useState<MenuItem | null>(null)
+  type OptionableItem = (MenuItem | MenuCombo) & { __tipo: 'item' | 'combo' }
+  const [selectedItemForOptions, setSelectedItemForOptions] = useState<OptionableItem | null>(null)
   const [selectedOptionsState, setSelectedOptionsState] = useState<Record<string, Record<string, boolean>>>({})
 
   const showToast = (title: string, message?: string, type: 'success' | 'error' | 'loading' = 'success') => {
@@ -376,6 +380,33 @@ export function PublicMenuView() {
         setCombos(cmbs || [])
         setPromos(validPromos)
         
+        // Sincronizar el carrito si hay items que se actualizaron en tiempo real
+        setCarrito(prevCart => {
+          if (!prevCart || prevCart.length === 0) return prevCart;
+          let hasChanges = false;
+          const newCart = prevCart.map(cObj => {
+            let latestItem;
+            if (cObj.item.tipo === 'item') latestItem = (prods || []).find((p: any) => p.id === cObj.item.id);
+            else if (cObj.item.tipo === 'combo') latestItem = (cmbs || []).find((c: any) => c.id === cObj.item.id);
+            else if (cObj.item.tipo === 'promocion') latestItem = validPromos.find(p => p.id === cObj.item.id);
+
+            // Si el item ya no está disponible o se eliminó, lo quitamos del carrito
+            if (!latestItem) {
+              hasChanges = true;
+              return null;
+            }
+
+            // Actualizamos la bandera del subsidio si cambió en tiempo real
+            if (cObj.item.aplica_subsidio !== latestItem.aplica_subsidio) {
+              hasChanges = true;
+              return { ...cObj, item: { ...cObj.item, aplica_subsidio: latestItem.aplica_subsidio } };
+            }
+            return cObj;
+          }).filter(Boolean) as typeof prevCart;
+          
+          return hasChanges ? newCart : prevCart;
+        });
+        
         if (!silently) {
           setLoading(false)
           const hasItems = (prods || []).length > 0
@@ -396,6 +427,8 @@ export function PublicMenuView() {
     }
 
     async function load() {
+      let actualRestId = id;
+
       // 1. Revisar caché local para carga instantánea en 0ms
       if (id && menuCache[id]) {
         const cached = menuCache[id]
@@ -405,22 +438,15 @@ export function PublicMenuView() {
         setCombos(cached.combos)
         setPromos(cached.promos)
         setLoading(false)
+        actualRestId = cached.restaurante.id;
         
         // Ejecutar fetch silencioso en background para actualizar caché si pasaron más de 1 min
         if (Date.now() - cached.timestamp > 60000) {
           fetchMenuData(true)
         }
       } else {
-        await fetchMenuData()
-      }
-
-      // 2. Configurar Supabase Realtime para este restaurante
-      // Solo nos suscribimos si ya tenemos el ID real del restaurante
-      let actualRestId = id
-      if (id && menuCache[id]) {
-        actualRestId = menuCache[id].restaurante.id
-      } else if (restaurante) {
-        actualRestId = restaurante.id
+        const fetchedId = await fetchMenuData()
+        if (fetchedId) actualRestId = fetchedId
       }
 
       // Creamos el canal de realtime
@@ -1156,7 +1182,14 @@ export function PublicMenuView() {
                             <div
                               key={item.id}
                               className={`bg-white p-4 rounded-[16px] border border-slate-100 flex gap-4 items-stretch cursor-pointer hover:border-slate-200 transition-colors ${fueraDeHorario ? 'opacity-50' : ''}`}
-                              onClick={() => setSelectedItemDetail({ ...item, cartItemTipo: 'item' })}
+                              onClick={() => {
+                                if (item.opciones && item.opciones.length > 0) {
+                                  setSelectedItemForOptions({ ...item, __tipo: 'item' });
+                                  setSelectedOptionsState({});
+                                } else {
+                                  setSelectedItemDetail({ ...item, cartItemTipo: 'item' });
+                                }
+                              }}
                             >
                               <div className="flex-1 min-w-0 flex flex-col">
                                 <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{item.nombre}</h4>
@@ -1178,7 +1211,7 @@ export function PublicMenuView() {
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       if (item.opciones && item.opciones.length > 0) {
-                                        setSelectedItemForOptions(item)
+                                        setSelectedItemForOptions({ ...item, __tipo: 'item' })
                                         setSelectedOptionsState({})
                                       } else {
                                         addToCart({ ...cartItem, cartItemId: item.id })
@@ -1220,11 +1253,26 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <div className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id })}>
-                          <LazyImage src={combo.foto_url} alt={combo.nombre} className="w-full h-[180px] rounded-[16px] mb-4" imgClassName="group-hover:scale-105 transition-transform duration-500" />
+                      <div className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => {
+                        if (combo.opciones && combo.opciones.length > 0) {
+                          setSelectedItemForOptions({ ...combo, __tipo: 'combo' })
+                          setSelectedOptionsState({})
+                        } else {
+                          addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id })
+                        }
+                      }}>
+                          <LazyImage blurBackground={true} src={combo.foto_url} alt={combo.nombre} className="w-full h-[250px] rounded-[16px] mb-4" imgClassName="object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-500" />
                           
                           <div className="flex-1 flex flex-col">
-                            <div className="cursor-pointer" onClick={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' })}>
+                            <div className="cursor-pointer" onClick={(e) => {
+                              e.stopPropagation();
+                              if (combo.opciones && combo.opciones.length > 0) {
+                                setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
+                                setSelectedOptionsState({});
+                              } else {
+                                setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' });
+                              }
+                            }}>
                               <h4 className="font-bold text-slate-900 text-xl mb-1">{combo.nombre}</h4>
                               <p className="text-slate-400 text-sm mb-3">{combo.descripcion}</p>
                             </div>
@@ -1255,11 +1303,18 @@ export function PublicMenuView() {
                     >
                       <div
                         className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full"
-                        onClick={() => setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' })}
+                        onClick={() => {
+                          if (promo.opciones && promo.opciones.length > 0) {
+                            setSelectedItemForOptions({ ...promo, __tipo: 'promo' });
+                            setSelectedOptionsState({});
+                          } else {
+                            setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' });
+                          }
+                        }}
                       >
                           <div className="relative">
                             <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[10px] font-black px-4 py-1 rounded-bl-[20px] z-10 shadow-lg">PROMO</div>
-                            <LazyImage src={promo.foto_url} alt={promo.titulo} className="w-full h-[220px] rounded-[18px] mb-4" imgClassName="group-hover:scale-105 transition-transform duration-700 ease-out" />
+                            <LazyImage blurBackground={true} src={promo.foto_url} alt={promo.titulo} className="w-full h-[250px] rounded-[18px] mb-4" imgClassName="object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-700 ease-out" />
                           </div>
 
                           <div className="flex-1 flex flex-col px-1">
@@ -1345,11 +1400,12 @@ export function PublicMenuView() {
                           precio: selectedItemDetail.precio || selectedItemDetail.precio_especial || 0,
                           tipo: selectedItemDetail.cartItemTipo,
                           foto_url: selectedItemDetail.foto_url || undefined,
-                          cartItemId: selectedItemDetail.id
+                          cartItemId: selectedItemDetail.id,
+                          aplica_subsidio: selectedItemDetail.aplica_subsidio
                         }
                         
                         if (selectedItemDetail.opciones && selectedItemDetail.opciones.length > 0) {
-                          setSelectedItemForOptions(selectedItemDetail)
+                          setSelectedItemForOptions({ ...selectedItemDetail, __tipo: 'item' })
                           setSelectedOptionsState({})
                         } else {
                           addToCart(cartItem)
@@ -1377,7 +1433,7 @@ export function PublicMenuView() {
                 <Store className="w-3.5 h-3.5 text-white" />
               </div>
               <span className="text-lg font-black text-slate-800 tracking-tighter">
-                Estrella<span className="text-orange-500">Delivery</span>
+                Estrella<span className="text-orange-500">Eats</span>
               </span>
             </div>
             <p className="text-slate-400 text-sm font-medium">La mejor selección gastronómica de Comitán.</p>
@@ -1499,7 +1555,7 @@ export function PublicMenuView() {
                         <div key={i} className="flex gap-3 py-3.5 bg-white group">
                           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[12px] overflow-hidden bg-slate-50 shrink-0 border border-slate-100 relative">
                             {p.item.foto_url ? (
-                              <img src={p.item.foto_url} alt={p.item.nombre} className="w-full h-full object-cover" loading="lazy" />
+                              <LazyImage src={p.item.foto_url} alt={p.item.nombre} className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-slate-300"><Store size={20} /></div>
                             )}
@@ -1854,34 +1910,35 @@ export function PublicMenuView() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="relative w-full sm:max-w-lg bg-white sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="w-full h-[200px] bg-slate-50 relative shrink-0">
-                  <LazyImage src={selectedItemForOptions.foto_url} alt={selectedItemForOptions.nombre} className="w-full h-full" imgClassName="object-contain" />
-                  <button onClick={() => setSelectedItemForOptions(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-600 shadow-sm z-10">
-                    <X size={20} />
+              <div className="w-full h-[220px] bg-slate-900 relative shrink-0">
+                  <LazyImage blurBackground={true} src={selectedItemForOptions.foto_url} alt={selectedItemForOptions.nombre} className="w-full h-full" imgClassName="object-contain drop-shadow-2xl scale-95" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent z-30 pointer-events-none" />
+                  <button onClick={() => setSelectedItemForOptions(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-slate-800 shadow-lg z-50 hover:scale-105 transition-transform">
+                    <X size={20} className="stroke-[3px]" />
                   </button>
                 </div>
-              <div className="p-6 shrink-0 border-b border-slate-100">
-                <h3 className="text-2xl font-black text-slate-900">{selectedItemForOptions.nombre}</h3>
-                <p className="text-slate-500 text-sm mt-1">{selectedItemForOptions.descripcion}</p>
+              <div className="p-6 shrink-0 bg-white relative z-40 -mt-6 rounded-t-[2.5rem]">
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight">{selectedItemForOptions.nombre}</h3>
+                <p className="text-slate-500 text-[15px] mt-1.5 leading-snug">{selectedItemForOptions.descripcion}</p>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-8">
                 {(selectedItemForOptions.opciones || []).map((grupo, gIdx) => {
                   const seleccionados = selectedOptionsState[grupo.titulo] || {};
                   const countSelected = Object.values(seleccionados).filter(Boolean).length;
                   
                   return (
-                    <div key={gIdx}>
-                      <div className="flex justify-between items-baseline mb-3">
-                        <h4 className="font-bold text-slate-800 text-lg">{grupo.titulo}</h4>
+                    <div key={gIdx} className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-slate-900 text-lg">{grupo.titulo}</h4>
                         {grupo.requerido && countSelected === 0 ? (
-                          <span className="text-[10px] font-black uppercase tracking-widest bg-red-50 text-red-500 px-2 py-1 rounded-md">Requerido</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest bg-red-100 text-red-600 px-3 py-1.5 rounded-full">Requerido</span>
                         ) : grupo.maximo_selecciones > 1 ? (
-                          <span className="text-[11px] text-slate-400 font-bold">Máx {grupo.maximo_selecciones}</span>
+                          <span className="text-[12px] bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">Elige hasta {grupo.maximo_selecciones}</span>
                         ) : null}
                       </div>
                       
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {grupo.opciones.map((opc, oIdx) => {
                           const isSelected = !!seleccionados[opc.nombre];
                           
@@ -1905,19 +1962,25 @@ export function PublicMenuView() {
                           };
 
                           return (
-                            <label key={oIdx} className={`flex items-center justify-between p-3 rounded-[20px] border cursor-pointer transition-all ${isSelected ? 'border-[#FA4A0C] bg-[#FA4A0C]/10' : 'border-slate-200 hover:border-slate-300'}`}>
-                              <div className="flex items-center gap-3">
-                                <div className="relative flex items-center justify-center">
-                                  <input 
-                                    type={grupo.maximo_selecciones === 1 ? 'radio' : 'checkbox'} 
-                                    checked={isSelected}
-                                    onChange={toggleOpcion}
-                                    className="w-5 h-5 accent-[#FA4A0C] cursor-pointer"
-                                  />
-                                </div>
-                                <span className={`text-sm font-bold ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>{opc.nombre}</span>
+                            <label key={oIdx} className="flex items-center justify-between py-4 border-b border-slate-100 last:border-0 cursor-pointer group">
+                              <div className="flex flex-col pr-4">
+                                <span className={`text-[16px] transition-colors ${isSelected ? 'text-slate-900 font-bold' : 'text-slate-700 font-medium group-hover:text-slate-900'}`}>
+                                  {opc.nombre}
+                                </span>
+                                {opc.precio_extra > 0 && (
+                                  <span className="text-[14px] text-slate-500 mt-0.5">
+                                    +${opc.precio_extra.toFixed(2)}
+                                  </span>
+                                )}
                               </div>
-                              {opc.precio_extra > 0 && <span className="text-sm font-bold text-slate-500">+${(opc.precio_extra).toFixed(2)}</span>}
+                              <div className="relative flex items-center justify-center shrink-0">
+                                <input 
+                                  type={grupo.maximo_selecciones === 1 ? 'radio' : 'checkbox'} 
+                                  checked={isSelected}
+                                  onChange={toggleOpcion}
+                                  className="w-[22px] h-[22px] accent-[#FA4A0C] cursor-pointer"
+                                />
+                              </div>
                             </label>
                           )
                         })}
@@ -1963,8 +2026,9 @@ export function PublicMenuView() {
                       cartItemId: hashId,
                       nombre: selectedItemForOptions.nombre,
                       precio: selectedItemForOptions.precio + precioExtra,
-                      tipo: 'item',
-                      opcionesSeleccionadas: opcionesSel
+                      tipo: selectedItemForOptions.__tipo,
+                      opcionesSeleccionadas: opcionesSel,
+                      aplica_subsidio: selectedItemForOptions.aplica_subsidio
                     };
                     
                     addToCart({ ...itemToAdd, foto_url: selectedItemForOptions.foto_url || undefined });

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Image as ImageIcon, Loader2, Package } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, Loader2, Package, X } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
 import { supabase, subirFoto } from '../../lib/supabase'
@@ -62,7 +62,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
       setEditingItem(item)
       setIncluyeInput(item.incluye?.join(', ') || '')
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, incluye: [], aplica_subsidio: true })
+      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, incluye: [], aplica_subsidio: true, opciones: [] })
       setIncluyeInput('')
     }
     setIsModalOpen(true)
@@ -72,6 +72,29 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
     e.preventDefault()
     setSaving(true)
     
+    // Validar grupos de opciones
+    const opciones = editingItem.opciones || []
+    for (let g = 0; g < opciones.length; g++) {
+      const grupo = opciones[g]
+      if (!grupo.titulo?.trim()) {
+        setErrorModal(`El Grupo de Opciones #${g + 1} no tiene nombre. Ponle un nombre o elimínalo.`)
+        setSaving(false)
+        return
+      }
+      if (grupo.opciones.length === 0) {
+        setErrorModal(`El grupo "${grupo.titulo}" no tiene ninguna opción. Agrega al menos una o elimina el grupo.`)
+        setSaving(false)
+        return
+      }
+      for (let o = 0; o < grupo.opciones.length; o++) {
+        if (!grupo.opciones[o].nombre?.trim()) {
+          setErrorModal(`Una opción del grupo "${grupo.titulo}" no tiene nombre. Rellénala o elimínala.`)
+          setSaving(false)
+          return
+        }
+      }
+    }
+
     const arrayIncluye = incluyeInput.split(',').map(s => s.trim()).filter(Boolean)
     const payload = { ...editingItem, restaurante_id: restaurante.id, incluye: arrayIncluye }
     
@@ -246,13 +269,132 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
             </div>
           </div>
 
-          <div className="flex items-start gap-3 mt-4 bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
-              <input type="checkbox" id="subsidioCombo" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-500 rounded cursor-pointer mt-1" />
-              <label htmlFor="subsidioCombo" className="m-0 cursor-pointer text-sm font-bold text-blue-900 flex flex-col">
-                <span>Aplica para subsidio de envío</span>
-                <span className="text-[11px] font-medium text-blue-700/80 mt-0.5">Si está activado, este combo sumará al descuento del envío del cliente. Asegúrate de haberle subido $8 al precio base.</span>
-              </label>
+          <div className="flex items-start gap-3 mt-4 bg-blue-50/50 border border-blue-200 p-5 rounded-2xl shadow-sm">
+            <input type="checkbox" id="subsidioCombo" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-600 rounded cursor-pointer mt-0.5" />
+            <label htmlFor="subsidioCombo" className="m-0 cursor-pointer flex flex-col">
+              <span className="text-[15px] font-black text-blue-900">Aplicar Subsidio de Envío ($8.00)</span>
+              <span className="text-[13px] font-medium text-blue-800/90 mt-1.5 leading-relaxed">
+                Si esta casilla <strong className="text-blue-900">está marcada</strong>, el sistema le descontará automáticamente $8.00 al costo de envío del cliente por cada vez que agregue este combo al carrito.
+              </span>
+              <div className="mt-3 bg-white/60 p-3 rounded-lg border border-blue-100 text-[12px] text-blue-900">
+                ⚠️ <b>IMPORTANTE:</b> Al marcar esto, tú como restaurante debes sumarle manualmente <b>$8.00</b> al Precio de Venta que ingresaste arriba para recuperar ese dinero. Si lo desmarcas, el cliente pagará su envío completo y tu precio se queda intacto.
+              </div>
+            </label>
+          </div>
+
+          {/* Opciones y Modificadores */}
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-black text-slate-800">Opciones y Extras</h3>
+              <button type="button" onClick={() => setEditingItem({
+                ...editingItem,
+                opciones: [...(editingItem.opciones || []), { titulo: '', requerido: false, maximo_selecciones: 1, opciones: [] }]
+              })} className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-1">
+                <Plus size={14} /> Añadir Grupo
+              </button>
             </div>
+            
+            <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3 mb-4 flex gap-2 items-start">
+              <div className="text-orange-400 mt-0.5">💡</div>
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                Usa <strong className="text-orange-600">Variantes</strong> si el cliente debe elegir forzosamente una opción (Ej. Refresco Cola, Refresco Manzana). Usa <strong className="text-emerald-600">Extras</strong> si quieres cobrar por ingredientes adicionales (Ej. Extra Queso +$15).
+              </p>
+            </div>
+            
+            <div className="space-y-4">
+              {(editingItem.opciones || []).map((grupo, gIndex) => (
+                <div key={gIndex} className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1 space-y-3">
+                      <input type="text" placeholder="Ej. Elige tu bebida" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold" value={grupo.titulo} onChange={e => {
+                        const newOpciones = [...(editingItem.opciones || [])];
+                        newOpciones[gIndex].titulo = e.target.value;
+                        setEditingItem({ ...editingItem, opciones: newOpciones });
+                      }} />
+                      <div className="flex flex-col sm:flex-row gap-2 bg-slate-200/50 p-1.5 rounded-xl w-full">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newOpciones = [...(editingItem.opciones || [])];
+                            newOpciones[gIndex].requerido = true;
+                            newOpciones[gIndex].maximo_selecciones = 1;
+                            setEditingItem({ ...editingItem, opciones: newOpciones });
+                          }}
+                          className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            grupo.requerido && grupo.maximo_selecciones === 1
+                              ? 'bg-white text-orange-600 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          ◉ Variantes (Debe elegir 1)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newOpciones = [...(editingItem.opciones || [])];
+                            newOpciones[gIndex].requerido = false;
+                            newOpciones[gIndex].maximo_selecciones = 10;
+                            setEditingItem({ ...editingItem, opciones: newOpciones });
+                          }}
+                          className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                            !grupo.requerido && grupo.maximo_selecciones > 1
+                              ? 'bg-white text-emerald-600 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          ☑ Extras (Opcional, varios)
+                        </button>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => {
+                      const newOpciones = [...(editingItem.opciones || [])];
+                      newOpciones.splice(gIndex, 1);
+                      setEditingItem({ ...editingItem, opciones: newOpciones });
+                    }} className="p-1.5 text-slate-400 hover:text-red-500 ml-2">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 pl-4 border-l-2 border-orange-200">
+                    {grupo.opciones.map((opc, oIndex) => (
+                      <div key={oIndex} className="flex gap-2 items-center">
+                        <input type="text" placeholder="Ej. Refresco Cola" className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm" value={opc.nombre} onChange={e => {
+                          const newOpciones = [...(editingItem.opciones || [])];
+                          newOpciones[gIndex].opciones[oIndex].nombre = e.target.value;
+                          setEditingItem({ ...editingItem, opciones: newOpciones });
+                        }} />
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400 text-sm">+$</span>
+                          <input type="number" min="0" placeholder="0" className="w-20 px-3 py-1.5 border border-slate-200 rounded-lg text-sm" value={opc.precio_extra} onChange={e => {
+                            const newOpciones = [...(editingItem.opciones || [])];
+                            newOpciones[gIndex].opciones[oIndex].precio_extra = parseFloat(e.target.value) || 0;
+                            setEditingItem({ ...editingItem, opciones: newOpciones });
+                          }} />
+                        </div>
+                        <button type="button" onClick={() => {
+                          const newOpciones = [...(editingItem.opciones || [])];
+                          newOpciones[gIndex].opciones.splice(oIndex, 1);
+                          setEditingItem({ ...editingItem, opciones: newOpciones });
+                        }} className="p-1.5 text-slate-400 hover:text-red-500">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => {
+                      const newOpciones = [...(editingItem.opciones || [])];
+                      newOpciones[gIndex].opciones.push({ nombre: '', precio_extra: 0 });
+                      setEditingItem({ ...editingItem, opciones: newOpciones });
+                    }} className="text-xs font-bold text-orange-500 hover:text-orange-600 mt-2 flex items-center gap-1">
+                      <Plus size={12} /> Añadir opción
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {(!editingItem.opciones || editingItem.opciones.length === 0) && (
+                <p className="text-sm text-slate-400 italic">No hay opciones configuradas para este combo.</p>
+              )}
+            </div>
+          </div>
 
           <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-emerald-500 shadow-xl shadow-slate-900/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
             {saving ? (

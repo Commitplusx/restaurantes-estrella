@@ -106,6 +106,7 @@ export interface MenuCombo {
   incluye: string[]
   disponible: boolean
   aplica_subsidio?: boolean
+  opciones?: OpcionGrupo[]
 }
 
 export interface MenuPromocion {
@@ -117,13 +118,14 @@ export interface MenuPromocion {
   foto_url: string | null
   fecha_fin: string | null
   activa: boolean
+  aplica_subsidio?: boolean
   dias_aplicacion?: string[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Helper para comprimir imágenes antes de subir */
-async function compressImage(file: File, maxWidth: number = 1200): Promise<File> {
+async function compressImage(file: File, maxWidth: number = 800): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
@@ -154,7 +156,7 @@ async function compressImage(file: File, maxWidth: number = 1200): Promise<File>
           lastModified: Date.now(),
         });
         resolve(compressedFile);
-      }, 'image/webp', 0.9); // 90% calidad, formato WebP
+      }, 'image/webp', 0.75); // 75% calidad, formato WebP
     };
     img.onerror = (error) => {
       URL.revokeObjectURL(img.src);
@@ -169,7 +171,10 @@ export async function subirFoto(file: File, path: string): Promise<string | null
     const compressedFile = await compressImage(file);
     const finalPath = path.replace(/\.[^/.]+$/, "") + ".webp"; // Aseguramos que termine en .webp
 
-    const { error } = await supabase.storage.from('menu-fotos').upload(finalPath, compressedFile, { upsert: true })
+    const { error } = await supabase.storage.from('menu-fotos').upload(finalPath, compressedFile, { 
+      upsert: true,
+      cacheControl: '31536000' // Cache en navegador por 1 año
+    })
     if (error) { console.error('Error subiendo foto:', error); return null }
     const { data } = supabase.storage.from('menu-fotos').getPublicUrl(finalPath)
     return data.publicUrl

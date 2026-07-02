@@ -45,7 +45,7 @@ export function LoginPage() {
       <div className="hidden lg:flex w-1/2 relative bg-[#F73220] overflow-hidden items-center justify-center">
         <img 
           src="/login-cover.jpg" 
-          alt="Restaurante Estrella Delivery" 
+          alt="Restaurante Estrella Eats" 
           className="absolute inset-0 w-full h-full object-contain object-center scale-105"
         />
         {/* Capa oscura ultra sutil para que los blancos de la imagen resalten más */}
@@ -87,7 +87,7 @@ export function LoginPage() {
               
               <motion.img 
                 src="/login-cover.png" 
-                alt="Estrella Delivery Aliados" 
+                alt="Estrella Eats Aliados" 
                 animate={{ y: [0, -12, 0] }}
                 transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
                 className="w-full h-full object-cover relative z-10"
