@@ -22,22 +22,30 @@ interface Restaurante {
   lng?: number
 }
 
-const CATEGORIES = [
-  { name: 'Hamburguesas', emoji: '🍔' },
-  { name: 'Pizza', emoji: '🍕' },
-  { name: 'Tacos', emoji: '🌮' },
-  { name: 'Sushi', emoji: '🍣' },
-  { name: 'Café', emoji: '☕' },
-  { name: 'Postres', emoji: '🍰' },
-  { name: 'Saludable', emoji: '🥗' },
-  { name: 'Pollo', emoji: '🍗' },
-  { name: 'Antojitos', emoji: '🌶️' },
-  { name: 'Bebidas', emoji: '🥤' }
-]
+const EMOJI_MAP: Record<string, string> = {
+  'Hamburguesas': '🍔',
+  'Pizza': '🍕',
+  'Tacos': '🌮',
+  'Sushi': '🍣',
+  'Café': '☕',
+  'Postres': '🍰',
+  'Saludable': '🥗',
+  'Pollo': '🍗',
+  'Antojitos': '🌶️',
+  'Bebidas': '🥤',
+  'Mariscos': '🦐',
+  'Carnes': '🥩',
+  'Snacks': '🍟',
+  'Desayunos': '🍳',
+  'Comida China': '🥡',
+  'Alitas': '🍗',
+  'Comida Corrida': '🍲'
+}
 
 export function PublicLandingPage() {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
+  const [activeCategories, setActiveCategories] = useState<{name: string, emoji: string}[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingPromos, setLoadingPromos] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -68,6 +76,26 @@ export function PublicLandingPage() {
     const handleScroll = () => setIsScrolled(window.scrollY > 10)
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    async function loadCats() {
+      const { data } = await supabase.from('restaurantes').select('categorias').eq('activo', true)
+      if (data) {
+        const unique = new Set<string>()
+        data.forEach(r => {
+          if (r.categorias && Array.isArray(r.categorias)) {
+            r.categorias.forEach((c: string) => unique.add(c))
+          }
+        })
+        const catArray = Array.from(unique).sort().map(name => ({
+          name,
+          emoji: EMOJI_MAP[name] || '🍽️'
+        }))
+        setActiveCategories(catArray)
+      }
+    }
+    loadCats()
   }, [])
 
   async function loadRestaurants(pageIndex: number) {
@@ -346,7 +374,7 @@ export function PublicLandingPage() {
         
         {/* Carrusel de Categorías Rápido */}
         <div className="flex overflow-x-auto gap-2.5 md:gap-5 pb-2 pt-2 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-          {CATEGORIES.map(c => (
+          {activeCategories.map(c => (
              <button 
                 key={c.name}
                 onClick={() => setSelectedCategory(selectedCategory === c.name ? null : c.name)} 
