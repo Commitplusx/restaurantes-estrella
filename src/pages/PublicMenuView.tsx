@@ -2045,7 +2045,7 @@ export function PublicMenuView() {
                   onClick={() => {
                     // Validar requeridos
                     const faltanRequeridos = (selectedItemForOptions.opciones || []).some(g => {
-                      if (!g.requerido) return false;
+                      if (!g.requerido || g.opciones.length === 0) return false;
                       const sel = selectedOptionsState[g.titulo] || {};
                       return Object.values(sel).filter(Boolean).length === 0;
                     });
