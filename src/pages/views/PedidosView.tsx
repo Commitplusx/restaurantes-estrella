@@ -323,22 +323,22 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: an
       {/* Lista de productos detallada */}
       <div className="space-y-3 mb-5">
         {items?.map((item: any, idx: number) => (
-          <div key={idx} className="flex flex-col text-sm bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+          <div key={idx} className="flex flex-col text-sm bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex justify-between items-start">
-              <span className="text-slate-800 font-bold leading-tight">
-                <span className="text-[#FF7A6A] font-black mr-1.5">{item.cantidad}x</span> 
+              <span className="text-slate-900 font-black text-[15px] leading-tight">
+                <span className="text-white bg-[#FF7A6A] px-1.5 py-0.5 rounded-md text-[13px] mr-2 shadow-sm">{item.cantidad}x</span> 
                 {item.nombre}
               </span>
             </div>
             
-            {/* Opciones seleccionadas */}
+            {/* Opciones seleccionadas estilo Tags/Badges */}
             {item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0 && (
-              <div className="mt-1.5 pl-5 space-y-0.5">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {item.opcionesSeleccionadas.map((opc: any, oIdx: number) => (
-                  <div key={oIdx} className="text-[12px] text-slate-500 flex items-center gap-1.5">
-                    <div className="w-1 h-1 rounded-full bg-slate-300"></div>
-                    <span className="font-medium">{opc.grupo}:</span> {opc.opcion} 
-                    {opc.precio_extra > 0 && <span className="text-slate-400 text-[11px]">(+${opc.precio_extra})</span>}
+                  <div key={oIdx} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
+                    <span className="text-slate-400 uppercase tracking-wider text-[9px]">{opc.grupo}:</span>
+                    <span className="text-slate-800">{opc.opcion}</span>
+                    {opc.precio_extra > 0 && <span className="text-emerald-600 ml-0.5">(+${opc.precio_extra})</span>}
                   </div>
                 ))}
               </div>
