@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Plus, Trash2, X, ChevronLeft, Settings2, GripVertical } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Trash2, X, ChevronLeft, Settings2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface Opcion {

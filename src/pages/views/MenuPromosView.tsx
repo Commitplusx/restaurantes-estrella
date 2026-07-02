@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag, X, Settings2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag, Settings2 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
 import { OpcionesEditor } from '../../components/OpcionesEditor'

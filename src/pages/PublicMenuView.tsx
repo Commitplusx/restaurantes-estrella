@@ -1944,11 +1944,11 @@ export function PublicMenuView() {
                   {selectedItemForOptions.descripcion && (
                     <p className="text-slate-500 text-[14px] sm:text-[15px] mt-2 leading-relaxed">{selectedItemForOptions.descripcion}</p>
                   )}
-                  {selectedItemForOptions.__tipo === 'combo' && selectedItemForOptions.incluye && (
+                  {selectedItemForOptions.__tipo === 'combo' && (selectedItemForOptions as MenuCombo).incluye && (
                     <div className="mt-4 flex flex-col gap-2">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Incluye</p>
                       <div className="flex flex-wrap gap-2">
-                        {selectedItemForOptions.incluye.map((inc: string, i: number) => (
+                        {(selectedItemForOptions as MenuCombo).incluye.map((inc: string, i: number) => (
                           <span key={i} className="text-[13px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">✓ {inc}</span>
                         ))}
                       </div>
