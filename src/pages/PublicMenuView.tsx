@@ -1293,6 +1293,20 @@ export function PublicMenuView() {
                             ) : (
                               <Tag size={32} className="text-blue-400" />
                             )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (combo.opciones && combo.opciones.length > 0) {
+                                  setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
+                                  setSelectedOptionsState({});
+                                } else {
+                                  addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id });
+                                }
+                              }}
+                              className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
+                            >
+                              <Plus size={16} strokeWidth={3} />
+                            </button>
                           </div>
                       </div>
                     </motion.div>
@@ -1338,6 +1352,15 @@ export function PublicMenuView() {
                             ) : (
                               <Ticket size={32} className="text-orange-400" />
                             )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' });
+                              }}
+                              className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
+                            >
+                              <Plus size={16} strokeWidth={3} />
+                            </button>
                           </div>
                       </div>
                     </motion.div>
