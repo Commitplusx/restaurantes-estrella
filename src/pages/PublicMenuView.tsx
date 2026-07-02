@@ -388,7 +388,7 @@ export function PublicMenuView() {
             let latestItem;
             if (cObj.item.tipo === 'item') latestItem = (prods || []).find((p: any) => p.id === cObj.item.id);
             else if (cObj.item.tipo === 'combo') latestItem = (cmbs || []).find((c: any) => c.id === cObj.item.id);
-            else if (cObj.item.tipo === 'promocion') latestItem = validPromos.find(p => p.id === cObj.item.id);
+            else if (cObj.item.tipo === 'promo') latestItem = validPromos.find(p => p.id === cObj.item.id);
 
             // Si el item ya no está disponible o se eliminó, lo quitamos del carrito
             if (!latestItem) {
@@ -1304,12 +1304,7 @@ export function PublicMenuView() {
                       <div
                         className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full"
                         onClick={() => {
-                          if (promo.opciones && promo.opciones.length > 0) {
-                            setSelectedItemForOptions({ ...promo, __tipo: 'promo' });
-                            setSelectedOptionsState({});
-                          } else {
-                            setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' });
-                          }
+                          setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' });
                         }}
                       >
                           <div className="relative">
