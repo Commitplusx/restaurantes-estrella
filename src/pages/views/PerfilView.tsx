@@ -324,7 +324,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
                 <label className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all ${uploadingImage ? 'bg-slate-200 text-slate-400 pointer-events-none' : 'bg-slate-900 hover:bg-orange-500 text-white shadow-lg'}`}>
                   {uploadingImage ? <Loader2 className="animate-spin" size={16} /> : <ImageIcon size={16} />}
                   {uploadingImage ? 'Subiendo...' : 'Seleccionar Foto'}
-                  <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} className="hidden" />
+                  <input type="file" accept="image/jpeg, image/png, image/webp" onChange={handleImageUpload} disabled={uploadingImage} className="hidden" />
                 </label>
                 {formData.foto_fachada_url && (
                   <button type="button" onClick={() => setFormData({ ...formData, foto_fachada_url: '' })} className="block text-xs text-red-500 hover:underline font-semibold">

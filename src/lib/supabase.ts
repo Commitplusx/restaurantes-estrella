@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-
+import imageCompression from 'browser-image-compression'
 const url = import.meta.env.VITE_SUPABASE_URL as string
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
@@ -124,45 +124,27 @@ export interface MenuPromocion {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Helper para comprimir imágenes antes de subir */
-async function compressImage(file: File, maxWidth: number = 800): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.src = URL.createObjectURL(file);
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        URL.revokeObjectURL(img.src);
-        return resolve(file);
-      }
-
-      ctx.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(img.src);
-      canvas.toBlob((blob) => {
-        if (!blob) return resolve(file);
-        const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
-          type: 'image/webp',
-          lastModified: Date.now(),
-        });
-        resolve(compressedFile);
-      }, 'image/webp', 0.75); // 75% calidad, formato WebP
-    };
-    img.onerror = (error) => {
-      URL.revokeObjectURL(img.src);
-      reject(error);
-    };
-  });
+/** Helper para comprimir imágenes antes de subir usando browser-image-compression (robusto para iPhones y HEIC/EXIF) */
+async function compressImage(file: File): Promise<File> {
+  const options = {
+    maxSizeMB: 0.8, // 800 KB máximo
+    maxWidthOrHeight: 1200,
+    useWebWorker: true,
+    fileType: 'image/webp' as const,
+    initialQuality: 0.8
+  };
+  
+  try {
+    const compressedBlob = await imageCompression(file, options);
+    // browser-image-compression devuelve un Blob o File, nos aseguramos que sea File con extensión webp
+    return new File([compressedBlob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+      type: 'image/webp',
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.error("Error al comprimir la imagen, se usará la original:", error);
+    return file;
+  }
 }
 
 /** Sube una imagen al bucket menu-fotos comprimiéndola primero y retorna la URL pública */

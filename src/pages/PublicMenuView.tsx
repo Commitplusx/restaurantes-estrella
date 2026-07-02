@@ -19,7 +19,8 @@ import {
   Ticket,
   CheckCircle2,
   Truck,
-  LocateFixed
+  LocateFixed,
+  Tag
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
@@ -1023,25 +1024,20 @@ export function PublicMenuView() {
       </header>
 
       {/* HERO FULL BLEED (RAPPI STYLE) */}
-      <div className="relative w-full h-[25vh] md:h-[25vh] bg-slate-50 overflow-hidden">
-        {restaurante.foto_fachada_url ? (
+      <div className="relative w-full h-[20vh] md:h-[15vh] bg-slate-50 overflow-hidden border-b border-slate-100">
+        {restaurante.foto_fachada_url && (
           <>
-            {/* Fondo borroso para rellenar espacios vacíos (solo en móvil) */}
+            {/* Mobile: Fondo borroso */}
             <div 
-              className="absolute inset-0 bg-cover bg-center blur-2xl scale-110 opacity-50 md:hidden"
+              className="absolute inset-0 bg-cover bg-center blur-[50px] scale-150 opacity-60 saturate-150 md:hidden"
               style={{ backgroundImage: `url(${restaurante.foto_fachada_url})` }}
             />
-            {/* Imagen principal: contenida en móvil, oculta en PC */}
-            <img
-              src={restaurante.foto_fachada_url}
-              className="relative w-full h-full object-contain md:hidden"
-              loading="lazy"
-              decoding="async"
-              alt={restaurante.nombre}
-            />
+            {/* PC: Gradiente muy limpio y premium en tonos claros */}
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-slate-50 to-orange-100/30 hidden md:block" />
+            
+            {/* Sombra de transición en móvil */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-slate-50/80 md:hidden" />
           </>
-        ) : (
-          <div className="w-full h-full bg-slate-50" />
         )}
       </div>
 
@@ -1050,20 +1046,24 @@ export function PublicMenuView() {
         {/* INFO CARD (RAPPI STYLE) */}
         <div className="bg-white rounded-t-3xl sm:rounded-none -mt-6 sm:mt-0 pt-0 pb-6 flex flex-col items-center sm:items-start text-center sm:text-left border-b border-slate-100">
           
-          <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-48 md:h-48 rounded-[18px] md:rounded-[32px] overflow-hidden shadow-sm border-4 md:border-[8px] border-white bg-white shrink-0 flex items-center justify-center -mt-10 md:-mt-24 mb-3 md:mb-6 z-20">
-            <LazyImage src={restaurante.foto_fachada_url} alt="Logo" className="w-full h-full" />
+          <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-[18px] md:rounded-[20px] overflow-hidden shadow-sm border-4 border-white bg-white shrink-0 flex items-center justify-center -mt-10 md:-mt-12 mb-3 z-20">
+            <LazyImage src={restaurante.foto_fachada_url} alt="Logo" className="w-full h-full object-cover" />
           </div>
           
-          <h1 className="text-2xl sm:text-4xl md:text-5xl font-brother font-normal uppercase tracking-widest text-slate-900 mb-1 mt-2 text-balance leading-none break-words px-2">
-            {restaurante.nombre}
-          </h1>
-          
-          <p className="text-slate-500 text-sm mb-4 flex items-center justify-center sm:justify-start gap-1">
-            <Star size={14} className="text-amber-400 fill-amber-400" /> 
-            <span className="font-medium text-slate-700">4.8</span>
-            <span className="text-slate-300 mx-1">•</span>
-            {restaurante.categorias?.slice(0, 2).join(' • ') || 'Restaurante'}
-          </p>
+          <div className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="flex-1 min-w-0 flex flex-col items-center sm:items-start">
+              <h1 className="text-2xl sm:text-3xl font-brother font-bold uppercase tracking-widest text-slate-900 mb-1 mt-1 text-balance leading-none break-words px-2 sm:px-0">
+                {restaurante.nombre}
+              </h1>
+              
+              <p className="text-slate-500 text-sm mb-4 flex items-center justify-center sm:justify-start gap-1 px-2 sm:px-0">
+                <Star size={14} className="text-amber-400 fill-amber-400" /> 
+                <span className="font-medium text-slate-700">4.8</span>
+                <span className="text-slate-300 mx-1">•</span>
+                {restaurante.categorias?.slice(0, 2).join(' • ') || 'Restaurante'}
+              </p>
+            </div>
+          </div>
           
           <div className="flex flex-wrap justify-center sm:justify-start gap-4 text-sm mt-1">
             <div className="flex items-center gap-1.5 text-slate-600">
@@ -1244,7 +1244,7 @@ export function PublicMenuView() {
 
             {/* COMBOS TAB */}
             {activeTab === 'combos' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {combos.map(combo => {
                   return (
                     <motion.div
@@ -1253,7 +1253,7 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <div className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full" onClick={() => {
+                      <div className="bg-white p-4 rounded-[16px] border border-slate-100 shadow-sm cursor-pointer hover:border-orange-200 transition-colors flex gap-4 items-stretch relative overflow-hidden group" onClick={() => {
                         if (combo.opciones && combo.opciones.length > 0) {
                           setSelectedItemForOptions({ ...combo, __tipo: 'combo' })
                           setSelectedOptionsState({})
@@ -1261,9 +1261,11 @@ export function PublicMenuView() {
                           addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id })
                         }
                       }}>
-                          <LazyImage blurBackground={true} src={combo.foto_url} alt={combo.nombre} className="w-full h-[250px] rounded-[16px] mb-4" imgClassName="object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-500" />
+                          <div className="absolute top-0 right-0 bg-blue-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-[12px] z-10 shadow-sm">
+                            Combo
+                          </div>
                           
-                          <div className="flex-1 flex flex-col">
+                          <div className="flex-1 min-w-0 flex flex-col pt-1">
                             <div className="cursor-pointer" onClick={(e) => {
                               e.stopPropagation();
                               if (combo.opciones && combo.opciones.length > 0) {
@@ -1273,15 +1275,24 @@ export function PublicMenuView() {
                                 setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' });
                               }
                             }}>
-                              <h4 className="font-bold text-slate-900 text-xl mb-1">{combo.nombre}</h4>
-                              <p className="text-slate-400 text-sm mb-3">{combo.descripcion}</p>
+                              <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{combo.nombre}</h4>
+                              <p className="text-slate-500 text-sm mb-2 line-clamp-2 leading-snug">{combo.descripcion}</p>
                             </div>
-                            <div className="flex flex-wrap gap-2 mb-4 justify-start">
-                              {combo.incluye?.map((inc, i) => <span key={i} className="text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-md">✓ {inc}</span>)}
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {combo.incluye?.slice(0, 2).map((inc, i) => <span key={i} className="text-[9px] font-bold bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md truncate max-w-full">✓ {inc}</span>)}
+                              {combo.incluye && combo.incluye.length > 2 && <span className="text-[9px] font-bold text-slate-400">+{combo.incluye.length - 2} más</span>}
                             </div>
-                            <div className="flex items-center justify-between mt-auto">
-                              <span className="text-[#ff6250] font-black text-2xl">${combo.precio.toFixed(2)}</span>
+                            <div className="mt-auto flex items-center justify-between">
+                              <span className="text-slate-900 font-bold text-[15px]">${combo.precio.toFixed(2)}</span>
                             </div>
+                          </div>
+
+                          <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-blue-50 flex items-center justify-center">
+                            {combo.foto_url ? (
+                              <LazyImage blurBackground={true} src={combo.foto_url} alt={combo.nombre} className="w-full h-full" imgClassName="object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                            ) : (
+                              <Tag size={32} className="text-blue-400" />
+                            )}
                           </div>
                       </div>
                     </motion.div>
@@ -1292,7 +1303,7 @@ export function PublicMenuView() {
 
             {/* PROMOS TAB */}
             {activeTab === 'promos' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {promos.map((promo, index) => {
                   return (
                     <motion.div
@@ -1302,25 +1313,31 @@ export function PublicMenuView() {
                       transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
                     >
                       <div
-                        className="bg-white rounded-[24px] p-4 border border-slate-100 shadow-sm cursor-pointer group flex flex-col h-full"
+                        className="bg-white p-4 rounded-[16px] border border-slate-100 shadow-sm cursor-pointer hover:border-orange-200 transition-colors flex gap-4 items-stretch relative overflow-hidden group"
                         onClick={() => {
                           setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' });
                         }}
                       >
-                          <div className="relative">
-                            <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[10px] font-black px-4 py-1 rounded-bl-[20px] z-10 shadow-lg">PROMO</div>
-                            <LazyImage blurBackground={true} src={promo.foto_url} alt={promo.titulo} className="w-full h-[250px] rounded-[18px] mb-4" imgClassName="object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-700 ease-out" />
+                          <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-[12px] z-10 shadow-sm">
+                            Promo
+                          </div>
+                          
+                          <div className="flex-1 min-w-0 flex flex-col pt-1">
+                            <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{promo.titulo}</h4>
+                            {promo.descripcion && (
+                              <p className="text-slate-500 text-sm mb-3 line-clamp-2 leading-snug">{promo.descripcion}</p>
+                            )}
+                            <div className="mt-auto flex items-center justify-between">
+                              <span className="text-[#FA4A0C] font-bold text-[15px]">${promo.precio_especial?.toFixed(2)}</span>
+                            </div>
                           </div>
 
-                          <div className="flex-1 flex flex-col px-1">
-                            <h4 className="font-extrabold text-slate-900 text-lg mb-1 leading-tight">{promo.titulo}</h4>
-                            <p className="text-slate-400 text-xs mb-3 line-clamp-2">{promo.descripcion}</p>
-                            <div className="flex items-center justify-between mt-auto">
-                              <span className="text-[#FA4A0C] font-black text-xl">${promo.precio_especial?.toFixed(2)}</span>
-                              <div className="w-9 h-9 rounded-full bg-[#FA4A0C] flex items-center justify-center shadow-md shadow-[#FA4A0C]/30">
-                                <Plus className="w-5 h-5 text-white" />
-                              </div>
-                            </div>
+                          <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-orange-50 flex items-center justify-center">
+                            {promo.foto_url ? (
+                              <LazyImage blurBackground={true} src={promo.foto_url} alt={promo.titulo} className="w-full h-full" imgClassName="object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                            ) : (
+                              <Ticket size={32} className="text-orange-400" />
+                            )}
                           </div>
                       </div>
                     </motion.div>
@@ -1905,16 +1922,16 @@ export function PublicMenuView() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="relative w-full sm:max-w-lg bg-white sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="w-full h-[220px] bg-slate-900 relative shrink-0">
-                  <LazyImage blurBackground={true} src={selectedItemForOptions.foto_url} alt={selectedItemForOptions.nombre} className="w-full h-full" imgClassName="object-contain drop-shadow-2xl scale-95" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent z-30 pointer-events-none" />
-                  <button onClick={() => setSelectedItemForOptions(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-slate-800 shadow-lg z-50 hover:scale-105 transition-transform">
-                    <X size={20} className="stroke-[3px]" />
-                  </button>
+              <div className="p-6 pb-5 shrink-0 bg-white relative z-40 border-b border-slate-100 flex justify-between items-start gap-4">
+                <div className="flex-1">
+                  <h3 className="text-[22px] sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">{selectedItemForOptions.nombre}</h3>
+                  {selectedItemForOptions.descripcion && (
+                    <p className="text-slate-500 text-[14px] sm:text-[15px] mt-2 leading-relaxed">{selectedItemForOptions.descripcion}</p>
+                  )}
                 </div>
-              <div className="p-6 shrink-0 bg-white relative z-40 -mt-6 rounded-t-[2.5rem]">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">{selectedItemForOptions.nombre}</h3>
-                <p className="text-slate-500 text-[15px] mt-1.5 leading-snug">{selectedItemForOptions.descripcion}</p>
+                <button onClick={() => setSelectedItemForOptions(null)} className="w-10 h-10 shrink-0 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm">
+                  <X size={20} className="stroke-[2.5px]" />
+                </button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-8">
@@ -1923,17 +1940,17 @@ export function PublicMenuView() {
                   const countSelected = Object.values(seleccionados).filter(Boolean).length;
                   
                   return (
-                    <div key={gIdx} className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="font-bold text-slate-900 text-lg">{grupo.titulo}</h4>
+                    <div key={gIdx} className="bg-white rounded-[24px] border border-slate-100/80 p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-bold text-slate-900 text-[17px] tracking-tight">{grupo.titulo}</h4>
                         {grupo.requerido && countSelected === 0 ? (
-                          <span className="text-[10px] font-black uppercase tracking-widest bg-red-100 text-red-600 px-3 py-1.5 rounded-full">Requerido</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-600 px-2.5 py-1 rounded-md border border-red-100">Requerido</span>
                         ) : grupo.maximo_selecciones > 1 ? (
-                          <span className="text-[12px] bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">Elige hasta {grupo.maximo_selecciones}</span>
+                          <span className="text-[11px] bg-slate-50 text-slate-500 px-2.5 py-1 rounded-md font-bold border border-slate-100">Máx {grupo.maximo_selecciones}</span>
                         ) : null}
                       </div>
                       
-                      <div className="space-y-2.5">
+                      <div className="space-y-1">
                         {grupo.opciones.map((opc, oIdx) => {
                           const isSelected = !!seleccionados[opc.nombre];
                           
@@ -1957,23 +1974,34 @@ export function PublicMenuView() {
                           };
 
                           return (
-                            <label key={oIdx} className="flex items-center justify-between py-4 border-b border-slate-100 last:border-0 cursor-pointer group">
+                            <label key={oIdx} className={`flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer group ${isSelected ? 'bg-orange-50/50' : 'hover:bg-slate-50'}`}>
                               <div className="flex flex-col pr-4">
-                                <span className={`text-[16px] transition-colors ${isSelected ? 'text-slate-900 font-bold' : 'text-slate-700 font-medium group-hover:text-slate-900'}`}>
+                                <span className={`text-[15px] transition-colors ${isSelected ? 'text-slate-900 font-bold' : 'text-slate-700 font-medium group-hover:text-slate-900'}`}>
                                   {opc.nombre}
                                 </span>
                                 {opc.precio_extra > 0 && (
-                                  <span className="text-[14px] text-slate-500 mt-0.5">
+                                  <span className={`text-[13px] font-medium mt-0.5 ${isSelected ? 'text-orange-600' : 'text-slate-400'}`}>
                                     +${opc.precio_extra.toFixed(2)}
                                   </span>
                                 )}
                               </div>
                               <div className="relative flex items-center justify-center shrink-0">
+                                <div className={`w-[22px] h-[22px] flex items-center justify-center transition-all duration-200 ${
+                                  grupo.maximo_selecciones === 1 
+                                    ? 'rounded-full' 
+                                    : 'rounded-[6px]'
+                                } border-[2px] ${isSelected ? 'border-[#FA4A0C] bg-[#FA4A0C] scale-105' : 'border-slate-300 bg-white group-hover:border-slate-400'}`}>
+                                  {isSelected && (
+                                    grupo.maximo_selecciones === 1 
+                                      ? <div className="w-2 h-2 rounded-full bg-white shadow-sm" /> 
+                                      : <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5 text-white"><path d="M11.6666 3.5L5.24992 9.91667L2.33325 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  )}
+                                </div>
                                 <input 
                                   type={grupo.maximo_selecciones === 1 ? 'radio' : 'checkbox'} 
                                   checked={isSelected}
                                   onChange={toggleOpcion}
-                                  className="w-[22px] h-[22px] accent-[#FA4A0C] cursor-pointer"
+                                  className="absolute inset-0 opacity-0 cursor-pointer"
                                 />
                               </div>
                             </label>

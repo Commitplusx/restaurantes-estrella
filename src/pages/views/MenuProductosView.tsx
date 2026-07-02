@@ -452,7 +452,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
               <div className="flex-1">
                 <input 
                   type="file" 
-                  accept="image/*"
+                  accept="image/jpeg, image/png, image/webp"
                   onChange={handleImageUpload}
                   disabled={uploadingImage}
                   className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-wider file:bg-orange-100 file:text-orange-600 hover:file:bg-orange-200 cursor-pointer transition-colors"
