@@ -503,7 +503,10 @@ export function PublicMenuView() {
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
   
   // Filtrar los items que sí aplican para el subsidio (por defecto true)
-  const itemsSubsidio = carrito.filter(p => p.item.aplica_subsidio !== false);
+  const itemsSubsidio = carrito.filter(p => {
+    // Asegurarnos de que no sea explícitamente false ni el string 'false'
+    return p.item.aplica_subsidio !== false && String(p.item.aplica_subsidio).toLowerCase() !== 'false';
+  });
   const cantidadSubsidio = itemsSubsidio.reduce((sum, p) => sum + p.cantidad, 0);
   
   // Por cada artículo calificable, el restaurante recauda $8 pesos extra que se usan para subsidiar el envío
@@ -1258,7 +1261,7 @@ export function PublicMenuView() {
                           setSelectedItemForOptions({ ...combo, __tipo: 'combo' })
                           setSelectedOptionsState({})
                         } else {
-                          addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id })
+                          addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio })
                         }
                       }}>
                           <div className="absolute top-0 right-0 bg-blue-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-[12px] z-10 shadow-sm">
@@ -1300,7 +1303,7 @@ export function PublicMenuView() {
                                   setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
                                   setSelectedOptionsState({});
                                 } else {
-                                  addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id });
+                                  addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
                                 }
                               }}
                               className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"

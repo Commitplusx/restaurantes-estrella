@@ -62,7 +62,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
       setEditingItem(item)
       setIncluyeInput(item.incluye?.join(', ') || '')
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, incluye: [], aplica_subsidio: true, opciones: [] })
+      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, incluye: [], aplica_subsidio: false, opciones: [] })
       setIncluyeInput('')
     }
     setIsModalOpen(true)
@@ -270,7 +270,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
           </div>
 
           <div className="flex items-start gap-3 mt-4 bg-blue-50/50 border border-blue-200 p-5 rounded-2xl shadow-sm">
-            <input type="checkbox" id="subsidioCombo" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-600 rounded cursor-pointer mt-0.5" />
+            <input type="checkbox" id="subsidioCombo" checked={editingItem.aplica_subsidio ?? false} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-600 rounded cursor-pointer mt-0.5" />
             <label htmlFor="subsidioCombo" className="m-0 cursor-pointer flex flex-col">
               <span className="text-[15px] font-black text-blue-900">Aplicar Subsidio de Envío ($8.00)</span>
               <span className="text-[13px] font-medium text-blue-800/90 mt-1.5 leading-relaxed">

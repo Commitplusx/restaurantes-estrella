@@ -70,7 +70,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     if (item) {
       setEditingItem(item)
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, activa: true, aplica_subsidio: true, dias_aplicacion: DIAS_SEMANA.map(d => d.id) })
+      setEditingItem({ restaurante_id: restaurante.id, activa: true, aplica_subsidio: false, dias_aplicacion: DIAS_SEMANA.map(d => d.id) })
     }
     setIsModalOpen(true)
   }
@@ -264,7 +264,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
           </div>
 
           <div className="flex items-start gap-3 mt-2 bg-blue-50/50 border border-blue-200 p-5 rounded-2xl shadow-sm">
-            <input type="checkbox" id="subsidioPromo" checked={editingItem.aplica_subsidio ?? true} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-600 rounded cursor-pointer mt-0.5" />
+            <input type="checkbox" id="subsidioPromo" checked={editingItem.aplica_subsidio ?? false} onChange={e => setEditingItem({...editingItem, aplica_subsidio: e.target.checked})} className="w-5 h-5 accent-blue-600 rounded cursor-pointer mt-0.5" />
             <label htmlFor="subsidioPromo" className="m-0 cursor-pointer flex flex-col">
               <span className="text-[15px] font-black text-blue-900">Aplicar Subsidio de Envío ($8.00)</span>
               <span className="text-[13px] font-medium text-blue-800/90 mt-1.5 leading-relaxed">
