@@ -108,7 +108,13 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
     if (item) {
       setEditingItem(item)
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, disponible: true, precio: 0, aplica_subsidio: true })
+      setEditingItem({ 
+        restaurante_id: restaurante.id, 
+        disponible: true, 
+        precio: 0, 
+        aplica_subsidio: true,
+        categoria_id: categorias.length > 0 ? categorias[0].id : undefined
+      })
     }
     setIsModalOpen(true)
   }
@@ -412,7 +418,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Categoría</label>
               <select className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-orange-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.categoria_id || ''} onChange={e => setEditingItem({...editingItem, categoria_id: e.target.value})}>
                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                {categorias.length === 0 && <option value="">Automática</option>}
+                {categorias.length === 0 && <option value="">Sin categoría (Crea una primero)</option>}
               </select>
             </div>
           </div>
