@@ -320,15 +320,33 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: an
         </div>
       )}
 
-      {/* Lista de productos minimizada */}
-      <div className="space-y-1.5 mb-4">
+      {/* Lista de productos detallada */}
+      <div className="space-y-3 mb-5">
         {items?.map((item: any, idx: number) => (
-          <div key={idx} className="flex justify-between text-sm">
-            <span className="text-slate-600 font-medium"><span className="text-slate-400 mr-1">{item.cantidad}x</span> {item.nombre}</span>
+          <div key={idx} className="flex flex-col text-sm bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+            <div className="flex justify-between items-start">
+              <span className="text-slate-800 font-bold leading-tight">
+                <span className="text-[#FF7A6A] font-black mr-1.5">{item.cantidad}x</span> 
+                {item.nombre}
+              </span>
+            </div>
+            
+            {/* Opciones seleccionadas */}
+            {item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0 && (
+              <div className="mt-1.5 pl-5 space-y-0.5">
+                {item.opcionesSeleccionadas.map((opc: any, oIdx: number) => (
+                  <div key={oIdx} className="text-[12px] text-slate-500 flex items-center gap-1.5">
+                    <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                    <span className="font-medium">{opc.grupo}:</span> {opc.opcion} 
+                    {opc.precio_extra > 0 && <span className="text-slate-400 text-[11px]">(+${opc.precio_extra})</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {(!items || items.length === 0) && (
-          <div className="text-sm text-slate-400 italic">Ver notas del pedido.</div>
+          <div className="text-sm text-slate-400 italic text-center py-2 bg-slate-50 rounded-lg">Ver notas del pedido.</div>
         )}
       </div>
 
