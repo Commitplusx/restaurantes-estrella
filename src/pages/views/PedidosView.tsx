@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { BellRing, Check, ChefHat, Clock, AlertCircle, Store } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
+import { BottomSheet } from '../../components/BottomSheet'
 
 export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
   const [pedidos, setPedidos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [pedidoToPrepare, setPedidoToPrepare] = useState<any>(null)
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'denied'
   )
@@ -106,7 +108,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
     }
   }
 
-  const updateEstado = async (id: string, nuevoEstado: string) => {
+  const updateEstado = async (id: string, nuevoEstado: string, tiempoMinutos?: number) => {
     // Guardar estado previo para rollback
     const estadoPrevio = pedidos.find(p => p.id === id)?.estado_cocina
     try {
@@ -114,23 +116,26 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       setPedidos((prev) =>
         prev.map((p) => (p.id === id ? { ...p, estado_cocina: nuevoEstado } : p))
       )
-      // Solo actualiza estado_cocina. El campo 'estado' (logística del repartidor)
-      // lo maneja únicamente la APK de Flutter para no interferir con el flujo del repartidor.
-      const { error } = await supabase.from('pedidos').update({ 
-        estado_cocina: nuevoEstado
-      }).eq('id', id)
+      
+      const updateData: any = { estado_cocina: nuevoEstado }
+      if (tiempoMinutos) {
+        updateData.tiempo_preparacion_minutos = tiempoMinutos
+      }
+      
+      const { error } = await supabase.from('pedidos').update(updateData).eq('id', id)
       if (error) throw error
       
       // Si cambia de estado en cocina, notificar
       if (nuevoEstado === 'en_cocina' || nuevoEstado === 'listo_para_recoger') {
         const tipo = nuevoEstado === 'en_cocina' ? 'preparando' : 'comida_lista'
         const { error: invokeErr } = await supabase.functions.invoke('notificar-whatsapp', {
-          body: { tipo, pedido_id: id, restaurante: restaurante.nombre }
+          body: { tipo, pedido_id: id, restaurante: restaurante.nombre, tiempo_preparacion_minutos: tiempoMinutos }
         })
         if (invokeErr) {
           console.error(`Error al invocar webhook de WA para ${tipo}:`, invokeErr)
         }
       }
+      setPedidoToPrepare(null)
     } catch (e) {
       console.error('Error actualizando estado, revirtiendo:', e)
       // Rollback: restaurar el estado previo en el UI
@@ -189,7 +194,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
                   pedido={p} 
                   actionLabel="Empezar a Preparar" 
                   actionColor="bg-orange-500 hover:bg-orange-600"
-                  onAction={() => updateEstado(p.id, 'en_cocina')}
+                  onAction={() => setPedidoToPrepare(p)}
                 />
               ))}
               {nuevos.length === 0 && <EmptyState text="No hay pedidos nuevos." />}
@@ -250,6 +255,37 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
         </div>
 
       </div>
+
+      <BottomSheet
+        isOpen={!!pedidoToPrepare}
+        onClose={() => setPedidoToPrepare(null)}
+        title="Tiempo Estimado"
+      >
+        <div className="flex flex-col gap-5">
+          <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3">
+            <Clock className="text-orange-500 shrink-0 mt-0.5" size={20} />
+            <p className="text-sm text-slate-700 font-medium leading-relaxed">
+              ¿En cuánto tiempo estará listo este pedido? Le avisaremos al cliente y asignaremos un repartidor para que llegue justo a tiempo.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            {[15, 25, 35, 45, 60].map(mins => (
+              <button
+                key={mins}
+                onClick={() => {
+                  if (pedidoToPrepare) {
+                    updateEstado(pedidoToPrepare.id, 'en_cocina', mins)
+                  }
+                }}
+                className="bg-white border-2 border-slate-100 hover:border-orange-500 hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-black py-4 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all"
+              >
+                {mins} min
+              </button>
+            ))}
+          </div>
+        </div>
+      </BottomSheet>
     </div>
   )
 }
