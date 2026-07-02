@@ -1217,7 +1217,7 @@ export function PublicMenuView() {
                                         addToCart({ ...cartItem, cartItemId: item.id })
                                       }
                                     }}
-                                    className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform"
+                                    className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
                                   >
                                     <Plus size={16} strokeWidth={3} />
                                   </button>
