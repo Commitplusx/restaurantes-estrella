@@ -4,7 +4,7 @@ import type { Restaurante, HorariosRestaurante, HorarioDia } from '../../lib/sup
 import { Save, Store, Clock, Image as ImageIcon, Loader2, Lock, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 
 const CATEGORIAS_COMUNES = [
-  'Hamburguesas', 'Pizzas', 'Sushi', 'Tacos', 'Alitas',
+  'Hamburguesas', 'Pizzas', 'Sushi', 'Tacos', 'Alitas', 'Pollo',
   'Mariscos', 'Postres', 'Desayunos', 'Bebidas', 'Saludable',
   'Comida China', 'Antojitos'
 ]

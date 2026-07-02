@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Image as ImageIcon, X, Loader2, Utensils, Clock } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, X, Loader2, Utensils, Clock, Settings2 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
+import { OpcionesEditor } from '../../components/OpcionesEditor'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuItem, MenuCategoria } from '../../lib/supabase'
 import { motion } from 'framer-motion'
@@ -32,6 +33,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
   const [uploadingImage, setUploadingImage] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
+  const [isEditingOptions, setIsEditingOptions] = useState(false)
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -392,9 +394,19 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
       {/* Modal CRUD (BottomSheet) */}
       <BottomSheet 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        title={editingItem.id ? 'Editar Platillo' : 'Nuevo Platillo'}
+        onClose={() => {
+          setIsModalOpen(false)
+          setIsEditingOptions(false)
+        }}
+        title={isEditingOptions ? '' : (editingItem.id ? 'Editar Platillo' : 'Nuevo Platillo')}
       >
+        {isEditingOptions ? (
+          <OpcionesEditor
+            opciones={editingItem.opciones || []}
+            onChange={(ops) => setEditingItem({ ...editingItem, opciones: ops })}
+            onClose={() => setIsEditingOptions(false)}
+          />
+        ) : (
         <form onSubmit={handleSave} className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nombre del platillo *</label>
@@ -486,118 +498,33 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
             </label>
           </div>
 
-          {/* Opciones y Modificadores */}
+          {/* Opciones y Modificadores (Boton para abrir editor) */}
           <div className="mt-6 border-t border-slate-100 pt-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-black text-slate-800">Opciones y Extras</h3>
-              <button type="button" onClick={() => setEditingItem({
-                ...editingItem,
-                opciones: [...(editingItem.opciones || []), { titulo: '', requerido: false, maximo_selecciones: 1, opciones: [] }]
-              })} className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-1">
-                <Plus size={14} /> Añadir Grupo
-              </button>
+              <div>
+                <h3 className="font-black text-slate-800">Opciones y Extras</h3>
+                <p className="text-xs text-slate-500 mt-1">Configura Variantes o Extras para este platillo.</p>
+              </div>
             </div>
             
-            <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3 mb-4 flex gap-2 items-start">
-              <div className="text-orange-400 mt-0.5">💡</div>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Usa <strong className="text-orange-600">Variantes</strong> si el cliente debe elegir forzosamente un tamaño o tipo (Ej. Chico, Mediano). Usa <strong className="text-emerald-600">Extras</strong> si quieres cobrar por ingredientes adicionales (Ej. Extra Queso +$15).
-              </p>
-            </div>
-            
-            <div className="space-y-4">
-              {(editingItem.opciones || []).map((grupo, gIndex) => (
-                <div key={gIndex} className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 space-y-3">
-                      <input type="text" placeholder="Ej. Elige tu tamaño" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold" value={grupo.titulo} onChange={e => {
-                        const newOpciones = [...(editingItem.opciones || [])];
-                        newOpciones[gIndex].titulo = e.target.value;
-                        setEditingItem({ ...editingItem, opciones: newOpciones });
-                      }} />
-                      <div className="flex flex-col sm:flex-row gap-2 bg-slate-200/50 p-1.5 rounded-xl w-full">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newOpciones = [...(editingItem.opciones || [])];
-                            newOpciones[gIndex].requerido = true;
-                            newOpciones[gIndex].maximo_selecciones = 1;
-                            setEditingItem({ ...editingItem, opciones: newOpciones });
-                          }}
-                          className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                            grupo.requerido && grupo.maximo_selecciones === 1
-                              ? 'bg-white text-orange-600 shadow-sm'
-                              : 'text-slate-500 hover:text-slate-700'
-                          }`}
-                        >
-                          ◉ Variantes (Debe elegir 1)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newOpciones = [...(editingItem.opciones || [])];
-                            newOpciones[gIndex].requerido = false;
-                            newOpciones[gIndex].maximo_selecciones = 10;
-                            setEditingItem({ ...editingItem, opciones: newOpciones });
-                          }}
-                          className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                            !grupo.requerido && grupo.maximo_selecciones > 1
-                              ? 'bg-white text-emerald-600 shadow-sm'
-                              : 'text-slate-500 hover:text-slate-700'
-                          }`}
-                        >
-                          ☑ Extras (Opcional, varios)
-                        </button>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => {
-                      const newOpciones = [...(editingItem.opciones || [])];
-                      newOpciones.splice(gIndex, 1);
-                      setEditingItem({ ...editingItem, opciones: newOpciones });
-                    }} className="p-1.5 text-slate-400 hover:text-red-500 ml-2">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 pl-4 border-l-2 border-orange-200">
-                    {grupo.opciones.map((opc, oIndex) => (
-                      <div key={oIndex} className="flex gap-2 items-center">
-                        <input type="text" placeholder="Ej. Grande" className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm" value={opc.nombre} onChange={e => {
-                          const newOpciones = [...(editingItem.opciones || [])];
-                          newOpciones[gIndex].opciones[oIndex].nombre = e.target.value;
-                          setEditingItem({ ...editingItem, opciones: newOpciones });
-                        }} />
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-400 text-sm">+$</span>
-                          <input type="number" min="0" placeholder="0" className="w-20 px-3 py-1.5 border border-slate-200 rounded-lg text-sm" value={opc.precio_extra} onChange={e => {
-                            const newOpciones = [...(editingItem.opciones || [])];
-                            newOpciones[gIndex].opciones[oIndex].precio_extra = parseFloat(e.target.value) || 0;
-                            setEditingItem({ ...editingItem, opciones: newOpciones });
-                          }} />
-                        </div>
-                        <button type="button" onClick={() => {
-                          const newOpciones = [...(editingItem.opciones || [])];
-                          newOpciones[gIndex].opciones.splice(oIndex, 1);
-                          setEditingItem({ ...editingItem, opciones: newOpciones });
-                        }} className="p-1.5 text-slate-400 hover:text-red-500">
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => {
-                      const newOpciones = [...(editingItem.opciones || [])];
-                      newOpciones[gIndex].opciones.push({ nombre: '', precio_extra: 0 });
-                      setEditingItem({ ...editingItem, opciones: newOpciones });
-                    }} className="text-xs font-bold text-orange-500 hover:text-orange-600 mt-2 flex items-center gap-1">
-                      <Plus size={12} /> Añadir opción
-                    </button>
-                  </div>
+            <button
+              type="button"
+              onClick={() => setIsEditingOptions(true)}
+              className="w-full mt-2 py-4 px-4 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl shadow-sm transition-all flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Settings2 size={20} />
                 </div>
-              ))}
-              {(!editingItem.opciones || editingItem.opciones.length === 0) && (
-                <p className="text-sm text-slate-400 italic">No hay opciones extra configuradas para este platillo.</p>
-              )}
-            </div>
+                <div className="text-left">
+                  <span className="block font-bold text-slate-700">Configurar Opciones</span>
+                  <span className="block text-xs text-slate-500">
+                    {(editingItem.opciones?.length || 0)} {editingItem.opciones?.length === 1 ? 'grupo configurado' : 'grupos configurados'}
+                  </span>
+                </div>
+              </div>
+              <span className="text-blue-600 font-bold text-sm">Editar</span>
+            </button>
           </div>
 
           <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-orange-500 shadow-xl shadow-slate-900/20 hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
@@ -609,6 +536,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
             ) : 'Guardar Platillo'}
           </button>
         </form>
+        )}
       </BottomSheet>
 
       <ConfirmDialog 

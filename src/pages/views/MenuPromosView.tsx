@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag } from 'lucide-react'
+import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag, X, Settings2 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
+import { OpcionesEditor } from '../../components/OpcionesEditor'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuPromocion } from '../../lib/supabase'
 
@@ -23,6 +24,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Partial<MenuPromocion>>({})
   const [saving, setSaving] = useState(false)
+  const [isEditingOptions, setIsEditingOptions] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
@@ -206,9 +208,19 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
       {/* Modal CRUD (BottomSheet) */}
       <BottomSheet 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        title={editingItem.id ? 'Editar Promoción' : 'Nueva Promoción'}
+        onClose={() => {
+          setIsModalOpen(false)
+          setIsEditingOptions(false)
+        }}
+        title={isEditingOptions ? '' : (editingItem.id ? 'Editar Promoción' : 'Nueva Promoción')}
       >
+        {isEditingOptions ? (
+          <OpcionesEditor
+            opciones={editingItem.opciones || []}
+            onChange={(ops) => setEditingItem({ ...editingItem, opciones: ops })}
+            onClose={() => setIsEditingOptions(false)}
+          />
+        ) : (
         <form onSubmit={handleSave} className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Título de la promoción *</label>
@@ -276,6 +288,35 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
             </label>
           </div>
 
+          {/* Opciones y Modificadores */}
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h3 className="font-black text-slate-800">Opciones y Extras</h3>
+                <p className="text-xs text-slate-500 mt-1">Configura Variantes o Extras para esta promoción.</p>
+              </div>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => setIsEditingOptions(true)}
+              className="w-full mt-2 py-4 px-4 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl shadow-sm transition-all flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Settings2 size={20} />
+                </div>
+                <div className="text-left">
+                  <span className="block font-bold text-slate-700">Configurar Opciones</span>
+                  <span className="block text-xs text-slate-500">
+                    {(editingItem.opciones?.length || 0)} {editingItem.opciones?.length === 1 ? 'grupo configurado' : 'grupos configurados'}
+                  </span>
+                </div>
+              </div>
+              <span className="text-blue-600 font-bold text-sm">Editar</span>
+            </button>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Foto de la Promoción (Opcional)</label>
             <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
@@ -308,6 +349,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
             ) : 'Guardar Promoción'}
           </button>
         </form>
+        )}
       </BottomSheet>
 
       <ConfirmDialog 

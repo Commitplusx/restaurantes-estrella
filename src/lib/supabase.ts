@@ -120,6 +120,7 @@ export interface MenuPromocion {
   activa: boolean
   aplica_subsidio?: boolean
   dias_aplicacion?: string[]
+  opciones?: any[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

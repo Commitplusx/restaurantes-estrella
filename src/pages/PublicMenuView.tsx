@@ -854,7 +854,7 @@ export function PublicMenuView() {
       // Notificar al admin para TODOS los pedidos en efectivo (domicilio Y tienda)
       // Si es pago en línea, la notificación se envía desde el webhook de Mercado Pago al aprobarse.
       if (metodoPago === 'efectivo') {
-        supabase.functions.invoke('notificar-whatsapp', {
+        await supabase.functions.invoke('notificar-whatsapp', {
           body: {
             tipo: 'nueva_orden_admin',
             ticket_id: ticketId,
@@ -1257,12 +1257,7 @@ export function PublicMenuView() {
                       transition={{ duration: 0.3 }}
                     >
                       <div className="bg-white p-4 rounded-[16px] border border-slate-100 shadow-sm cursor-pointer hover:border-orange-200 transition-colors flex gap-4 items-stretch relative overflow-hidden group" onClick={() => {
-                        if (combo.opciones && combo.opciones.length > 0) {
-                          setSelectedItemForOptions({ ...combo, __tipo: 'combo' })
-                          setSelectedOptionsState({})
-                        } else {
-                          addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio })
-                        }
+                        setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' });
                       }}>
                           <div className="absolute top-0 right-0 bg-blue-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-[12px] z-10 shadow-sm">
                             Combo
@@ -1271,19 +1266,14 @@ export function PublicMenuView() {
                           <div className="flex-1 min-w-0 flex flex-col pt-1">
                             <div className="cursor-pointer" onClick={(e) => {
                               e.stopPropagation();
-                              if (combo.opciones && combo.opciones.length > 0) {
-                                setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
-                                setSelectedOptionsState({});
-                              } else {
-                                setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' });
-                              }
+                              setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' });
                             }}>
                               <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{combo.nombre}</h4>
                               <p className="text-slate-500 text-sm mb-2 line-clamp-2 leading-snug">{combo.descripcion}</p>
                             </div>
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {combo.incluye?.slice(0, 2).map((inc, i) => <span key={i} className="text-[9px] font-bold bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md truncate max-w-full">✓ {inc}</span>)}
-                              {combo.incluye && combo.incluye.length > 2 && <span className="text-[9px] font-bold text-slate-400">+{combo.incluye.length - 2} más</span>}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {combo.incluye?.slice(0, 2).map((inc, i) => <span key={i} className="text-[11px] font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded-md truncate max-w-full">✓ {inc}</span>)}
+                              {combo.incluye && combo.incluye.length > 2 && <span className="text-[11px] font-bold text-slate-500 self-center">+{combo.incluye.length - 2} más</span>}
                             </div>
                             <div className="mt-auto flex items-center justify-between">
                               <span className="text-slate-900 font-bold text-[15px]">${combo.precio.toFixed(2)}</span>
@@ -1413,12 +1403,12 @@ export function PublicMenuView() {
                       {selectedItemDetail.descripcion || 'Sin descripción adicional.'}
                     </p>
 
-                    {selectedItemDetail.cartItemTipo === 'combo' && selectedItemDetail.incluye && (
+                    {(selectedItemDetail.cartItemTipo === 'combo' || selectedItemDetail.__tipo === 'combo') && selectedItemDetail.incluye && (
                       <div className="mt-4 flex flex-col gap-2">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Incluye</p>
                         <div className="flex flex-wrap gap-2">
                           {selectedItemDetail.incluye.map((inc: string, i: number) => (
-                            <span key={i} className="text-sm font-bold bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg border border-slate-100">✓ {inc}</span>
+                            <span key={i} className="text-[13px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">✓ {inc}</span>
                           ))}
                         </div>
                       </div>
@@ -1953,6 +1943,16 @@ export function PublicMenuView() {
                   <h3 className="text-[22px] sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">{selectedItemForOptions.nombre}</h3>
                   {selectedItemForOptions.descripcion && (
                     <p className="text-slate-500 text-[14px] sm:text-[15px] mt-2 leading-relaxed">{selectedItemForOptions.descripcion}</p>
+                  )}
+                  {selectedItemForOptions.__tipo === 'combo' && selectedItemForOptions.incluye && (
+                    <div className="mt-4 flex flex-col gap-2">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Incluye</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedItemForOptions.incluye.map((inc: string, i: number) => (
+                          <span key={i} className="text-[13px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">✓ {inc}</span>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
                 <button onClick={() => setSelectedItemForOptions(null)} className="w-10 h-10 shrink-0 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm">
