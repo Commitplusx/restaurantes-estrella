@@ -1433,7 +1433,7 @@ export function PublicMenuView() {
                         }
                         
                         if (selectedItemDetail.opciones && selectedItemDetail.opciones.length > 0) {
-                          setSelectedItemForOptions({ ...selectedItemDetail, __tipo: 'item' })
+                          setSelectedItemForOptions({ ...selectedItemDetail, __tipo: selectedItemDetail.cartItemTipo })
                           setSelectedOptionsState({})
                         } else {
                           addToCart(cartItem)

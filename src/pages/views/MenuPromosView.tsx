@@ -81,6 +81,29 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     e.preventDefault()
     setSaving(true)
     
+    // Validar grupos de opciones
+    const opciones = editingItem.opciones || []
+    for (let g = 0; g < opciones.length; g++) {
+      const grupo = opciones[g]
+      if (!grupo.titulo?.trim()) {
+        setErrorModal(`El Grupo de Opciones #${g + 1} no tiene nombre. Ponle un nombre o elimínalo.`)
+        setSaving(false)
+        return
+      }
+      if (grupo.opciones.length === 0) {
+        setErrorModal(`El grupo "${grupo.titulo}" no tiene ninguna opción. Agrega al menos una o elimina el grupo.`)
+        setSaving(false)
+        return
+      }
+      for (let o = 0; o < grupo.opciones.length; o++) {
+        if (!grupo.opciones[o].nombre?.trim()) {
+          setErrorModal(`Una opción del grupo "${grupo.titulo}" no tiene nombre. Rellénala o elimínala.`)
+          setSaving(false)
+          return
+        }
+      }
+    }
+
     const payload = { ...editingItem, restaurante_id: restaurante.id }
     
     if (payload.id) {
