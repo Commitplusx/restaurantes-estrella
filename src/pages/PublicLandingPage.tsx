@@ -38,7 +38,7 @@ const EMOJI_MAP: Record<string, string> = {
   'Snacks': '🍟',
   'Desayunos': '🍳',
   'Comida China': '🥡',
-  'Alitas': '🍗',
+  'Alitas': '🔥',
   'Comida Corrida': '🍲'
 }
 
