@@ -863,6 +863,23 @@ export function PublicMenuView() {
             tipo_entrega: tipoEntrega
           }
         }).catch(err => console.warn('Error notificando al admin:', err))
+
+        // Si es a domicilio, hacer broadcast a repartidores activos
+        if (tipoEntrega === 'domicilio') {
+          supabase.functions.invoke('asignar-repartidor', {
+            body: {
+              ticket_id: ticketId,
+              restaurante: restaurante.nombre,
+              descripcion: pedidoCompleto,
+              direccion: direccionEntrega,
+              referencias: direccionReferencias.trim() || null,
+              metodo_pago: 'efectivo',
+              total: total,
+              lat: ubicacionGPS?.lat ?? null,
+              lng: ubicacionGPS?.lng ?? null
+            }
+          }).catch(err => console.warn('Error en broadcast a repartidores:', err))
+        }
       }
 
     } catch (err: any) { 
