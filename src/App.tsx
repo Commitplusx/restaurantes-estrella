@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { supabase } from './lib/supabase'
-import { LoginPage } from './pages/LoginPage'
-import { PortalPage } from './pages/PortalPage'
-import { PublicLandingPage } from './pages/PublicLandingPage'
-import { PublicMenuView } from './pages/PublicMenuView'
-import { SuccessPage } from './pages/SuccessPage'
 import { FloatingOrderTracker } from './components/FloatingOrderTracker'
 import { InstallPWA } from './components/InstallPWA'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+
+// Lazy loading de las vistas para hacer Code Splitting
+const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })))
+const PortalPage = lazy(() => import('./pages/PortalPage').then(module => ({ default: module.PortalPage })))
+const PublicLandingPage = lazy(() => import('./pages/PublicLandingPage').then(module => ({ default: module.PublicLandingPage })))
+const PublicMenuView = lazy(() => import('./pages/PublicMenuView').then(module => ({ default: module.PublicMenuView })))
+const SuccessPage = lazy(() => import('./pages/SuccessPage').then(module => ({ default: module.SuccessPage })))
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -42,14 +44,20 @@ export default function App() {
   return (
     <BrowserRouter>
       <FloatingOrderTracker />
-      <Routes>
-        <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
-        <Route path="/menu/:id" element={<PublicMenuView />} />
-        <Route path="/success" element={<SuccessPage />} />
-        <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />
-        <Route path="/portal/*" element={session ? <PortalPage /> : <Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }>
+        <Routes>
+          <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
+          <Route path="/menu/:id" element={<PublicMenuView />} />
+          <Route path="/success" element={<SuccessPage />} />
+          <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />
+          <Route path="/portal/*" element={session ? <PortalPage /> : <Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
       <InstallPWA />
     </BrowserRouter>
   )

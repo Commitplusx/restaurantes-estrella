@@ -1052,7 +1052,7 @@ export function PublicMenuView() {
         <div className={`flex-1 min-w-0 transition-all duration-500 ease-out flex items-center gap-3 ${isScrolled ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           {restaurante.foto_fachada_url && (
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-sm">
-              <img src={restaurante.foto_fachada_url} alt="Logo" className="w-full h-full object-cover" />
+              <img src={restaurante.foto_fachada_url} loading="lazy" alt="Logo" className="w-full h-full object-cover" />
             </div>
           )}
           <h1 className="text-[16px] md:text-[18px] font-brother font-bold uppercase tracking-widest text-slate-900 truncate mt-0.5">{restaurante.nombre}</h1>

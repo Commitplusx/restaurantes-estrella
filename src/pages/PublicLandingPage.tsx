@@ -608,7 +608,7 @@ export function PublicLandingPage() {
                  {/* Imagen 16:9 en Desktop, 4:3 pequeño en Móvil */}
                  <div className="relative w-[110px] sm:w-full shrink-0 aspect-[4/3] sm:aspect-video rounded-xl sm:rounded-[18px] overflow-hidden bg-slate-100 sm:mb-2.5 shadow-none sm:shadow-[0_2px_15px_rgba(0,0,0,0.06)] border border-slate-100 isolate">
                     {res.foto_fachada_url ? (
-                      <img src={res.foto_fachada_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" alt={res.nombre} />
+                      <img src={res.foto_fachada_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" alt={res.nombre} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-orange-50"><Store size={24} className="text-orange-200 sm:w-10 sm:h-10" /></div>
                     )}
