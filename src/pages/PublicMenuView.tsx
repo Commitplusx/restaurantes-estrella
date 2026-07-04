@@ -122,8 +122,7 @@ export function PublicMenuView() {
 
   const [loading, setLoading] = useState(true)
 
-  const [activeTab, setActiveTab] = useState<'menu' | 'combos' | 'promos'>('menu')
-  const [activeCategoryId, setActiveCategoryId] = useState<string>('todos')
+  const [activeTab, setActiveTab] = useState<string>('')
 
   const [selectedItemDetail, setSelectedItemDetail] = useState<any | null>(null)
 
@@ -415,16 +414,18 @@ export function PublicMenuView() {
           const hasValidPromos = validPromos.length > 0
           
           const urlTab = new URLSearchParams(location.search).get('tab')
-          if (urlTab === 'promos') setActiveTab('promos')
-          else if (urlTab === 'combos' && hasCombos) setActiveTab('combos')
-          else if (urlTab === 'menu') setActiveTab('menu')
-          else if (!hasItems && hasCombos) setActiveTab('combos')
-          else if (!hasItems && !hasCombos && hasValidPromos) setActiveTab('promos')
-          else setActiveTab('menu')
+        if (urlTab && urlTab !== 'menu') {
+          setActiveTab(urlTab)
+        } else {
+          const validCategories = (cats || []).filter(c => (prods || []).some(i => i.categoria_id === c.id))
+          if (validCategories.length > 0) setActiveTab(validCategories[0].id)
+          else if (hasCombos) setActiveTab('combos')
+          else if (hasValidPromos) setActiveTab('promos')
         }
       }
+    }
       
-      return actualId
+    return actualId
     }
 
     async function load() {
@@ -440,6 +441,17 @@ export function PublicMenuView() {
         setPromos(cached.promos)
         setLoading(false)
         actualRestId = cached.restaurante.id;
+        
+        // Inicializar la pestaña activa desde caché
+        const urlTab = new URLSearchParams(location.search).get('tab')
+        if (urlTab && urlTab !== 'menu') {
+          setActiveTab(urlTab)
+        } else {
+          const validCategories = cached.categorias.filter((c: any) => cached.items.some((i: any) => i.categoria_id === c.id))
+          if (validCategories.length > 0) setActiveTab(validCategories[0].id)
+          else if (cached.combos.length > 0) setActiveTab('combos')
+          else if (cached.promos.length > 0) setActiveTab('promos')
+        }
         
         // Ejecutar fetch silencioso en background para actualizar caché si pasaron más de 1 min
         if (Date.now() - cached.timestamp > 60000) {
@@ -545,9 +557,14 @@ export function PublicMenuView() {
 
   useEffect(() => {
     const urlTab = new URLSearchParams(location.search).get('tab')
-    if (urlTab === 'promos') setActiveTab('promos')
-    else if (urlTab === 'combos') setActiveTab('combos')
-    else if (urlTab === 'menu') setActiveTab('menu')
+    if (urlTab && urlTab !== 'menu') {
+      setActiveTab(urlTab)
+    } else {
+      const validCategories = categorias.filter(c => items.some(i => i.categoria_id === c.id))
+      if (validCategories.length > 0) setActiveTab(validCategories[0].id)
+      else if (combos.length > 0) setActiveTab('combos')
+      else if (promos.length > 0) setActiveTab('promos')
+    }
   }, [location.search])
 
   // Fix Map interaction to be like Rappi/Uber (fixed center pin)
@@ -1113,16 +1130,19 @@ export function PublicMenuView() {
         )}
 
         {/* TABS DE NAVEGACIÓN (RAPPI STYLE) */}
-        {(combos.length > 0 || promos.length > 0) && (
+        {(categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 0 || combos.length > 0 || promos.length > 0) && (
           <div className="sticky top-[52px] z-40 bg-white pt-6 pb-0 mb-6 border-b border-slate-100">
             <div className="flex overflow-x-auto hide-scrollbar gap-8 px-2">
-              <button
-                onClick={() => setActiveTab('menu')}
-                className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === 'menu' ? 'text-slate-900' : 'text-slate-400'}`}
-              >
-                Menú
-                {activeTab === 'menu' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
-              </button>
+              {categorias.filter(c => items.some(i => i.categoria_id === c.id)).map(cat => (
+                <button
+                  key={`tab-${cat.id}`}
+                  onClick={() => setActiveTab(cat.id)}
+                  className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === cat.id ? 'text-slate-900' : 'text-slate-400'}`}
+                >
+                  {cat.emoji && <span className="mr-2">{cat.emoji}</span>}{cat.nombre}
+                  {activeTab === cat.id && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
+                </button>
+              ))}
               {combos.length > 0 && (
                 <button
                   onClick={() => setActiveTab('combos')}
@@ -1145,32 +1165,10 @@ export function PublicMenuView() {
           </div>
         )}
 
-            {/* PRODUCT CATEGORIES (MENU TAB) */}
-            {activeTab === 'menu' && (
-              <div className="mt-8 relative">
-                {/* STICKY CATEGORY NAV */}
-                {categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 1 && (
-                  <div className="sticky top-[60px] md:top-[70px] z-30 bg-white/95 backdrop-blur-md py-3 -mx-4 px-4 overflow-x-auto flex gap-2 border-b border-slate-100 shadow-[0_4px_12px_rgba(0,0,0,0.02)] mb-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    <button 
-                      onClick={() => setActiveCategoryId('todos')}
-                      className={`whitespace-nowrap px-5 py-2 font-bold rounded-full text-sm transition-all border shrink-0 ${activeCategoryId === 'todos' ? 'bg-orange-500 text-white border-orange-500 shadow-md scale-105' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
-                    >
-                      Todos
-                    </button>
-                    {categorias.filter(c => items.some(i => i.categoria_id === c.id)).map(cat => (
-                      <button 
-                        key={`nav-${cat.id}`}
-                        onClick={() => setActiveCategoryId(cat.id)}
-                        className={`whitespace-nowrap px-5 py-2 font-bold rounded-full text-sm transition-all border shrink-0 ${activeCategoryId === cat.id ? 'bg-orange-500 text-white border-orange-500 shadow-md scale-105' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}`}
-                      >
-                        {cat.nombre}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
+            {/* PRODUCT CATEGORIES CONTENT */}
+            <div className="mt-8 relative">
                 <AnimatePresence mode="popLayout">
-                  {categorias.filter(cat => activeCategoryId === 'todos' || cat.id === activeCategoryId).map(cat => {
+                  {categorias.filter(cat => cat.id === activeTab).map(cat => {
                     const catItems = items.filter(i => i.categoria_id === cat.id)
                     if (catItems.length === 0) return null
                     return (
@@ -1184,11 +1182,6 @@ export function PublicMenuView() {
                         exit={{ opacity: 0, scale: 0.95, y: -20 }}
                         transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 25 }}
                       >
-                        {activeCategoryId === 'todos' && (
-                          <h3 className="text-xl font-bold text-slate-900 mb-4 px-2 tracking-tight">
-                            {cat.nombre}
-                          </h3>
-                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {catItems.map((item) => {
                           const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
@@ -1252,10 +1245,9 @@ export function PublicMenuView() {
                   })}
                 </AnimatePresence>
               </div>
-            )}
 
-            {/* Empty state for menu tab */}
-            {activeTab === 'menu' && items.length === 0 && !loading && (
+            {/* Empty state for categories */}
+            {items.length === 0 && !loading && activeTab !== 'combos' && activeTab !== 'promos' && (
               <div className="text-center py-16 text-slate-400">
                 <Store size={40} className="mx-auto mb-3 opacity-30" />
                 <p className="font-bold">Este restaurante aún no tiene platillos publicados</p>
@@ -1474,14 +1466,14 @@ export function PublicMenuView() {
         <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="text-center md:text-left">
             <div className="flex items-center gap-2 mb-3 justify-center md:justify-start">
-              <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center shadow">
-                <Store className="w-3.5 h-3.5 text-white" />
-              </div>
               <span className="text-lg font-black text-slate-800 tracking-tighter">
                 Estrella<span className="text-orange-500">Eats</span>
               </span>
             </div>
             <p className="text-slate-400 text-sm font-medium">La mejor selección gastronómica de Comitán.</p>
+            <div className="mt-6 flex justify-center md:justify-start">
+              <img src="/estrella-circle.png" alt="Sello Estrella" className="w-24 h-24 object-contain" />
+            </div>
           </div>
           <div className="flex gap-12">
             <div className="flex flex-col gap-3">

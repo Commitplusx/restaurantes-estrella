@@ -4,8 +4,9 @@ import type { MenuPromocion } from '../lib/supabase'
 import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useLoadScript } from '@react-google-maps/api';
 
-
+const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
 interface Restaurante {
   id: string
   nombre: string
@@ -43,6 +44,11 @@ const EMOJI_MAP: Record<string, string> = {
 }
 
 export function PublicLandingPage() {
+  const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: LIBRARIES
+  });
+
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
   const [activeCategories, setActiveCategories] = useState<{name: string, emoji: string}[]>([])
@@ -55,7 +61,11 @@ export function PublicLandingPage() {
   const [hasMore, setHasMore] = useState(true)
   const [activeTab, setActiveTab] = useState<'todos' | 'cerca'>('todos')
   const [isScrolled, setIsScrolled] = useState(false)
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(() => {
+    const saved = sessionStorage.getItem('est_ubicacion')
+    return saved ? JSON.parse(saved) : null
+  })
+  const [userAddress, setUserAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
   const [locationLoading, setLocationLoading] = useState(false)
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0)
 
@@ -178,7 +188,33 @@ export function PublicLandingPage() {
   useEffect(() => {
     loadRestaurants(0)
     loadPromos()
+  }, [])
 
+  // Auto-geocode si hay ubicación pero no hay dirección guardada
+  useEffect(() => {
+    if (isGoogleMapsLoaded && userLocation && !userAddress && window.google && window.google.maps) {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: userLocation }, (results, status) => {
+        if (status === 'OK' && results && results.length > 0) {
+          let colonia = '';
+          for (let i = 0; i < results.length; i++) {
+            const sublocalityInfo = results[i].address_components.find((c: any) => 
+              c.types.includes('sublocality') || c.types.includes('sublocality_level_1') || c.types.includes('neighborhood')
+            );
+            if (sublocalityInfo) {
+              colonia = sublocalityInfo.long_name;
+              break;
+            }
+          }
+          if (!colonia) colonia = results[0].formatted_address.split(',')[0];
+          setUserAddress(colonia);
+          sessionStorage.setItem('est_direccion', colonia);
+        }
+      });
+    }
+  }, [isGoogleMapsLoaded, userLocation, userAddress])
+
+  useEffect(() => {
     const channel = supabase
       .channel('public:landing_restaurantes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes' }, (payload) => {
@@ -253,28 +289,64 @@ export function PublicLandingPage() {
     return R * c;
   }
 
+  const requestLocation = (onComplete?: () => void) => {
+    setLocationLoading(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setUserLocation({ lat, lng });
+          sessionStorage.setItem('est_ubicacion', JSON.stringify({ lat, lng }));
+          
+          // Geocoding to get neighborhood
+          if (window.google && window.google.maps) {
+            const geocoder = new window.google.maps.Geocoder();
+            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+              if (status === 'OK' && results && results.length > 0) {
+                let colonia = '';
+                for (let i = 0; i < results.length; i++) {
+                  const addressComponents = results[i].address_components;
+                  const sublocalityInfo = addressComponents.find((c: any) => 
+                    c.types.includes('sublocality') || 
+                    c.types.includes('sublocality_level_1') || 
+                    c.types.includes('neighborhood')
+                  );
+                  if (sublocalityInfo) {
+                    colonia = sublocalityInfo.long_name;
+                    break;
+                  }
+                }
+                if (!colonia) {
+                  colonia = results[0].formatted_address.split(',')[0];
+                }
+                setUserAddress(colonia);
+                sessionStorage.setItem('est_direccion', colonia);
+              }
+            });
+          }
+
+          setLocationLoading(false);
+          if (onComplete) onComplete();
+        },
+        (err) => {
+          console.error("Error obteniendo ubicación:", err);
+          alert("No pudimos obtener tu ubicación GPS. Por favor actívala en tu navegador.");
+          setLocationLoading(false);
+          if (onComplete) onComplete();
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      alert("Tu navegador no soporta geolocalización.");
+      setLocationLoading(false);
+      if (onComplete) onComplete();
+    }
+  }
+
   const handleTabClick = (tab: 'todos' | 'cerca') => {
     if (tab === 'cerca' && !userLocation) {
-      setLocationLoading(true);
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-            setActiveTab('cerca');
-            setLocationLoading(false);
-          },
-          (err) => {
-            console.error("Error obteniendo ubicación:", err);
-            alert("No pudimos obtener tu ubicación GPS. Por favor actívala en tu navegador.");
-            setActiveTab('cerca');
-            setLocationLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-      } else {
-        alert("Tu navegador no soporta geolocalización.");
-        setLocationLoading(false);
-      }
+      requestLocation(() => setActiveTab('cerca'));
     } else {
       setActiveTab(tab);
     }
@@ -342,16 +414,18 @@ export function PublicLandingPage() {
       {/* Header Pegajoso (Estilo Delivery App) */}
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-sm' : 'bg-slate-50'} pt-3 md:pt-6 pb-2.5 md:pb-3 px-4 md:px-12 flex flex-col gap-2 md:gap-4`}>
         <div className="max-w-[1400px] mx-auto w-full flex justify-between items-center">
-           <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity" onClick={() => handleTabClick('cerca')}>
+           <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity" onClick={() => requestLocation()}>
               <span className="text-[10px] md:text-[11px] font-bold text-orange-600 uppercase tracking-wide">Entregar ahora en</span>
               <div className="flex items-center gap-1 font-bold text-slate-800 text-[14px] md:text-[15px]">
                  <MapPin size={14} strokeWidth={2.5} className="text-slate-800"/> 
-                 {userLocation ? "Tu Ubicación Actual" : "Comitán de Domínguez"} 
-                 <ChevronRight size={14} className="text-slate-400"/>
+                 <span className="truncate max-w-[200px] md:max-w-[300px]">
+                   {locationLoading ? "Obteniendo ubicación..." : (userAddress ? userAddress.split(',')[0] : (userLocation ? "Tu Ubicación Actual" : "Comitán de Domínguez"))}
+                 </span>
+                 {locationLoading ? <Loader2 size={14} className="animate-spin text-orange-500 shrink-0"/> : <ChevronRight size={14} className="text-slate-400 shrink-0"/>}
               </div>
            </div>
-           <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-white flex items-center justify-center p-1 shadow-sm border border-slate-100">
-             <img src="/logo.png" alt="Estrella Eats" className="w-full h-full object-contain" />
+           <div className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center">
+             <img src="/estrella-circle.png" alt="Estrella Eats" className="w-full h-full object-contain" />
            </div>
         </div>
         
@@ -592,13 +666,15 @@ export function PublicLandingPage() {
       <footer className="bg-white border-t border-slate-100 py-12 px-6">
         <div className="max-w-[1400px] mx-auto text-center">
           <div className="flex items-center gap-2 mb-4 justify-center">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-md">
-              <Store className="w-4 h-4 text-white" />
-            </div>
             <span className="text-xl font-black text-slate-900 tracking-tighter">
               Estrella<span className="text-[#FA4A0C]">Eats</span>
             </span>
           </div>
+          
+          <div className="mt-6 mb-2 flex justify-center">
+            <img src="/estrella-circle.png" alt="Sello Estrella" className="w-24 h-24 object-contain" />
+          </div>
+
           <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-6">
             © {new Date().getFullYear()} Estrella Eats · Comitán de Domínguez
           </div>

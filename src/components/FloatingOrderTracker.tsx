@@ -45,7 +45,16 @@ export function FloatingOrderTracker() {
         .eq('id', orderId)
         .single();
         
-      if (!error && data) {
+      if (error) {
+        // PGRST116 means no rows found (e.g. order deleted or old cache)
+        if (error.code === 'PGRST116') {
+          localStorage.removeItem('est_active_order');
+          setOrderId(null);
+        }
+        return;
+      }
+
+      if (data) {
         setStatus(data.estado);
         setRestaurantName(data.restaurante || 'Estrella Eats');
         

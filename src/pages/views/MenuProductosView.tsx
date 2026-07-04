@@ -4,6 +4,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
 import { OpcionesEditor } from '../../components/OpcionesEditor'
 import { supabase, subirFoto } from '../../lib/supabase'
+import { CategoriasEditor } from '../../components/CategoriasEditor'
 import type { Restaurante, MenuItem, MenuCategoria } from '../../lib/supabase'
 import { motion } from 'framer-motion'
 import type { Variants } from 'framer-motion'
@@ -34,6 +35,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
   const [errorModal, setErrorModal] = useState<string | null>(null)
   const [isEditingOptions, setIsEditingOptions] = useState(false)
+  const [isEditingCategorias, setIsEditingCategorias] = useState(false)
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -118,6 +120,7 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
         categoria_id: categorias.length > 0 ? categorias[0].id : undefined
       })
     }
+    setIsEditingCategorias(false)
     setIsModalOpen(true)
   }
 
@@ -294,15 +297,29 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-2 tracking-tight">Platillos</h1>
           <p className="text-slate-500 font-medium">Gestiona tu menú principal.</p>
         </div>
-        <motion.button 
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.95 }}
-          className="w-full sm:w-auto px-6 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-2xl shadow-lg shadow-[#FF7A6A]/30 transition-colors flex items-center justify-center gap-2 group" 
-          onClick={() => handleOpenModal()}
-        >
-          <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
-          Agregar Platillo
-        </motion.button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold rounded-2xl shadow-sm transition-colors flex items-center justify-center gap-2" 
+            onClick={() => {
+              setIsEditingCategorias(true)
+              setIsModalOpen(true)
+            }}
+          >
+            <Settings2 size={20} /> 
+            Categorías
+          </motion.button>
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full sm:w-auto px-6 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-2xl shadow-lg shadow-[#FF7A6A]/30 transition-colors flex items-center justify-center gap-2 group" 
+            onClick={() => handleOpenModal()}
+          >
+            <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
+            Agregar Platillo
+          </motion.button>
+        </div>
       </div>
 
       {categorias.length === 0 && items.length === 0 ? (
@@ -397,10 +414,20 @@ export function MenuProductosView({ restaurante }: { restaurante: Restaurante })
         onClose={() => {
           setIsModalOpen(false)
           setIsEditingOptions(false)
+          setIsEditingCategorias(false)
         }}
-        title={isEditingOptions ? '' : (editingItem.id ? 'Editar Platillo' : 'Nuevo Platillo')}
+        title={isEditingOptions ? '' : (isEditingCategorias ? 'Gestionar Categorías' : (editingItem.id ? 'Editar Platillo' : 'Nuevo Platillo'))}
       >
-        {isEditingOptions ? (
+        {isEditingCategorias ? (
+          <CategoriasEditor
+            restauranteId={restaurante.id}
+            categorias={categorias}
+            onClose={() => {
+              setIsModalOpen(false)
+              setIsEditingCategorias(false)
+            }}
+          />
+        ) : isEditingOptions ? (
           <OpcionesEditor
             opciones={editingItem.opciones || []}
             onChange={(ops) => setEditingItem({ ...editingItem, opciones: ops })}
