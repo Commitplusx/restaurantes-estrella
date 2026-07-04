@@ -33,12 +33,6 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
-
   const isPartnerDomain = window.location.hostname.includes('restaurantes-app') || window.location.hostname.includes('socio');
 
   useEffect(() => {
@@ -47,6 +41,12 @@ export default function App() {
       window.location.replace(`https://estrella-eats.mx${window.location.pathname}${window.location.search}`);
     }
   }, []);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
   return (
     <BrowserRouter>
       <FloatingOrderTracker />
