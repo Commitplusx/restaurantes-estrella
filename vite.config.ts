@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'Estrella Eats',
         short_name: 'Estrella',
         description: 'Pide de tus restaurantes favoritos en Comitán y recibe tu comida calientita hasta la puerta de tu casa.',
-        theme_color: '#ea580c',
+        theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
