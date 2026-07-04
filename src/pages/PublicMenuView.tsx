@@ -409,7 +409,6 @@ export function PublicMenuView() {
         
         if (!silently) {
           setLoading(false)
-          const hasItems = (prods || []).length > 0
           const hasCombos = (cmbs || []).length > 0
           const hasValidPromos = validPromos.length > 0
           
