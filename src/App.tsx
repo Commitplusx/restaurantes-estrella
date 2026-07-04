@@ -6,6 +6,7 @@ import { PublicLandingPage } from './pages/PublicLandingPage'
 import { PublicMenuView } from './pages/PublicMenuView'
 import { SuccessPage } from './pages/SuccessPage'
 import { FloatingOrderTracker } from './components/FloatingOrderTracker'
+import { InstallPWA } from './components/InstallPWA'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/portal/*" element={session ? <PortalPage /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <InstallPWA />
     </BrowserRouter>
   )
 }
