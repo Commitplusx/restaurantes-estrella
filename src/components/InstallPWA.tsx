@@ -49,40 +49,33 @@ export function InstallPWA() {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 bg-white rounded-2xl shadow-2xl p-4 border border-orange-100 flex items-center justify-between animate-in slide-in-from-bottom-5">
+    <div className="fixed top-20 left-4 right-4 md:left-1/2 md:w-auto md:-translate-x-1/2 z-[100] bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-xl p-2 border border-white/10 flex items-center justify-between gap-4 animate-in slide-in-from-top-5">
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
-          <img src="/estrella-circle.png" alt="App" className="w-8 h-8" />
+        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0">
+          <img src="/estrella-circle.png" alt="App" className="w-7 h-7" />
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-slate-800 text-sm">Instalar Estrella Eats</span>
-          {isIOS ? (
-            <span className="text-xs text-slate-500 leading-tight">
-              Toca Compartir y luego "Añadir a inicio"
-            </span>
-          ) : (
-            <span className="text-xs text-slate-500 leading-tight">
-              Pide rápido desde tu inicio
-            </span>
-          )}
+          <span className="font-bold text-white text-sm leading-tight">Lleva a Estrella Eats contigo</span>
+          <span className="text-[11px] text-slate-300 leading-tight">
+            {isIOS ? 'Comparte y "Añadir a inicio"' : 'Pide a un toque y sin consumir espacio'}
+          </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {!isIOS && (
           <button 
             onClick={handleInstallClick}
-            className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-orange-600 active:scale-95 transition-all"
+            className="bg-orange-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-orange-600 transition-colors"
           >
-            <Download size={16} />
             Instalar
           </button>
         )}
         <button 
           onClick={handleDismiss}
-          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2 text-slate-400 hover:text-white transition-colors"
         >
-          <X size={18} />
+          <X size={16} />
         </button>
       </div>
     </div>
