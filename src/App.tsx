@@ -41,6 +41,12 @@ export default function App() {
 
   const isPartnerDomain = window.location.hostname.includes('restaurantes-app') || window.location.hostname.includes('socio');
 
+  useEffect(() => {
+    // Redirigir enlaces viejos de menús públicos al nuevo dominio .mx
+    if (window.location.pathname.startsWith('/menu/') && window.location.hostname.includes('restaurantes-app')) {
+      window.location.replace(`https://estrella-eats.mx${window.location.pathname}${window.location.search}`);
+    }
+  }, []);
   return (
     <BrowserRouter>
       <FloatingOrderTracker />
