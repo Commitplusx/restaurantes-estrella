@@ -55,9 +55,9 @@ export function InstallPWA() {
           <img src="/estrella-circle.png" alt="App" className="w-7 h-7" />
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-white text-sm leading-tight">Lleva a Estrella Eats contigo</span>
+          <span className="font-bold text-white text-sm leading-tight">¿Antojo? 🍔</span>
           <span className="text-[11px] text-slate-300 leading-tight">
-            {isIOS ? 'Comparte y "Añadir a inicio"' : 'Pide a un toque y sin consumir espacio'}
+            {isIOS ? 'Toca Compartir y "Añadir a inicio" 📲' : 'Instala la app y pide en segundos ✨'}
           </span>
         </div>
       </div>
