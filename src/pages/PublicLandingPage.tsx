@@ -251,30 +251,35 @@ export function PublicLandingPage() {
   }
 
   const estaAbierto = (res: Restaurante) => {
+    const toMinutes = (timeStr: string): number => {
+      if (!timeStr) return 0;
+      const [h, m] = timeStr.split(':').map(Number)
+      return (h || 0) * 60 + (m || 0)
+    }
+    const nowMinutes = () => {
+      const d = new Date()
+      return d.getHours() * 60 + d.getMinutes()
+    }
+    const isOpenRange = (abre: string, cierra: string): boolean => {
+      const now = nowMinutes()
+      const a = toMinutes(abre)
+      const c = toMinutes(cierra)
+      if (a <= c) return now >= a && now <= c
+      return now >= a || now <= c
+    }
+
     if (res.horarios) {
       const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
-      const hoy = new Date()
-      const diaString = dias[hoy.getDay()]
-      const horarioHoy = res.horarios[diaString]
+      const diaString = dias[new Date().getDay()]
+      const horarioHoy = res.horarios[diaString as keyof typeof res.horarios]
       if (horarioHoy && horarioHoy.activo) {
-        const horaLocal = hoy.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        if (horarioHoy.abre <= horarioHoy.cierra) {
-          return horaLocal >= horarioHoy.abre && horaLocal <= horarioHoy.cierra
-        } else {
-          return horaLocal >= horarioHoy.abre || horaLocal <= horarioHoy.cierra
-        }
+        return isOpenRange(horarioHoy.abre, horarioHoy.cierra)
       }
       return false
     }
 
     if (!res.hora_apertura || !res.hora_cierre) return false;
-    const ahora = new Date();
-    const horaLocal = ahora.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    if (res.hora_apertura <= res.hora_cierre) {
-      return horaLocal >= res.hora_apertura && horaLocal <= res.hora_cierre;
-    } else {
-      return horaLocal >= res.hora_apertura || horaLocal <= res.hora_cierre;
-    }
+    return isOpenRange(res.hora_apertura, res.hora_cierre)
   }
 
   function calculaDistancia(lat1: number, lon1: number, lat2: number, lon2: number) {
