@@ -1156,7 +1156,7 @@ export function PublicMenuView() {
                       >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {catItems.map((item) => {
-                          const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined }
+                          const cartItem = { id: item.id, nombre: item.nombre, precio: item.precio, tipo: 'item' as const, foto_url: item.foto_url || undefined, aplica_subsidio: item.aplica_subsidio }
                           // Filtrar por horario si tiene horario configurado
                           const horaActual = new Date().toTimeString().slice(0,5) // 'HH:MM'
                           const fueraDeHorario = !!(
