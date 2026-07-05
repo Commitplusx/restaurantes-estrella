@@ -61,6 +61,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
     
     if (pendientes.length > 0) {
       document.title = `(${pendientes.length}) ¡NUEVO PEDIDO! 🔔`
+      
       // Hacemos sonar la campana cada 4 segundos
       const interval = setInterval(() => {
         if (notifPermission === 'granted') {
@@ -69,7 +70,9 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       }, 4000)
       
       // Reproducir también inmediatamente al detectar
-      if (notifPermission === 'granted') playBellSound()
+      if (notifPermission === 'granted') {
+        playBellSound()
+      }
 
       return () => {
         clearInterval(interval)
@@ -80,13 +83,39 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
     }
   }, [pedidos, notifPermission])
 
+  // Enviar Notificación Push real al detectar nuevos pedidos (usando un listener al websocket)
+  useEffect(() => {
+    if (!restaurante) return
+    const channel = supabase
+      .channel(`public:pedidos:notif:${restaurante.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
+        (payload) => {
+          if (notifPermission === 'granted' && 'Notification' in window) {
+            new Notification('¡NUEVO PEDIDO!', {
+              body: `Tienes un nuevo pedido a las ${new Date().toLocaleTimeString()}. ¡Revísalo ahora!`,
+              icon: '/favicon.ico'
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [restaurante.id, notifPermission])
+
   const playBellSound = () => {
     try {
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
-      audio.volume = 1.0
-      const playPromise = audio.play()
-      if (playPromise !== undefined) {
-        playPromise.catch((e) => console.error('Audio play blocked:', e))
+      const audioElement = document.getElementById('alarm-audio') as HTMLAudioElement;
+      if (audioElement) {
+        audioElement.currentTime = 0; // Reiniciar
+        const playPromise = audioElement.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((e) => console.error('Audio play blocked. Interactúa con la página para activar el sonido.', e))
+        }
       }
     } catch (e) {
       console.error('Error playing sound:', e)
@@ -125,16 +154,8 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       const { error } = await supabase.from('pedidos').update(updateData).eq('id', id)
       if (error) throw error
       
-      // Si cambia de estado en cocina, notificar
-      if (nuevoEstado === 'en_cocina' || nuevoEstado === 'listo_para_recoger') {
-        const tipo = nuevoEstado === 'en_cocina' ? 'preparando' : 'comida_lista'
-        const { error: invokeErr } = await supabase.functions.invoke('notificar-whatsapp', {
-          body: { tipo, pedido_id: id, restaurante: restaurante.nombre, tiempo_preparacion_minutos: tiempoMinutos }
-        })
-        if (invokeErr) {
-          console.error(`Error al invocar webhook de WA para ${tipo}:`, invokeErr)
-        }
-      }
+      // NOTA: Si cambia de estado en cocina, el Webhook de BD ahora detectará
+      // el UPDATE y disparará automáticamente 'notificar-whatsapp' al cliente.
       setPedidoToPrepare(null)
     } catch (e) {
       console.error('Error actualizando estado, revirtiendo:', e)
@@ -158,6 +179,8 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Audio oculto cargado previamente para evitar bloqueos del navegador al reproducir */}
+      <audio id="alarm-audio" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-bold text-slate-800">Monitor de Cocina</h3>
         <div className="flex gap-4">

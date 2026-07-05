@@ -867,38 +867,11 @@ export function PublicMenuView() {
 
       if (insertError) throw insertError
 
-      // Notificar al admin para TODOS los pedidos en efectivo (domicilio Y tienda)
-      // Si es pago en línea, la notificación se envía desde el webhook de Mercado Pago al aprobarse.
-      if (metodoPago === 'efectivo') {
-        await supabase.functions.invoke('notificar-whatsapp', {
-          body: {
-            tipo: 'nueva_orden_admin',
-            ticket_id: ticketId,
-            restaurante: restaurante.nombre,
-            descripcion: pedidoCompleto,
-            tipo_entrega: tipoEntrega
-          }
-        }).catch(err => console.warn('Error notificando al admin:', err))
+                        // NOTA: La notificación de WhatsApp al restaurante ahora se maneja vía Webhook de Base de Datos
+      // en Supabase (Trigger) para pagos en efectivo. Si es pago en línea, lo maneja el webhook de MercadoPago.
 
-        // Si es a domicilio, hacer broadcast a repartidores activos
-        if (tipoEntrega === 'domicilio') {
-          supabase.functions.invoke('asignar-repartidor', {
-            body: {
-              ticket_id: ticketId,
-              restaurante: restaurante.nombre,
-              descripcion: pedidoCompleto,
-              direccion: direccionEntrega,
-              referencias: direccionReferencias.trim() || null,
-              metodo_pago: 'efectivo',
-              total: total,
-              lat: ubicacionGPS?.lat ?? null,
-              lng: ubicacionGPS?.lng ?? null
-            }
-          }).catch(err => console.warn('Error en broadcast a repartidores:', err))
-        }
-      }
 
-    } catch (err: any) { 
+    } catch (err: any) {    
       alert('Hubo un problema registrando el pedido en la base de datos: ' + (err.message || 'Error desconocido') + '. Por favor intenta nuevamente.');
       submittingRef.current = false // BUG 5 fix
       setProcesando(false);
@@ -1108,14 +1081,14 @@ export function PublicMenuView() {
             </div>
             
             <a 
-              href={restaurante.maps_url || (restaurante.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurante.direccion.replace('GPS: ', ''))}` : '#')} 
+              href={restaurante.maps_url || (restaurante.direccion?.startsWith('http') ? restaurante.direccion : (restaurante.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurante.direccion.replace('GPS: ', ''))}` : '#'))} 
               target="_blank" 
               rel="noopener noreferrer" 
-              className={`flex items-center gap-1.5 transition-colors ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') ? 'text-blue-600 hover:text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
+              className={`flex items-center gap-1.5 transition-colors ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-600 hover:text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
             >
-              <MapPin size={16} className={restaurante.maps_url || restaurante.direccion?.includes('GPS:') ? 'text-blue-500' : 'text-slate-400'} /> 
-              <span className={`line-clamp-1 max-w-[200px] font-medium ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') ? 'underline decoration-blue-200 underline-offset-2' : ''}`}>
-                {restaurante.direccion?.includes('GPS:') ? 'Ver ubicación en el mapa' : (restaurante.direccion || 'Comitán')}
+              <MapPin size={16} className={restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-500' : 'text-slate-400'} /> 
+              <span className={`line-clamp-1 max-w-[200px] font-medium ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'underline decoration-blue-200 underline-offset-2' : ''}`}>
+                {restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'Ver ubicación en el mapa' : (restaurante.direccion || 'Comitán')}
               </span>
             </a>
           </div>
