@@ -91,7 +91,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
-        (payload) => {
+        () => {
           if (notifPermission === 'granted' && 'Notification' in window) {
             new Notification('¡NUEVO PEDIDO!', {
               body: `Tienes un nuevo pedido a las ${new Date().toLocaleTimeString()}. ¡Revísalo ahora!`,
