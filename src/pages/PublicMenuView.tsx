@@ -867,8 +867,8 @@ export function PublicMenuView() {
 
       if (insertError) throw insertError
 
-                        // NOTA: La notificación de WhatsApp al restaurante ahora se maneja vía Webhook de Base de Datos
-      // en Supabase (Trigger) para pagos en efectivo. Si es pago en línea, lo maneja el webhook de MercadoPago.
+      // La notificación al restaurante la maneja el DB Webhook de Supabase (tabla pedidos → notificar-whatsapp)
+      // tanto para efectivo como para pagos en línea (este último vía webhook de MercadoPago).
 
 
     } catch (err: any) {    
