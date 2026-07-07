@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ShieldCheck, Building2, Target, Database, Cookie, Scale, RefreshCcw } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, Variants } from 'framer-motion'
 
 export function PrivacyPage() {
   const sections = [
@@ -58,7 +58,7 @@ export function PrivacyPage() {
     }
   ]
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -66,7 +66,7 @@ export function PrivacyPage() {
     }
   }
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   }
