@@ -246,6 +246,8 @@ export function PublicMenuView() {
   
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
+  const [isFreeDelivery, setIsFreeDelivery] = useState(false)
+  const [checkingLoyalty, setCheckingLoyalty] = useState(false)
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null)
   const [procesando, setProcesando] = useState(false)
   const [ubicacionGPS, setUbicacionGPS] = useState<{lat: number, lng: number} | null>(() => {
@@ -285,6 +287,44 @@ export function PublicMenuView() {
 
   // Estados de cálculo H3 abstraídos
   const { costoEnvioBase, fueraDeCobertura, calculandoEnvio } = useDeliveryCalculation(ubicacionGPS, tipoEntrega);
+  
+  // Revisar si el cliente tiene envío gratis por lealtad
+  useEffect(() => {
+    const telLimpio = clienteTel.replace(/\D/g, '')
+    if (telLimpio.length === 10) {
+      checkLoyaltyPoints(telLimpio)
+    } else {
+      setIsFreeDelivery(false)
+    }
+  }, [clienteTel])
+
+  const checkLoyaltyPoints = async (tel: string) => {
+    setCheckingLoyalty(true)
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('puntos, rango')
+        .eq('telefono', tel)
+        .single()
+      
+      if (!error && data) {
+        // En su sistema original, la meta VIP depende del rango
+        const meta = (data.rango === 'vip') ? 5 : 6; 
+        if (data.puntos % meta === (meta - 1)) {
+          setIsFreeDelivery(true)
+        } else {
+          setIsFreeDelivery(false)
+        }
+      } else {
+        setIsFreeDelivery(false)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCheckingLoyalty(false)
+    }
+  }
+
   useEffect(() => {
     sessionStorage.setItem('est_carrito', JSON.stringify(carrito))
   }, [carrito])
@@ -602,7 +642,8 @@ export function PublicMenuView() {
   const bolsaSubsidio = cantidadSubsidio * 8;
   
   // El costo de envío se reduce usando la bolsa de subsidio (nunca baja de 0)
-  const costoEnvio = costoEnvioBase > 0 ? Math.max(0, costoEnvioBase - bolsaSubsidio) : 0;
+  const costoEnvioNormal = costoEnvioBase > 0 ? Math.max(0, costoEnvioBase - bolsaSubsidio) : 0;
+  const costoEnvio = isFreeDelivery ? 0 : costoEnvioNormal;
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
     if (restaurante && !estaAbierto(restaurante)) {
@@ -1764,10 +1805,21 @@ export function PublicMenuView() {
                       <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-white border border-slate-200 rounded-[16px] px-4 py-3.5 outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 transition-all font-medium text-slate-800 placeholder:text-slate-300 shadow-sm" />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Tu Teléfono (WhatsApp)</label>
+                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-between">
+                        <span>Tu Teléfono (WhatsApp)</span>
+                        {checkingLoyalty && <Loader2 size={12} className="animate-spin text-orange-500" />}
+                      </label>
                       <input type="tel" value={clienteTel} onChange={(e) => {setClienteTel(e.target.value); setTelError(false);}} placeholder="10 dígitos" maxLength={10} className={`w-full bg-white border rounded-[16px] px-4 py-3.5 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-300 shadow-sm ${telError ? 'border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-500/10' : 'border-slate-200 focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10'}`} />
                       {telError && <p className="text-red-500 text-[10px] font-bold mt-2 flex items-center gap-1"><AlertCircle size={10} /> Ingrese un número a 10 dígitos válido</p>}
                     </div>
+                    
+                    {isFreeDelivery && (
+                      <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="bg-orange-50 p-3 rounded-xl border border-orange-200 flex items-center gap-2 mt-2">
+                        <Star size={16} className="text-orange-500 fill-orange-500" />
+                        <p className="text-[11px] font-bold text-orange-800">¡Felicidades! Este es tu 6to pedido, tu envío será <span className="font-black text-orange-600">GRATIS</span>.</p>
+                      </motion.div>
+                    )}
+
                     <div className="bg-slate-50 p-4 rounded-2xl flex items-start gap-3 mt-4 border border-slate-100">
                       <div className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0">💡</div>
                       <p className="text-xs text-slate-500 mt-1">Tu información está segura. Solo la usamos para contactarte si el repartidor no encuentra tu casa.</p>
@@ -1915,12 +1967,14 @@ export function PublicMenuView() {
                 {checkoutStep === 3 && tipoEntrega === 'domicilio' && costoEnvioBase > 0 && !fueraDeCobertura && !calculandoEnvio && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[16px] p-3 flex items-center gap-3 border ${costoEnvio === 0 ? 'bg-green-50/80 border-green-200/50' : 'bg-blue-50/80 border-blue-200/50'}`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${costoEnvio === 0 ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                      {costoEnvio === 0 ? <span className="text-sm">🎉</span> : <span className="text-sm">🛵</span>}
+                      {costoEnvio === 0 ? <span className="text-sm">🎁</span> : <span className="text-sm">🛵</span>}
                     </div>
                     <p className={`text-[12px] font-medium leading-tight ${costoEnvio === 0 ? 'text-green-800' : 'text-blue-800'}`}>
-                      {costoEnvio === 0 
-                        ? <>¡Magia! ✨ Tu envío es <span className="font-black">TOTALMENTE GRATIS</span>. ¡Aprovecha ese ahorro para pedir un postre!</>
-                        : <>¡Tu envío está bajando gracias a tu compra! 🛵 Agrega un antojito más para que tu envío salga aún más barato... <span className="font-bold">¡o hasta GRATIS!</span></>}
+                      {isFreeDelivery 
+                        ? <>¡Magia! Por ser cliente Estrella, tu 6to envío es <span className="font-black">TOTALMENTE GRATIS</span> 🎁.</>
+                        : costoEnvio === 0 
+                        ? <>¡Magia! 🪄 Tu envío es <span className="font-black">TOTALMENTE GRATIS</span>. ¡Aprovecha ese ahorro para pedir un postre!</>
+                        : <>¡Tu envío está bajando gracias a tu compra! 👇 Agrega un antojito más para que tu envío salga aún más barato... <span className="font-bold">¡o hasta GRATIS!</span></>}
                     </p>
                   </motion.div>
                 )}
