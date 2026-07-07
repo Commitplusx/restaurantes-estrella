@@ -355,11 +355,7 @@ export function PublicMenuView() {
           setCuponValido(true)
           setDescuento(descuentoFinal)
           showToast('¡Cupón Aplicado!', `Descuento de $${descuentoFinal.toFixed(2)} aplicado`, 'success')
-          // Incrementar contador de usos
-          await supabase
-            .from('cupones_restaurante')
-            .update({ usos_actuales: cuponPropio.usos_actuales + 1 })
-            .eq('id', cuponPropio.id)
+          // El incremento de usos_actuales se hará en el backend o al confirmar la orden, NO aquí en la validación visual.
           return
         }
       }
