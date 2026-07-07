@@ -851,12 +851,18 @@ export function PublicLandingPage() {
             </span>
           </div>
           
-          <div className="mt-6 mb-2 flex justify-center">
+          <div className="mt-6 mb-6 flex justify-center">
             <img src="/estrella-circle.png" alt="Sello Estrella" className="w-24 h-24 object-contain" />
           </div>
 
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-6">
-            © {new Date().getFullYear()} Estrella Eats · Comitán de Domínguez
+          <div className="flex items-center justify-center gap-4 text-sm font-medium text-slate-500 mb-6">
+            <Link to="/terminos" className="hover:text-orange-500 transition-colors">Términos y Condiciones</Link>
+            <span>•</span>
+            <Link to="/privacidad" className="hover:text-orange-500 transition-colors">Aviso de Privacidad</Link>
+          </div>
+
+          <div className="text-sm text-slate-400 font-medium">
+            © {new Date().getFullYear()} Estrella Eats • Comitán de Domínguez
           </div>
         </div>
       </footer>

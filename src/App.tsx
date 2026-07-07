@@ -12,6 +12,10 @@ const PublicLandingPage = lazy(() => import('./pages/PublicLandingPage').then(mo
 const PublicMenuView = lazy(() => import('./pages/PublicMenuView').then(module => ({ default: module.PublicMenuView })))
 const SuccessPage = lazy(() => import('./pages/SuccessPage').then(module => ({ default: module.SuccessPage })))
 const BeneficiosPage = lazy(() => import('./pages/BeneficiosPage').then(module => ({ default: module.BeneficiosPage })))
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })))
+const TermsPage = lazy(() => import('./pages/TermsPage').then(module => ({ default: module.TermsPage })))
+
+import { CookieBanner } from './components/CookieBanner'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -50,6 +54,7 @@ export default function App() {
   );
   return (
     <BrowserRouter>
+      <CookieBanner />
       <FloatingOrderTracker />
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -59,6 +64,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
           <Route path="/beneficios" element={isPartnerDomain ? <Navigate to="/login" replace /> : <BeneficiosPage />} />
+          <Route path="/privacidad" element={<PrivacyPage />} />
+          <Route path="/terminos" element={<TermsPage />} />
           <Route path="/menu/:id" element={<PublicMenuView />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />

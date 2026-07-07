@@ -1581,7 +1581,8 @@ export function PublicMenuView() {
               <img src="/estrella-circle.png" alt="Sello Estrella" className="w-24 h-24 object-contain" />
             </div>
           </div>
-          <div className="flex gap-12">
+          
+          <div className="flex flex-col md:flex-row gap-8 md:gap-12 text-center md:text-left">
             <div className="flex flex-col gap-3">
               <p className="text-xs font-black uppercase tracking-widest text-slate-900">Ayuda</p>
               <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Soporte 24/7</a>
@@ -1589,8 +1590,8 @@ export function PublicMenuView() {
             </div>
             <div className="flex flex-col gap-3">
               <p className="text-xs font-black uppercase tracking-widest text-slate-900">Legal</p>
-              <a href="/terminos" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Términos</a>
-              <a href="/terminos" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Privacidad</a>
+              <Link to="/terminos" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Términos y Condiciones</Link>
+              <Link to="/privacidad" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Aviso de Privacidad</Link>
             </div>
           </div>
         </div>

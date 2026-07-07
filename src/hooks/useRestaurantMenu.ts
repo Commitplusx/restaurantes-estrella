@@ -101,7 +101,7 @@ export function useRestaurantMenu(id: string | undefined) {
         menuCache[id] = {
           restaurante: resRes.data,
           categorias: resCat.data || [],
-          items: resProd.data as unknown as MenuItem[] || [],
+          items: (resProd.data || []).map((i: any) => ({ ...i, foto_url: i.foto_url || i.imagen_url })) as unknown as MenuItem[] || [],
           combos: resComb.data as unknown as MenuCombo[] || [],
           promos: validPromos,
           timestamp: Date.now()
@@ -110,7 +110,7 @@ export function useRestaurantMenu(id: string | undefined) {
         if (isMounted) {
           setRestaurante(resRes.data);
           setCategorias(resCat.data || []);
-          setProductos(resProd.data as unknown as MenuItem[] || []);
+          setProductos((resProd.data || []).map((i: any) => ({ ...i, foto_url: i.foto_url || i.imagen_url })) as unknown as MenuItem[] || []);
           setCombos(resComb.data as unknown as MenuCombo[] || []);
           setPromociones(validPromos);
           if (resGrup.data) setGruposOpciones(resGrup.data as unknown as GrupoOpciones[]);
