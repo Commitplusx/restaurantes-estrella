@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
-import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript } from '@react-google-maps/api';
@@ -43,6 +43,79 @@ const EMOJI_MAP: Record<string, string> = {
   'Comida Corrida': '🍲'
 }
 
+function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calculaDistancia, horizontal = false }: any) {
+  const isAbierto = estaAbierto(res);
+  let distanceStr = '';
+  let costoStr = 'Envío: $45';
+  
+  if (userLocation && res.lat && res.lng) {
+    const dist = calculaDistancia(userLocation.lat, userLocation.lng, res.lat, res.lng);
+    distanceStr = dist < 1 ? '< 1 km' : `${dist.toFixed(1)} km`;
+    if (dist <= 1.5) {
+      costoStr = 'Envío Gratis 🏍️';
+    } else {
+      const calcCost = Math.round(15 + (dist * 10));
+      costoStr = `Envío: $${calcCost}`;
+    }
+  }
+
+  return (
+    <Link to={`/menu/${res.slug || res.id}`} className={`flex flex-col group relative bg-white sm:bg-transparent rounded-2xl sm:rounded-none shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none p-3 sm:p-0 gap-2 sm:gap-0`}>
+       {/* Imagen Circular */}
+       <div className={`relative mx-auto shrink-0 aspect-square rounded-full overflow-hidden bg-white sm:mb-3 shadow-sm border border-slate-100 isolate ${horizontal ? 'w-[100px]' : 'w-[90px] sm:w-[160px] md:w-[180px]'}`}>
+          {res.foto_fachada_url ? (
+            <img 
+              src={res.foto_fachada_url} 
+              loading="lazy" 
+              className="relative w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out z-10" 
+              alt={res.nombre} 
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-orange-50"><Store size={24} className="text-orange-200 sm:w-10 sm:h-10" /></div>
+          )}
+          
+          <button 
+            onClick={(e) => toggleFav(e, res.id)}
+            className="absolute top-2 right-2 md:top-3 md:right-3 w-8 h-8 bg-white/90 backdrop-blur-md rounded-full shadow-md flex items-center justify-center z-30 transition-transform active:scale-90 hover:scale-110"
+          >
+            <Heart size={16} className={`${isFav ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+          </button>
+
+          {/* Badge de Tiempo */}
+          {isAbierto && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-2 py-1 rounded-full shadow-sm text-[9px] sm:text-[11px] font-bold text-slate-900 flex items-center gap-1 z-20 whitespace-nowrap">
+               <Clock size={10} strokeWidth={3} className="text-[#FA4A0C]"/> 25-35 min
+            </div>
+          )}
+
+          {/* Overlay Cerrado */}
+          {!isAbierto && (
+             <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-20">
+                <span className="bg-slate-900 text-white text-[8px] sm:text-[11px] font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] px-2 py-1 sm:px-4 sm:py-2 rounded-full shadow-lg">Cerrado</span>
+             </div>
+          )}
+       </div>
+       
+       {/* Info Header */}
+       <div className={`flex flex-col items-center sm:items-center gap-1 sm:px-1 flex-1 min-w-0 text-center w-full ${horizontal ? 'mt-0' : 'mt-1 sm:mt-0'}`}>
+          <div className="min-w-0 w-full flex flex-col items-center">
+             <h3 className="font-bold text-[13px] sm:text-[15px] md:text-[16px] text-slate-900 leading-tight group-hover:text-[#FA4A0C] transition-colors truncate w-full px-2">
+               {res.nombre}
+             </h3>
+             <p className={`text-slate-500 text-[10px] sm:text-[12px] font-medium mt-0.5 truncate w-full px-2 ${costoStr.includes('Gratis') ? 'text-green-600' : ''}`}>
+               {res.categorias?.[0] || 'Restaurante'} • {costoStr} {distanceStr && `(${distanceStr})`}
+             </p>
+          </div>
+          {/* Fake Rating */}
+          <div className="bg-slate-50 border border-slate-100 flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black text-slate-700 shrink-0 gap-1 mt-0.5">
+            4.8 <Star size={10} className="fill-orange-400 text-orange-400" />
+          </div>
+       </div>
+    </Link>
+  )
+}
+
+
 export function PublicLandingPage() {
   const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
@@ -61,6 +134,8 @@ export function PublicLandingPage() {
   const [hasMore, setHasMore] = useState(true)
   const [activeTab, setActiveTab] = useState<'todos' | 'cerca'>('todos')
   const [isScrolled, setIsScrolled] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(() => {
     const saved = sessionStorage.getItem('est_ubicacion')
     return saved ? JSON.parse(saved) : null
@@ -68,6 +143,21 @@ export function PublicLandingPage() {
   const [userAddress, setUserAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
   const [locationLoading, setLocationLoading] = useState(false)
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0)
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    const saved = localStorage.getItem('est_favorites')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setFavorites(prev => {
+      const isFav = prev.includes(id)
+      const newFavs = isFav ? prev.filter(f => f !== id) : [...prev, id]
+      localStorage.setItem('est_favorites', JSON.stringify(newFavs))
+      return newFavs
+    })
+  }
 
   useEffect(() => {
     if (promosGlobales.length === 0) return;
@@ -416,55 +506,121 @@ export function PublicLandingPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-orange-100">
 
-      {/* Header Pegajoso (Estilo Delivery App) */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-sm' : 'bg-slate-50'} pt-3 md:pt-6 pb-2.5 md:pb-3 px-4 md:px-12 flex flex-col gap-2 md:gap-4`}>
-        <div className="max-w-[1400px] mx-auto w-full flex justify-between items-center">
-           <div className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity" onClick={() => requestLocation()}>
-              <span className="text-[10px] md:text-[11px] font-bold text-orange-600 uppercase tracking-wide">Entregar ahora en</span>
-              <div className="flex items-center gap-1 font-bold text-slate-800 text-[14px] md:text-[15px]">
-                 <MapPin size={14} strokeWidth={2.5} className="text-slate-800"/> 
-                 <span className="truncate max-w-[200px] md:max-w-[300px]">
-                   {locationLoading ? "Obteniendo ubicación..." : (userAddress ? userAddress.split(',')[0] : (userLocation ? "Tu Ubicación Actual" : "Comitán de Domínguez"))}
+      {/* Header Pegajoso Premium (Estilo Delivery App) */}
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'bg-slate-50'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2`}>
+        <div className="max-w-[1400px] mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
+           
+           {/* Top Row (Address + Action) */}
+           <div className="flex justify-between items-center md:w-auto w-full">
+              {/* Desktop Logo (Left) */}
+              <div className="hidden md:flex items-center gap-2 mr-4 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                 <img src="/estrella-circle.png" alt="Estrella Eats" className="w-10 h-10 object-contain" />
+                 <span className="text-xl font-black text-slate-900 tracking-tighter hidden lg:block">
+                   Estrella<span className="text-[#FA4A0C]">Eats</span>
                  </span>
-                 {locationLoading ? <Loader2 size={14} className="animate-spin text-orange-500 shrink-0"/> : <ChevronRight size={14} className="text-slate-400 shrink-0"/>}
+              </div>
+
+              {/* Address Picker Premium */}
+              <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity bg-white md:bg-transparent pl-1.5 pr-4 py-1.5 md:p-0 rounded-full md:rounded-none shadow-sm md:shadow-none border border-slate-100 md:border-transparent flex-1 md:flex-none" onClick={() => requestLocation()}>
+                 <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                    <MapPin size={18} strokeWidth={2.5} className="text-orange-600"/>
+                 </div>
+                 <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-[1px]">Entregar en</span>
+                    <div className="flex items-center gap-1">
+                       <span className="font-bold text-slate-800 text-[13px] md:text-[15px] truncate max-w-[180px] md:max-w-[250px] leading-none">
+                         {locationLoading ? "Buscando..." : (userAddress ? userAddress.split(',')[0] : (userLocation ? "Ubicación actual" : "Comitán de Domínguez"))}
+                       </span>
+                       {locationLoading ? <Loader2 size={13} className="animate-spin text-orange-500 shrink-0"/> : <ChevronDown size={14} strokeWidth={3} className="text-slate-800 shrink-0 ml-0.5"/>}
+                    </div>
+                 </div>
+              </div>
+
+              {/* Mobile Notification Bell (Right) */}
+              <div className="relative">
+                 <div 
+                   className="w-11 h-11 flex md:hidden items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 ml-3 shrink-0 relative cursor-pointer"
+                   onClick={() => setShowNotifications(!showNotifications)}
+                 >
+                    <Bell size={20} className="text-slate-700" />
+                    <div className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-white"></div>
+                 </div>
+
+                 {/* Notifications Dropdown */}
+                 <AnimatePresence>
+                   {showNotifications && (
+                     <motion.div 
+                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                       animate={{ opacity: 1, y: 0, scale: 1 }}
+                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                       className="absolute top-[52px] right-0 w-[280px] bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-100 overflow-hidden z-50 origin-top-right md:hidden"
+                     >
+                       <div className="p-4 border-b border-slate-50 bg-slate-50/50">
+                         <h3 className="font-bold text-slate-800">Notificaciones</h3>
+                       </div>
+                       <div className="p-5 flex flex-col items-center justify-center text-center gap-2">
+                         <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mb-1">
+                           <Bell size={24} className="text-orange-500 opacity-50" />
+                         </div>
+                         <p className="text-[13px] font-bold text-slate-700">No hay notificaciones nuevas</p>
+                         <p className="text-[12px] text-slate-500">Aquí te avisaremos sobre el estado de tus pedidos y promociones exclusivas.</p>
+                       </div>
+                       <div className="p-3 bg-slate-50 border-t border-slate-100">
+                         <button 
+                           onClick={() => setShowNotifications(false)}
+                           className="w-full py-2 bg-white rounded-xl text-[13px] font-bold text-slate-700 border border-slate-200 active:bg-slate-50"
+                         >
+                           Cerrar
+                         </button>
+                       </div>
+                     </motion.div>
+                   )}
+                 </AnimatePresence>
               </div>
            </div>
-           <div className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center">
-             <img src="/estrella-circle.png" alt="Estrella Eats" className="w-full h-full object-contain" />
+           
+           {/* Barra de Búsqueda Premium */}
+           <div className="relative group flex-1 w-full md:max-w-2xl flex items-center gap-2">
+              <div className="relative flex-1">
+                 <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                   <Search className="text-slate-400 group-focus-within:text-orange-500 transition-colors" size={18} strokeWidth={2.5} />
+                 </div>
+                 <input 
+                   type="text" 
+                   placeholder="Restaurantes, platillos, antojos..."
+                   className="w-full bg-white hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-orange-500 rounded-full py-3 pl-12 pr-4 text-[14px] md:text-[15px] font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+                   value={search}
+                   onChange={(e) => setSearch(e.target.value)}
+                 />
+              </div>
+              <button className="w-12 h-12 shrink-0 bg-white rounded-full flex items-center justify-center border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-colors md:hidden">
+                 <SlidersHorizontal size={20} strokeWidth={2.5} />
+              </button>
            </div>
-        </div>
-        
-        {/* Barra de Búsqueda */}
-        <div className="max-w-[1400px] mx-auto w-full relative group">
-           <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none">
-             <Search className="text-slate-400 group-focus-within:text-orange-500 transition-colors" size={18} strokeWidth={2.5} />
-           </div>
-           <input 
-             type="text" 
-             placeholder="Restaurantes, platillos, antojos..."
-             className="w-full bg-slate-100 hover:bg-slate-200/60 focus:bg-white border-2 border-transparent focus:border-orange-500 rounded-full py-2 md:py-3.5 pl-10 md:pl-12 pr-4 text-[13px] md:text-[15px] font-medium text-slate-900 placeholder:text-slate-500 outline-none transition-all shadow-sm"
-             value={search}
-             onChange={(e) => setSearch(e.target.value)}
-           />
+
+           {/* Desktop Empty Spacer for Balance */}
+           <div className="hidden md:flex w-[200px] justify-end"></div>
         </div>
       </header>
 
-      <main className="pt-28 md:pt-44 max-w-[1400px] mx-auto px-4 md:px-12">
+      <main className="pt-[140px] md:pt-32 max-w-[1400px] mx-auto px-4 md:px-12">
         
-        {/* Carrusel de Categorías Rápido */}
-        <div className="flex overflow-x-auto gap-2.5 md:gap-5 pb-2 pt-2 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-          {activeCategories.map(c => (
-             <button 
-                key={c.name}
-                onClick={() => setSelectedCategory(selectedCategory === c.name ? null : c.name)} 
-                className="flex flex-col items-center gap-1.5 md:gap-2 min-w-[64px] md:min-w-[85px] group"
-              >
-                <div className={`w-14 h-14 md:w-20 md:h-20 rounded-[14px] md:rounded-2xl flex items-center justify-center text-[28px] md:text-[40px] shadow-[0_2px_10px_rgba(0,0,0,0.04)] border transition-all duration-300 ${selectedCategory === c.name ? 'bg-orange-50 border-orange-500 scale-105' : 'bg-white border-slate-100 group-hover:border-orange-200 group-hover:scale-105'}`}>
-                  {c.emoji}
-                </div>
-                <span className={`text-[11px] md:text-[13px] font-bold ${selectedCategory === c.name ? 'text-orange-600' : 'text-slate-600'}`}>{c.name}</span>
-             </button>
-          ))}
+        {/* Carrusel de Categorías (Solo Sticky en Desktop) */}
+        <div className="md:sticky top-[128px] md:top-[80px] z-40 bg-slate-50 md:bg-slate-50/95 md:backdrop-blur-xl border-b border-slate-200/50 -mx-4 px-4 md:mx-0 md:px-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+          <div className="flex overflow-x-auto gap-2.5 md:gap-4 pb-3 pt-3 no-scrollbar max-w-[1400px] mx-auto">
+            {activeCategories.map(c => (
+               <button 
+                  key={c.name}
+                  onClick={() => setSelectedCategory(selectedCategory === c.name ? null : c.name)} 
+                  className="flex flex-col items-center gap-1.5 md:gap-2 min-w-[64px] md:min-w-[80px] group"
+                >
+                  <div className={`w-14 h-14 md:w-16 md:h-16 rounded-[14px] md:rounded-2xl flex items-center justify-center text-[28px] md:text-[32px] shadow-[0_2px_10px_rgba(0,0,0,0.04)] border transition-all duration-300 ${selectedCategory === c.name ? 'bg-orange-50 border-orange-500 scale-105' : 'bg-white border-slate-100 group-hover:border-orange-200 group-hover:scale-105'}`}>
+                    {c.emoji}
+                  </div>
+                  <span className={`text-[11px] md:text-[12px] font-bold ${selectedCategory === c.name ? 'text-orange-600' : 'text-slate-600'}`}>{c.name}</span>
+               </button>
+            ))}
+          </div>
         </div>
 
         {/* Carrusel de Promociones Animado (Si existen) */}
@@ -572,13 +728,13 @@ export function PublicLandingPage() {
 
         {/* Grid de Restaurantes */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 mt-4 md:mt-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 mt-4 md:mt-6">
             {[1,2,3,4,5,6,7,8,9,10].map(i => (
-              <div key={i} className="flex flex-row sm:flex-col gap-3 sm:gap-0 animate-pulse bg-white sm:bg-transparent p-3 sm:p-0 rounded-2xl sm:rounded-none border border-slate-100 sm:border-none">
-                <div className="w-24 sm:w-full shrink-0 aspect-[4/3] sm:aspect-video bg-slate-200 rounded-xl sm:rounded-[18px] sm:mb-3" />
-                <div className="flex flex-col justify-center w-full">
-                  <div className="w-3/4 h-4 bg-slate-200 rounded-md mb-2" />
-                  <div className="w-1/2 h-3 bg-slate-200 rounded-md" />
+              <div key={i} className="flex flex-col gap-3 sm:gap-0 animate-pulse bg-white sm:bg-transparent p-3 sm:p-0 rounded-2xl sm:rounded-none border border-slate-100 sm:border-none">
+                <div className="w-[90px] sm:w-[160px] md:w-[180px] shrink-0 aspect-square mx-auto bg-slate-200 rounded-full sm:mb-3" />
+                <div className="flex flex-col justify-center w-full items-center">
+                  <div className="w-3/4 h-4 bg-slate-200 rounded-full mb-2" />
+                  <div className="w-1/2 h-3 bg-slate-200 rounded-full" />
                 </div>
               </div>
             ))}
@@ -601,61 +757,57 @@ export function PublicLandingPage() {
             </button>
           </motion.div>
         ) : (
-          <motion.div 
-            key={selectedCategory || search || activeTab}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6 mt-4 md:mt-6 pb-12"
-          >
-            {displayRestaurants.map(res => (
-              <Link to={`/menu/${res.slug || res.id}`} key={res.id} className="flex flex-row sm:flex-col gap-3 sm:gap-0 group relative bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-2xl sm:rounded-none shadow-sm sm:shadow-none border border-slate-100 sm:border-none">
-                 {/* Imagen Circular */}
-                 <div className="relative w-[110px] sm:w-[160px] md:w-[180px] mx-auto shrink-0 aspect-square rounded-full overflow-hidden bg-white sm:mb-3 shadow-sm border border-slate-100 isolate">
-                    {res.foto_fachada_url ? (
-                      <img 
-                        src={res.foto_fachada_url} 
-                        loading="lazy" 
-                        className="relative w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out z-10" 
-                        alt={res.nombre} 
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-orange-50"><Store size={24} className="text-orange-200 sm:w-10 sm:h-10" /></div>
-                    )}
-                    
-                    {/* Badge de Tiempo */}
-                    {estaAbierto(res) && (
-                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-2 py-1 rounded-full shadow-sm text-[10px] sm:text-[11px] font-bold text-slate-900 flex items-center gap-1 z-10 whitespace-nowrap">
-                         <Clock size={10} strokeWidth={3} className="text-[#FA4A0C]"/> 25-35 min
-                      </div>
-                    )}
+          <div className="flex flex-col gap-10 mt-4 md:mt-6 pb-12">
+            
+            {/* Sección: Favoritos */}
+            {favorites.length > 0 && !search && !selectedCategory && activeTab === 'todos' && (
+              <section>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight mb-4 px-2">Tus Favoritos ❤️</h2>
+                <div className="flex overflow-x-auto gap-4 pb-4 px-2 no-scrollbar snap-x">
+                  {displayRestaurants.filter(r => favorites.includes(r.id)).map(res => (
+                    <motion.div key={res.id} whileInView={{ opacity: 1, x: 0 }} initial={{ opacity: 0, x: 20 }} viewport={{ once: true }} className="snap-start shrink-0 w-[140px] sm:w-[180px]">
+                      <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} horizontal />
+                    </motion.div>
+                  ))}
+                </div>
+              </section>
+            )}
 
-                    {/* Overlay Cerrado */}
-                    {!estaAbierto(res) && (
-                       <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-20">
-                          <span className="bg-slate-900 text-white text-[8px] sm:text-[11px] font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] px-2 py-1 sm:px-4 sm:py-2 rounded-full shadow-lg">Cerrado</span>
-                       </div>
-                    )}
-                 </div>
-                 
-                 {/* Info Header */}
-                 <div className="flex flex-col items-center sm:items-center gap-1 sm:px-1 flex-1 min-w-0 text-center w-full mt-1 sm:mt-0">
-                    <div className="min-w-0 w-full flex flex-col items-center">
-                       <h3 className="font-bold text-[14px] sm:text-[16px] md:text-[17px] text-slate-900 leading-tight group-hover:text-[#FA4A0C] transition-colors truncate w-full px-2">
-                         {res.nombre}
-                       </h3>
-                       <p className="text-slate-500 text-[11px] sm:text-[12px] font-medium mt-0.5 truncate w-full px-2">
-                         {res.categorias?.[0] || 'Restaurante'} • Envío: $45
-                       </p>
-                    </div>
-                    {/* Fake Rating */}
-                    <div className="bg-slate-100 flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black text-slate-700 shrink-0 gap-1 mt-0.5">
-                      4.8 <Star size={10} className="fill-slate-700" />
-                    </div>
-                 </div>
-              </Link>
-            ))}
-          </motion.div>
+            {/* Sección: Populares (Simulado) */}
+            {!search && !selectedCategory && activeTab === 'todos' && displayRestaurants.length > 4 && (
+              <section>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight mb-4 px-2">Populares 🔥</h2>
+                <div className="flex overflow-x-auto gap-4 pb-4 px-2 no-scrollbar snap-x">
+                  {displayRestaurants.slice(0, 8).map(res => (
+                    <motion.div key={res.id} whileInView={{ opacity: 1, x: 0 }} initial={{ opacity: 0, x: 20 }} viewport={{ once: true }} className="snap-start shrink-0 w-[140px] sm:w-[180px]">
+                      <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} horizontal />
+                    </motion.div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Sección: Todos los Restaurantes */}
+            <section>
+              {(!search && !selectedCategory && activeTab === 'todos') && (
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight mb-4 px-2">Todos los Restaurantes</h2>
+              )}
+              <motion.div 
+                key={selectedCategory || search || activeTab}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6"
+              >
+                {displayRestaurants.map(res => (
+                  <motion.div key={res.id} whileInView={{ opacity: 1, y: 0 }} initial={{ opacity: 0, y: 20 }} viewport={{ once: true, margin: "0px 0px -50px 0px" }}>
+                    <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            </section>
+
+          </div>
         )}
 
         {/* Cargar más */}

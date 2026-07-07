@@ -20,12 +20,78 @@ import {
   CheckCircle2,
   Truck,
   LocateFixed,
-  Tag
+  Tag,
+  ChevronDown
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
+
+const PREMIUM_MAP_STYLE = [
+  { "elementType": "geometry", "stylers": [{"color": "#f5f5f5"}] },
+  { "elementType": "labels.icon", "stylers": [{"visibility": "off"}] },
+  { "elementType": "labels.text.fill", "stylers": [{"color": "#616161"}] },
+  { "elementType": "labels.text.stroke", "stylers": [{"color": "#f5f5f5"}] },
+  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{"color": "#bdbdbd"}] },
+  { "featureType": "poi", "elementType": "geometry", "stylers": [{"color": "#eeeeee"}] },
+  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{"color": "#757575"}] },
+  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{"color": "#e5e5e5"}] },
+  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{"color": "#9e9e9e"}] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{"color": "#ffffff"}] },
+  { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{"color": "#757575"}] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#dadada"}] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{"color": "#616161"}] },
+  { "featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{"color": "#9e9e9e"}] },
+  { "featureType": "transit.line", "elementType": "geometry", "stylers": [{"color": "#e5e5e5"}] },
+  { "featureType": "transit.station", "elementType": "geometry", "stylers": [{"color": "#eeeeee"}] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{"color": "#c9c9c9"}] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{"color": "#9e9e9e"}] }
+];
+
+const EMOJI_MAP: Record<string, string> = {
+  'Hamburguesas': '🍔',
+  'Pizza': '🍕',
+  'Tacos': '🌮',
+  'Sushi': '🍣',
+  'Café': '☕',
+  'Postres': '🍰',
+  'Saludable': '🥗',
+  'Pollo': '🍗',
+  'Antojitos': '🌶️',
+  'Bebidas': '🥤',
+  'Mariscos': '🦐',
+  'Carnes': '🥩',
+  'Snacks': '🍟',
+  'Desayunos': '🍳',
+  'Comida China': '🥡',
+  'Alitas': '🔥',
+  'Comida Corrida': '🍲'
+};
+
+function getEmojiForCategory(name: string): string {
+  if (!name) return '🍽️';
+  const n = name.toLowerCase();
+  if (n.includes('hamburguesa') || n.includes('burger')) return '🍔';
+  if (n.includes('pizza')) return '🍕';
+  if (n.includes('taco') || n.includes('antojito') || n.includes('quesadilla') || n.includes('mexican')) return '🌮';
+  if (n.includes('sushi') || n.includes('maki')) return '🍣';
+  if (n.includes('café') || n.includes('cafe')) return '☕';
+  if (n.includes('postre') || n.includes('dulce') || n.includes('pastel') || n.includes('crepa') || n.includes('helado')) return '🍰';
+  if (n.includes('saludable') || n.includes('ensalada') || n.includes('fit') || n.includes('bowl')) return '🥗';
+  if (n.includes('pollo') || n.includes('chicken') || n.includes('alita') || n.includes('wing') || n.includes('boneless')) return '🍗';
+  if (n.includes('carne') || n.includes('asada') || n.includes('grill') || n.includes('steak') || n.includes('corte') || n.includes('arrachera') || n.includes('torta')) return '🥩';
+  if (n.includes('marisco') || n.includes('camaron') || n.includes('pescado') || n.includes('ceviche') || n.includes('aguachile')) return '🦐';
+  if (n.includes('bebida') || n.includes('refresco') || n.includes('agua') || n.includes('soda') || n.includes('jugo') || n.includes('frappe')) return '🥤';
+  if (n.includes('snack') || n.includes('papas') || n.includes('complemento') || n.includes('extra') || n.includes('entrada') || n.includes('guarnicion')) return '🍟';
+  if (n.includes('desayuno') || n.includes('huevo') || n.includes('omelet') || n.includes('chilaquiles')) return '🍳';
+  if (n.includes('china') || n.includes('oriental') || n.includes('arroz') || n.includes('wok')) return '🥡';
+  if (n.includes('sopa') || n.includes('caldo') || n.includes('consome')) return '🥣';
+  if (n.includes('pasta') || n.includes('spaghetti') || n.includes('italian')) return '🍝';
+  if (n.includes('pan') || n.includes('baguette') || n.includes('sandwich') || n.includes('chapata')) return '🥪';
+  
+  return EMOJI_MAP[name] || '🍽️';
+}
 
 export type OpcionSeleccionada = {
   grupo: string;
@@ -123,8 +189,30 @@ export function PublicMenuView() {
   const [loading, setLoading] = useState(true)
 
   const [activeTab, setActiveTab] = useState<string>('')
+  const categoryChipsRef = useRef<HTMLDivElement>(null)
+  const [chipsAtEnd, setChipsAtEnd] = useState(false)
+
+  // Auto-scroll el chip activo al centro cuando cambia la categoría
+  useEffect(() => {
+    if (!categoryChipsRef.current) return
+    const activeChip = categoryChipsRef.current.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement
+    if (activeChip) {
+      activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    }
+  }, [activeTab])
+
+  // Detectar si el scroll de chips llegó al final (para ocultar la flechita)
+  const handleChipsScroll = () => {
+    const el = categoryChipsRef.current
+    if (!el) return
+    const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 8
+    setChipsAtEnd(atEnd)
+  }
 
   const [selectedItemDetail, setSelectedItemDetail] = useState<any | null>(null)
+
+  // Wizard de opciones — paso actual
+  const [optionsStep, setOptionsStep] = useState(0)
 
   // Estado del carrito y drawer
   const [carrito, setCarrito] = useState<{ item: CartItem & { foto_url?: string }, cantidad: number }[]>(() => {
@@ -208,19 +296,12 @@ export function PublicMenuView() {
   useEffect(() => { sessionStorage.setItem('est_direccion', direccionEntrega) }, [direccionEntrega])
   useEffect(() => { if (ubicacionGPS) sessionStorage.setItem('est_ubicacion', JSON.stringify(ubicacionGPS)) }, [ubicacionGPS])
 
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : true);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 640);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   // Estado del modal de opciones de producto
   type OptionableItem = (MenuItem | MenuCombo) & { __tipo: 'item' | 'combo' }
   const [selectedItemForOptions, setSelectedItemForOptions] = useState<OptionableItem | null>(null)
+  // Resetear el paso del wizard cuando cambia el item seleccionado
+  useEffect(() => { setOptionsStep(0) }, [selectedItemForOptions])
+
   const [selectedOptionsState, setSelectedOptionsState] = useState<Record<string, Record<string, boolean>>>({})
 
   const showToast = (title: string, message?: string, type: 'success' | 'error' | 'loading' = 'success') => {
@@ -297,6 +378,7 @@ export function PublicMenuView() {
   // Verificamos si la ruta o id cambian para hacer reload silencioso si es necesario
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     let isMounted = true
 
     async function fetchMenuData(silently = false) {
@@ -417,9 +499,9 @@ export function PublicMenuView() {
           setActiveTab(urlTab)
         } else {
           const validCategories = (cats || []).filter(c => (prods || []).some(i => i.categoria_id === c.id))
-          if (validCategories.length > 0) setActiveTab(validCategories[0].id)
+          if (hasValidPromos) setActiveTab('promos')
+          else if (validCategories.length > 0) setActiveTab(validCategories[0].id)
           else if (hasCombos) setActiveTab('combos')
-          else if (hasValidPromos) setActiveTab('promos')
         }
       }
     }
@@ -447,9 +529,9 @@ export function PublicMenuView() {
           setActiveTab(urlTab)
         } else {
           const validCategories = cached.categorias.filter((c: any) => cached.items.some((i: any) => i.categoria_id === c.id))
-          if (validCategories.length > 0) setActiveTab(validCategories[0].id)
+          if (cached.promos.length > 0) setActiveTab('promos')
+          else if (validCategories.length > 0) setActiveTab(validCategories[0].id)
           else if (cached.combos.length > 0) setActiveTab('combos')
-          else if (cached.promos.length > 0) setActiveTab('promos')
         }
         
         // Ejecutar fetch silencioso en background para actualizar caché si pasaron más de 1 min
@@ -560,9 +642,9 @@ export function PublicMenuView() {
       setActiveTab(urlTab)
     } else {
       const validCategories = categorias.filter(c => items.some(i => i.categoria_id === c.id))
-      if (validCategories.length > 0) setActiveTab(validCategories[0].id)
+      if (promos.length > 0) setActiveTab('promos')
+      else if (validCategories.length > 0) setActiveTab(validCategories[0].id)
       else if (combos.length > 0) setActiveTab('combos')
-      else if (promos.length > 0) setActiveTab('promos')
     }
   }, [location.search])
 
@@ -1101,41 +1183,97 @@ export function PublicMenuView() {
           </div>
         )}
 
-        {/* TABS DE NAVEGACIÓN (RAPPI STYLE) */}
+        {/* CHIPS DE CATEGORÍA — premium pill chips estilo Rappi/UberEats */}
         {(categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 0 || combos.length > 0 || promos.length > 0) && (
-          <div className="sticky top-[52px] z-40 bg-white pt-6 pb-0 mb-6 border-b border-slate-100">
-            <div className="flex overflow-x-auto hide-scrollbar gap-8 px-2">
-              {categorias.filter(c => items.some(i => i.categoria_id === c.id)).map(cat => (
-                <button
-                  key={`tab-${cat.id}`}
-                  onClick={() => setActiveTab(cat.id)}
-                  className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === cat.id ? 'text-slate-900' : 'text-slate-400'}`}
-                >
-                  {cat.emoji && <span className="mr-2">{cat.emoji}</span>}{cat.nombre}
-                  {activeTab === cat.id && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
-                </button>
-              ))}
-              {combos.length > 0 && (
-                <button
-                  onClick={() => setActiveTab('combos')}
-                  className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === 'combos' ? 'text-slate-900' : 'text-slate-400'}`}
-                >
-                  Combos
-                  {activeTab === 'combos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
-                </button>
-              )}
-              {promos.length > 0 && (
-                <button
-                  onClick={() => setActiveTab('promos')}
-                  className={`pb-4 text-sm font-bold transition-all relative shrink-0 ${activeTab === 'promos' ? 'text-slate-900' : 'text-slate-400'}`}
-                >
-                  Promociones
-                  {activeTab === 'promos' && <motion.div layoutId="menuTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-900" />}
-                </button>
-              )}
+          <div className="sticky top-[52px] z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
+            <div className="relative">
+              {/* Gradiente izquierdo */}
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white/95 to-transparent z-10" />
+
+              {/* Gradiente derecho + flechita animada */}
+              <div
+                className={`pointer-events-none absolute right-0 top-0 bottom-0 z-10 flex items-center justify-end pr-1 transition-all duration-300 ${
+                  chipsAtEnd ? 'opacity-0 w-8' : 'opacity-100 w-14'
+                }`}
+                style={{ background: 'linear-gradient(to left, rgba(255,255,255,0.97) 55%, transparent)' }}
+              >
+                {!chipsAtEnd && (
+                  <div className="animate-bounce">
+                    <ChevronDown size={16} className="text-slate-400 rotate-[-90deg]" />
+                  </div>
+                )}
+              </div>
+
+              <div
+                ref={categoryChipsRef}
+                onScroll={handleChipsScroll}
+                className="flex overflow-x-auto gap-2 px-4 py-3"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
+              >
+                {promos.length > 0 && (
+                  <button
+                    data-tab="promos"
+                    onClick={() => setActiveTab('promos')}
+                    style={{ minHeight: '44px' }}
+                    className={`shrink-0 flex items-center gap-1.5 px-4 rounded-full text-[13.5px] font-bold
+                      transition-all duration-150 whitespace-nowrap
+                      active:scale-95 select-none
+                      ${activeTab === 'promos'
+                        ? 'bg-[#FA4A0C] text-white shadow-lg shadow-orange-500/25'
+                        : 'bg-orange-50 text-orange-500 active:bg-orange-100'
+                      }`}
+                  >
+                    <span className="text-base leading-none">🔥</span> Promociones
+                  </button>
+                )}
+                {categorias.filter(c => items.some(i => i.categoria_id === c.id)).map(cat => (
+                  <button
+                    key={`chip-${cat.id}`}
+                    data-tab={cat.id}
+                    onClick={() => setActiveTab(cat.id)}
+                    style={{ minHeight: '44px' }}
+                    className={`shrink-0 flex items-center gap-1.5 px-4 rounded-full text-[13.5px] font-bold
+                      transition-all duration-150 whitespace-nowrap
+                      active:scale-95 select-none
+                      ${activeTab === cat.id
+                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
+                        : 'bg-slate-100 text-slate-600 active:bg-slate-200'
+                      }`}
+                  >
+                    <span className="text-base leading-none">
+                      {(!cat.emoji || cat.emoji.trim() === '🍽️' || cat.emoji.trim() === '🍽') ? getEmojiForCategory(cat.nombre) : cat.emoji}
+                    </span>
+                    {cat.nombre}
+                  </button>
+                ))}
+                {combos.length > 0 && (
+                  <button
+                    data-tab="combos"
+                    onClick={() => setActiveTab('combos')}
+                    style={{ minHeight: '44px' }}
+                    className={`shrink-0 flex items-center gap-1.5 px-4 rounded-full text-[13.5px] font-bold
+                      transition-all duration-150 whitespace-nowrap
+                      active:scale-95 select-none
+                      ${activeTab === 'combos'
+                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
+                        : 'bg-slate-100 text-slate-600 active:bg-slate-200'
+                      }`}
+                  >
+                    <span className="text-base leading-none">🏷️</span> Combos
+                  </button>
+                )}
+
+                {/* Spacer para que el último chip no quede pegado al borde */}
+                <div className="shrink-0 w-8" />
+              </div>
             </div>
           </div>
         )}
+
 
             {/* PRODUCT CATEGORIES CONTENT */}
             <div className="mt-8 relative">
@@ -1503,35 +1641,30 @@ export function PublicMenuView() {
     {isCartOpen && (
       <motion.div 
         key="cart-drawer"
-        initial={{ [isMobile ? 'y' : 'x']: '100%' }} 
-        animate={{ x: 0, y: 0 }} 
-        exit={{ [isMobile ? 'y' : 'x']: '100%' }} 
-        transition={{ type: 'spring', damping: 28, stiffness: 350 }} 
+        initial={{ x: '100%' }} 
+        animate={{ x: 0 }} 
+        exit={{ x: '100%' }} 
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }} 
         style={{ willChange: "transform" }}
-        className="fixed bottom-0 left-0 w-full h-[92vh] rounded-t-[32px] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-full sm:w-[440px] sm:max-w-md sm:rounded-none bg-white z-[110] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] sm:shadow-2xl flex flex-col overflow-hidden"
+        className="fixed inset-0 w-full h-[100dvh] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-[100vh] sm:w-[440px] sm:max-w-md bg-white z-[110] shadow-[0_-5px_40px_rgba(0,0,0,0.1)] sm:shadow-2xl flex flex-col overflow-hidden"
       >
           
-          {/* Grabber bar for mobile */}
-          <div className="w-full flex justify-center pt-3 pb-1 sm:bottom-10 sm:right-10 sm:left-auto sm:justify-end">
-            <div className="w-12 h-1.5 bg-slate-300/50 rounded-full"></div>
-          </div>
-          
-          <div className="p-6 pt-4 sm:pt-6 border-b border-slate-100/50 flex flex-col shrink-0">
+          <div className="p-5 md:p-6 pb-4 border-b border-slate-100 flex flex-col shrink-0 bg-white z-10 shadow-sm relative">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 {checkoutStep > 1 && (
-                  <button onClick={() => setCheckoutStep(prev => prev - 1)} className="p-2 bg-white rounded-full text-slate-500 hover:text-[#FA4A0C] shadow-sm transition-colors">
-                    <ChevronLeft size={20} />
+                  <button onClick={() => setCheckoutStep(prev => prev - 1)} className="p-2 -ml-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 hover:text-[#FA4A0C] transition-colors">
+                    <ChevronLeft size={22} strokeWidth={2.5} />
                   </button>
                 )}
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                <div className="flex flex-col">
+                  <h2 className="text-[22px] font-black text-slate-900 tracking-tight leading-tight">
                     {checkoutStep === 1 ? 'Tu Pedido' : checkoutStep === 2 ? 'Tus Datos' : checkoutStep === 3 ? 'Entrega' : 'Método de Pago'}
                   </h2>
-                  <p className="text-slate-500 text-sm">{restaurante.nombre}</p>
+                  <p className="text-orange-500 font-bold text-[12px] uppercase tracking-wider">{restaurante.nombre}</p>
                 </div>
               </div>
-              <button onClick={closeCart} className="p-2.5 bg-white rounded-full text-slate-400 hover:text-slate-700 shadow-sm"><X size={20} /></button>
+              <button onClick={closeCart} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><X size={20} strokeWidth={2.5} /></button>
             </div>
             
             {carrito.length > 0 && (
@@ -1575,9 +1708,13 @@ export function PublicMenuView() {
                               <span className="font-black text-slate-900 text-[13px] sm:text-[14px]">${(p.item.precio * p.cantidad).toFixed(2)}</span>
                             </div>
                             {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                              <p className="text-[10px] sm:text-[11px] text-slate-400 leading-tight mb-2 truncate">
-                                {p.item.opcionesSeleccionadas.map(o => o.opcion).join(', ')}
-                              </p>
+                              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                                {p.item.opcionesSeleccionadas.map((o, idx) => (
+                                  <span key={idx} className="bg-slate-100/80 border border-slate-200 text-slate-500 text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md font-medium leading-tight">
+                                    {o.opcion}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full p-0.5 w-max mt-auto">
                               <button onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-red-500 transition-colors"><Minus size={12} /></button>
@@ -1905,183 +2042,347 @@ export function PublicMenuView() {
     )}
   </AnimatePresence>
 
-      {/* MODAL DE OPCIONES DE PRODUCTO */}
+      {/* MODAL DE OPCIONES — WIZARD PASO A PASO */}
       <AnimatePresence>
-        {selectedItemForOptions && (
-          <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setSelectedItemForOptions(null)}
-            />
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="relative w-full sm:max-w-lg bg-white sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-            >
-              <div className="p-6 pb-5 shrink-0 bg-white relative z-40 border-b border-slate-100 flex justify-between items-start gap-4">
-                <div className="flex-1">
-                  <h3 className="text-[22px] sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">{selectedItemForOptions.nombre}</h3>
-                  {selectedItemForOptions.descripcion && (
-                    <p className="text-slate-500 text-[14px] sm:text-[15px] mt-2 leading-relaxed">{selectedItemForOptions.descripcion}</p>
-                  )}
-                  {selectedItemForOptions.__tipo === 'combo' && (selectedItemForOptions as MenuCombo).incluye && (
-                    <div className="mt-4 flex flex-col gap-2">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Incluye</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(selectedItemForOptions as MenuCombo).incluye.map((inc: string, i: number) => (
-                          <span key={i} className="text-[13px] font-bold bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">✓ {inc}</span>
-                        ))}
+        {selectedItemForOptions && (() => {
+          const grupos = selectedItemForOptions.opciones || [];
+          const totalSteps = grupos.length;
+          const grupo = grupos[optionsStep];
+          const seleccionados = grupo ? (selectedOptionsState[grupo.titulo] || {}) : {};
+          const countSelected = Object.values(seleccionados).filter(Boolean).length;
+          const isLastStep = optionsStep === totalSteps - 1;
+          const isFirstStep = optionsStep === 0;
+
+          const handleToggle = (opc: any) => {
+            if (!grupo) return;
+            const isRadio = grupo.maximo_selecciones === 1;
+            // Auto-avance FUERA del updater para evitar doble llamada en StrictMode
+            if (isRadio && !isLastStep) {
+              // Usamos optionsStep directo para evitar que múltiples taps rápidos salten pasos (race condition)
+              setTimeout(() => setOptionsStep(optionsStep + 1), 200);
+            }
+            setSelectedOptionsState(prev => {
+              const groupState = { ...(prev[grupo.titulo] || {}) };
+              if (isRadio) {
+                return { ...prev, [grupo.titulo]: { [opc.nombre]: true } };
+              } else {
+                const already = !!groupState[opc.nombre];
+                if (already) {
+                  delete groupState[opc.nombre];
+                } else {
+                  if (Object.values(groupState).filter(Boolean).length >= grupo.maximo_selecciones) return prev;
+                  groupState[opc.nombre] = true;
+                }
+                return { ...prev, [grupo.titulo]: groupState };
+              }
+            });
+          };
+
+          const handleNext = () => {
+            if (grupo?.requerido && countSelected === 0) {
+              // Shake sin toast
+              const btn = document.getElementById('wizard-next-btn');
+              if (btn) {
+                btn.animate([
+                  { transform: 'translateX(0)' },
+                  { transform: 'translateX(-8px)' },
+                  { transform: 'translateX(8px)' },
+                  { transform: 'translateX(-6px)' },
+                  { transform: 'translateX(6px)' },
+                  { transform: 'translateX(0)' },
+                ], { duration: 320, easing: 'ease-out' });
+              }
+              return;
+            }
+            if (isLastStep) {
+              // Agregar al carrito
+              let precioExtra = 0;
+              const opcionesSel: OpcionSeleccionada[] = [];
+              grupos.forEach((g: any) => {
+                g.opciones.forEach((o: any) => {
+                  if (selectedOptionsState[g.titulo]?.[o.nombre]) {
+                    precioExtra += o.precio_extra;
+                    opcionesSel.push({ grupo: g.titulo, opcion: o.nombre, precio_extra: o.precio_extra });
+                  }
+                });
+              });
+              const hashId = selectedItemForOptions.id + '_' + opcionesSel.map((o: any) => o.opcion).sort().join('_');
+              const itemToAdd: CartItem = {
+                id: selectedItemForOptions.id,
+                cartItemId: hashId,
+                nombre: selectedItemForOptions.nombre,
+                precio: selectedItemForOptions.precio + precioExtra,
+                tipo: selectedItemForOptions.__tipo,
+                opcionesSeleccionadas: opcionesSel,
+                aplica_subsidio: selectedItemForOptions.aplica_subsidio
+              };
+              addToCart({ ...itemToAdd, foto_url: selectedItemForOptions.foto_url || undefined });
+              setSelectedItemForOptions(null);
+              showToast('Agregado', `${selectedItemForOptions.nombre} añadido al carrito`);
+            } else {
+              setOptionsStep(s => s + 1);
+            }
+          };
+
+          // Precio total acumulado hasta el paso actual
+          const precioActual = selectedItemForOptions.precio + grupos.reduce((sum: number, g: any) => {
+            return sum + g.opciones.reduce((s2: number, o: any) => {
+              return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? o.precio_extra : 0);
+            }, 0);
+          }, 0);
+
+          return (
+            <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                onClick={() => setSelectedItemForOptions(null)}
+              />
+              <motion.div
+                initial={{ y: "100%", opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: "100%", opacity: 0 }}
+                transition={{ type: "spring", damping: 32, stiffness: 280, mass: 0.9 }}
+                className="relative w-full sm:max-w-lg bg-white sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+              >
+                {/* ── HEADER ── */}
+                <div className="px-6 pt-6 pb-4 shrink-0 bg-white">
+                  <div className="flex justify-between items-start gap-3 mb-4">
+                    <div className="flex-1">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">{selectedItemForOptions.nombre}</p>
+                      {grupo && (
+                        <div className="flex items-start gap-2">
+                          <h3 className="text-[22px] font-black text-slate-900 tracking-tight leading-tight flex-1">{grupo.titulo}</h3>
+                          {grupo.requerido && countSelected === 0 && (
+                            <span className="shrink-0 mt-1.5 text-[10px] font-black uppercase tracking-widest bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-100">
+                              Requerido
+                            </span>
+                          )}
+                          {grupo.requerido && countSelected > 0 && (
+                            <span className="shrink-0 mt-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100">
+                              ✓ Listo
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {grupo?.maximo_selecciones > 1 && (
+                        <p className="text-[13px] text-slate-400 mt-1">
+                          Elige hasta {grupo.maximo_selecciones}
+                          {countSelected > 0 && (
+                            <span className="ml-1.5 font-bold text-orange-500">— {countSelected} elegid{countSelected === 1 ? 'a' : 'as'}</span>
+                          )}
+                        </p>
+                      )}
+                      {grupo?.maximo_selecciones === 1 && (
+                        <p className="text-[13px] text-slate-400 mt-1">Elige 1 opción</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSelectedItemForOptions(null)}
+                      className="w-9 h-9 shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 active:bg-slate-200 transition-colors"
+                    >
+                      <X size={18} className="stroke-[2.5px]" />
+                    </button>
+                  </div>
+
+                  {/* ── PROGRESS BAR + DOTS ── */}
+                  {totalSteps > 1 && (
+                    <div className="space-y-2">
+                      {/* Barra de progreso */}
+                      <div className="relative h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-[#FA4A0C] to-orange-400 rounded-full"
+                          initial={false}
+                          animate={{ width: `${((optionsStep + 1) / totalSteps) * 100}%` }}
+                          transition={{ type: 'spring', stiffness: 180, damping: 28 }}
+                        />
+                      </div>
+                      {/* Dots con checkmarks */}
+                      <div className="flex items-center gap-1.5">
+                        {grupos.map((_: any, i: number) => {
+                          const done = i < optionsStep;
+                          const active = i === optionsStep;
+                          return (
+                            <motion.div
+                              key={i}
+                              layout
+                              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                              className={`rounded-full flex items-center justify-center ${
+                                active ? 'w-6 h-2.5 bg-[#FA4A0C]'
+                                : done  ? 'w-2.5 h-2.5 bg-emerald-400'
+                                :         'w-2.5 h-2.5 bg-slate-200'
+                              }`}
+                            >
+                              {done && (
+                                <motion.svg
+                                  initial={{ opacity: 0, scale: 0 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.05 }}
+                                  viewBox="0 0 10 10" fill="none" className="w-1.5 h-1.5"
+                                >
+                                  <path d="M8.5 2.5L4 7.5L1.5 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </motion.svg>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                        <span className="ml-auto text-[11px] text-slate-400 font-bold tabular-nums">{optionsStep + 1}&thinsp;/&thinsp;{totalSteps}</span>
                       </div>
                     </div>
                   )}
                 </div>
-                <button onClick={() => setSelectedItemForOptions(null)} className="w-10 h-10 shrink-0 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors shadow-sm">
-                  <X size={20} className="stroke-[2.5px]" />
-                </button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-8">
-                {(selectedItemForOptions.opciones || []).map((grupo, gIdx) => {
-                  const seleccionados = selectedOptionsState[grupo.titulo] || {};
-                  const countSelected = Object.values(seleccionados).filter(Boolean).length;
-                  
-                  return (
-                    <div key={gIdx} className="bg-white rounded-[24px] border border-slate-100/80 p-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold text-slate-900 text-[17px] tracking-tight">{grupo.titulo}</h4>
-                        {grupo.requerido && countSelected === 0 ? (
-                          <span className="text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-600 px-2.5 py-1 rounded-md border border-red-100">Requerido</span>
-                        ) : grupo.maximo_selecciones > 1 ? (
-                          <span className="text-[11px] bg-slate-50 text-slate-500 px-2.5 py-1 rounded-md font-bold border border-slate-100">Máx {grupo.maximo_selecciones}</span>
-                        ) : null}
-                      </div>
-                      
-                      <div className="space-y-1">
-                        {grupo.opciones.map((opc, oIdx) => {
-                          const isSelected = !!seleccionados[opc.nombre];
-                          
-                          const toggleOpcion = () => {
-                            setSelectedOptionsState(prev => {
-                              const groupState = { ...(prev[grupo.titulo] || {}) };
-                              if (grupo.maximo_selecciones === 1) {
-                                // Radio behavior
-                                return { ...prev, [grupo.titulo]: { [opc.nombre]: true } }
-                              } else {
-                                // Checkbox behavior
-                                if (isSelected) {
-                                  delete groupState[opc.nombre];
-                                } else {
-                                  if (Object.values(groupState).filter(Boolean).length >= grupo.maximo_selecciones) return prev; // Limit reached
-                                  groupState[opc.nombre] = true;
-                                }
-                                return { ...prev, [grupo.titulo]: groupState }
-                              }
-                            });
-                          };
 
-                          return (
-                            <label key={oIdx} className={`flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer group ${isSelected ? 'bg-orange-50/50' : 'hover:bg-slate-50'}`}>
-                              <div className="flex flex-col pr-4">
-                                <span className={`text-[15px] transition-colors ${isSelected ? 'text-slate-900 font-bold' : 'text-slate-700 font-medium group-hover:text-slate-900'}`}>
-                                  {opc.nombre}
-                                </span>
-                                {opc.precio_extra > 0 && (
-                                  <span className={`text-[13px] font-medium mt-0.5 ${isSelected ? 'text-orange-600' : 'text-slate-400'}`}>
-                                    +${opc.precio_extra.toFixed(2)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="relative flex items-center justify-center shrink-0">
-                                <div className={`w-[22px] h-[22px] flex items-center justify-center transition-all duration-200 ${
-                                  grupo.maximo_selecciones === 1 
-                                    ? 'rounded-full' 
-                                    : 'rounded-[6px]'
-                                } border-[2px] ${isSelected ? 'border-[#FA4A0C] bg-[#FA4A0C] scale-105' : 'border-slate-300 bg-white group-hover:border-slate-400'}`}>
-                                  {isSelected && (
-                                    grupo.maximo_selecciones === 1 
-                                      ? <div className="w-2 h-2 rounded-full bg-white shadow-sm" /> 
-                                      : <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5 text-white"><path d="M11.6666 3.5L5.24992 9.91667L2.33325 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {/* ── SEPARADOR ── */}
+                <div className="h-px bg-slate-100 shrink-0" />
+
+                {/* ── CONTENIDO DEL PASO ACTUAL (animado) ── */}
+                <div className="flex-1 overflow-y-auto">
+                  <AnimatePresence mode="wait">
+                    {grupo && (
+                      <motion.div
+                        key={optionsStep}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
+                        className="px-5 py-5"
+                      >
+                        {grupo.opciones.every((o: any) => !o.precio_extra || o.precio_extra === 0) ? (
+                          // ── Chips compactos (sin precio extra) ──
+                          <div className="flex flex-wrap gap-2.5">
+                            {grupo.opciones.map((opc: any, oIdx: number) => {
+                              const isSelected = !!seleccionados[opc.nombre];
+                              return (
+                                <motion.button
+                                  key={oIdx}
+                                  type="button"
+                                  onClick={() => handleToggle(opc)}
+                                  whileTap={{ scale: 0.93 }}
+                                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                  style={{ minHeight: '42px' }}
+                                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-semibold
+                                    select-none whitespace-nowrap border-2
+                                    transition-colors duration-200
+                                    ${isSelected
+                                      ? 'bg-[#FA4A0C] text-white border-[#FA4A0C] shadow-md shadow-orange-200'
+                                      : 'bg-white text-slate-700 border-slate-200'
+                                    }`}
+                                >
+                                  {isSelected ? (
+                                    grupo.maximo_selecciones === 1
+                                      ? <div className="w-2.5 h-2.5 rounded-full bg-white shrink-0" />
+                                      : <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5 shrink-0"><path d="M11.6666 3.5L5.24992 9.91667L2.33325 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  ) : (
+                                    grupo.maximo_selecciones === 1
+                                      ? <div className="w-2.5 h-2.5 rounded-full border-2 border-slate-300 shrink-0" />
+                                      : null
                                   )}
-                                </div>
-                                <input 
-                                  type={grupo.maximo_selecciones === 1 ? 'radio' : 'checkbox'} 
-                                  checked={isSelected}
-                                  onChange={toggleOpcion}
-                                  className="absolute inset-0 opacity-0 cursor-pointer"
-                                />
-                              </div>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              
-              <div className="p-6 border-t border-slate-100 bg-white shrink-0">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    // Validar requeridos
-                    const faltanRequeridos = (selectedItemForOptions.opciones || []).some(g => {
-                      if (!g.requerido || g.opciones.length === 0) return false;
-                      const sel = selectedOptionsState[g.titulo] || {};
-                      return Object.values(sel).filter(Boolean).length === 0;
-                    });
+                                  {opc.nombre}
+                                </motion.button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          // ── Lista detallada (con precio extra) ──
+                          <div className="space-y-1.5">
+                            {grupo.opciones.map((opc: any, oIdx: number) => {
+                              const isSelected = !!seleccionados[opc.nombre];
+                              return (
+                                <motion.button
+                                  key={oIdx}
+                                  type="button"
+                                  onClick={() => handleToggle(opc)}
+                                  whileTap={{ scale: 0.98 }}
+                                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                                  style={{ minHeight: '56px' }}
+                                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl select-none border-2
+                                    transition-colors duration-200
+                                    ${isSelected
+                                      ? 'bg-orange-50 border-[#FA4A0C]'
+                                      : 'bg-white border-slate-200'
+                                    }`}
+                                >
+                                  <span className={`text-[15px] font-semibold ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
+                                    {opc.nombre}
+                                  </span>
+                                  <div className="flex items-center gap-3">
+                                    {opc.precio_extra > 0 && (
+                                      <span className={`text-[13px] font-bold ${isSelected ? 'text-[#FA4A0C]' : 'text-slate-400'}`}>
+                                        +${opc.precio_extra.toFixed(2)}
+                                      </span>
+                                    )}
+                                    <motion.div
+                                      animate={isSelected
+                                        ? { backgroundColor: '#FA4A0C', borderColor: '#FA4A0C', scale: 1.08 }
+                                        : { backgroundColor: '#ffffff', borderColor: '#cbd5e1', scale: 1 }
+                                      }
+                                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                      className="w-5 h-5 flex items-center justify-center rounded-full border-2"
+                                    >
+                                      {isSelected && (
+                                        <motion.svg
+                                          initial={{ opacity: 0, scale: 0.3 }}
+                                          animate={{ opacity: 1, scale: 1 }}
+                                          transition={{ type: 'spring', stiffness: 600, damping: 25 }}
+                                          viewBox="0 0 14 14" fill="none" className="w-3 h-3 text-white"
+                                        >
+                                          <path d="M11.6666 3.5L5.24992 9.91667L2.33325 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </motion.svg>
+                                      )}
+                                    </motion.div>
+                                  </div>
+                                </motion.button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
 
-                    if (faltanRequeridos) {
-                      showToast('Faltan opciones', 'Por favor selecciona las opciones requeridas', 'error');
-                      return;
+                {/* ── FOOTER: Atrás / Siguiente / Agregar ── */}
+                <div className="px-5 py-4 border-t border-slate-100 bg-white shrink-0 flex gap-3">
+                  {!isFirstStep && (
+                    <motion.button
+                      whileTap={{ scale: 0.94 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      onClick={() => setOptionsStep(s => s - 1)}
+                      style={{ minHeight: '52px' }}
+                      className="flex items-center justify-center gap-1.5 px-5 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-[14px] transition-colors duration-150 shrink-0 hover:bg-slate-50"
+                    >
+                      <ChevronDown size={18} className="rotate-90" /> Atrás
+                    </motion.button>
+                  )}
+                  <motion.button
+                    id="wizard-next-btn"
+                    whileTap={{ scale: 0.97 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    onClick={handleNext}
+                    style={{ minHeight: '52px' }}
+                    className={`flex-1 rounded-2xl font-black text-[15px] transition-colors duration-300 flex items-center justify-between px-5
+                      ${ isLastStep
+                        ? 'bg-[#FA4A0C] text-white shadow-lg shadow-orange-300/40'
+                        : grupo?.requerido && countSelected === 0
+                          ? 'bg-slate-100 text-slate-400'
+                          : 'bg-slate-900 text-white'
+                      }`}
+                  >
+                    <span>{isLastStep ? 'Añadir al Carrito' : 'Siguiente'}</span>
+                    {isLastStep
+                      ? <span className="text-white/90 font-black">${precioActual.toFixed(2)}</span>
+                      : <ChevronDown size={20} className="rotate-[-90deg]" />
                     }
-
-                    // Calcular precio total y armar opciones
-                    let precioExtra = 0;
-                    const opcionesSel: OpcionSeleccionada[] = [];
-                    
-                    (selectedItemForOptions.opciones || []).forEach(g => {
-                      g.opciones.forEach(o => {
-                        if (selectedOptionsState[g.titulo]?.[o.nombre]) {
-                          precioExtra += o.precio_extra;
-                          opcionesSel.push({ grupo: g.titulo, opcion: o.nombre, precio_extra: o.precio_extra });
-                        }
-                      });
-                    });
-
-                    const hashId = selectedItemForOptions.id + '_' + opcionesSel.map(o => o.opcion).sort().join('_');
-                    
-                    const itemToAdd: CartItem = {
-                      id: selectedItemForOptions.id,
-                      cartItemId: hashId,
-                      nombre: selectedItemForOptions.nombre,
-                      precio: selectedItemForOptions.precio + precioExtra,
-                      tipo: selectedItemForOptions.__tipo,
-                      opcionesSeleccionadas: opcionesSel,
-                      aplica_subsidio: selectedItemForOptions.aplica_subsidio
-                    };
-                    
-                    addToCart({ ...itemToAdd, foto_url: selectedItemForOptions.foto_url || undefined });
-                    setSelectedItemForOptions(null);
-                    showToast('Agregado', `${selectedItemForOptions.nombre} añadido al carrito`);
-                  }}
-                  className="w-full bg-[#FA4A0C] hover:bg-[#fa5a20] text-white font-black py-4 rounded-[24px] shadow-lg shadow-[#FA4A0C]/20 transition-colors flex items-center justify-between px-6"
-                >
-                  <span>Añadir al Carrito</span>
-                  <span>${(
-                    selectedItemForOptions.precio + 
-                    (selectedItemForOptions.opciones || []).reduce((sum, g) => {
-                      return sum + g.opciones.reduce((s2, o) => {
-                        return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? o.precio_extra : 0);
-                      }, 0);
-                    }, 0)
-                  ).toFixed(2)}</span>
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
+
+
+
 
     {/* Toast notification */}
     <AnimatePresence>
@@ -2190,7 +2491,8 @@ export function PublicMenuView() {
                     options={{ 
                       disableDefaultUI: true, 
                       zoomControl: false,
-                      gestureHandling: 'greedy'
+                      gestureHandling: 'greedy',
+                      styles: PREMIUM_MAP_STYLE
                     }}
                   >
                     {/* Punto Azul de ubicación GPS real detectada */}
