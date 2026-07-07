@@ -593,6 +593,24 @@ export function PublicLandingPage() {
                    onChange={(e) => setSearch(e.target.value)}
                  />
               </div>
+              
+              {/* Botón Beneficios (Desktop) */}
+              <Link 
+                to="/beneficios" 
+                className="hidden md:flex h-12 items-center gap-2 px-6 bg-gradient-to-r from-orange-500 to-[#FA4A0C] hover:from-orange-600 hover:to-orange-700 text-white rounded-full font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
+              >
+                <Star size={18} className="fill-white" />
+                <span>Beneficios VIP</span>
+              </Link>
+
+              {/* Botón Beneficios (Mobile) */}
+              <Link 
+                to="/beneficios" 
+                className="w-12 h-12 shrink-0 bg-gradient-to-r from-orange-500 to-[#FA4A0C] rounded-full flex items-center justify-center shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-white hover:-translate-y-0.5 transition-all md:hidden"
+              >
+                <Star size={20} className="fill-white" />
+              </Link>
+
               <button className="w-12 h-12 shrink-0 bg-white rounded-full flex items-center justify-center border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-colors md:hidden">
                  <SlidersHorizontal size={20} strokeWidth={2.5} />
               </button>

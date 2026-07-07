@@ -11,6 +11,7 @@ const PortalPage = lazy(() => import('./pages/PortalPage').then(module => ({ def
 const PublicLandingPage = lazy(() => import('./pages/PublicLandingPage').then(module => ({ default: module.PublicLandingPage })))
 const PublicMenuView = lazy(() => import('./pages/PublicMenuView').then(module => ({ default: module.PublicMenuView })))
 const SuccessPage = lazy(() => import('./pages/SuccessPage').then(module => ({ default: module.SuccessPage })))
+const BeneficiosPage = lazy(() => import('./pages/BeneficiosPage').then(module => ({ default: module.BeneficiosPage })))
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -57,6 +58,7 @@ export default function App() {
       }>
         <Routes>
           <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
+          <Route path="/beneficios" element={isPartnerDomain ? <Navigate to="/login" replace /> : <BeneficiosPage />} />
           <Route path="/menu/:id" element={<PublicMenuView />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />
