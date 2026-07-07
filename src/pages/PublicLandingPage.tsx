@@ -610,18 +610,23 @@ export function PublicLandingPage() {
           >
             {displayRestaurants.map(res => (
               <Link to={`/menu/${res.slug || res.id}`} key={res.id} className="flex flex-row sm:flex-col gap-3 sm:gap-0 group relative bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-2xl sm:rounded-none shadow-sm sm:shadow-none border border-slate-100 sm:border-none">
-                 {/* Imagen 16:9 en Desktop, 4:3 pequeño en Móvil */}
-                 <div className="relative w-[110px] sm:w-full shrink-0 aspect-[4/3] sm:aspect-video rounded-xl sm:rounded-[18px] overflow-hidden bg-slate-100 sm:mb-2.5 shadow-none sm:shadow-[0_2px_15px_rgba(0,0,0,0.06)] border border-slate-100 isolate">
+                 {/* Imagen Circular */}
+                 <div className="relative w-[110px] sm:w-[160px] md:w-[180px] mx-auto shrink-0 aspect-square rounded-full overflow-hidden bg-white sm:mb-3 shadow-sm border border-slate-100 isolate">
                     {res.foto_fachada_url ? (
-                      <img src={res.foto_fachada_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" alt={res.nombre} />
+                      <img 
+                        src={res.foto_fachada_url} 
+                        loading="lazy" 
+                        className="relative w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out z-10" 
+                        alt={res.nombre} 
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-orange-50"><Store size={24} className="text-orange-200 sm:w-10 sm:h-10" /></div>
                     )}
                     
                     {/* Badge de Tiempo */}
                     {estaAbierto(res) && (
-                      <div className="absolute bottom-1 right-1 sm:bottom-3 sm:right-3 bg-white/95 backdrop-blur-md px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-lg sm:rounded-xl shadow-sm text-[9px] sm:text-[12px] font-bold text-slate-900 flex items-center gap-0.5 sm:gap-1 z-10">
-                         <Clock size={10} strokeWidth={3} className="text-[#FA4A0C] sm:w-3 sm:h-3"/> 25-35 min
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-2 py-1 rounded-full shadow-sm text-[10px] sm:text-[11px] font-bold text-slate-900 flex items-center gap-1 z-10 whitespace-nowrap">
+                         <Clock size={10} strokeWidth={3} className="text-[#FA4A0C]"/> 25-35 min
                       </div>
                     )}
 
@@ -634,17 +639,17 @@ export function PublicLandingPage() {
                  </div>
                  
                  {/* Info Header */}
-                 <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-start sm:items-start gap-1 sm:gap-2 sm:px-1 flex-1 min-w-0">
-                    <div className="min-w-0 w-full">
-                       <h3 className="font-bold text-[15px] sm:text-[16px] md:text-[17px] text-slate-900 leading-tight group-hover:text-[#FA4A0C] transition-colors truncate">
+                 <div className="flex flex-col items-center sm:items-center gap-1 sm:px-1 flex-1 min-w-0 text-center w-full mt-1 sm:mt-0">
+                    <div className="min-w-0 w-full flex flex-col items-center">
+                       <h3 className="font-bold text-[14px] sm:text-[16px] md:text-[17px] text-slate-900 leading-tight group-hover:text-[#FA4A0C] transition-colors truncate w-full px-2">
                          {res.nombre}
                        </h3>
-                       <p className="text-slate-500 text-[11px] sm:text-[12px] font-medium mt-0.5 truncate">
+                       <p className="text-slate-500 text-[11px] sm:text-[12px] font-medium mt-0.5 truncate w-full px-2">
                          {res.categorias?.[0] || 'Restaurante'} • Envío: $45
                        </p>
                     </div>
                     {/* Fake Rating */}
-                    <div className="bg-slate-100 flex items-center justify-center px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black text-slate-700 shrink-0 gap-1 mt-1 sm:mt-0.5">
+                    <div className="bg-slate-100 flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black text-slate-700 shrink-0 gap-1 mt-0.5">
                       4.8 <Star size={10} className="fill-slate-700" />
                     </div>
                  </div>
