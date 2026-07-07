@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ChevronLeft, FileText, CheckCircle2, Store, UserCheck, ShoppingBag, Star, AlertTriangle, RefreshCw, Mail } from 'lucide-react'
-import { motion, Variants } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 
 export function TermsPage() {
   const sections = [

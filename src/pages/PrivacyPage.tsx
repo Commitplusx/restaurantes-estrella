@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ShieldCheck, Building2, Target, Database, Cookie, Scale, RefreshCcw } from 'lucide-react'
-import { motion, Variants } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 
 export function PrivacyPage() {
   const sections = [
