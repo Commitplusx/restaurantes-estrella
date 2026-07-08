@@ -246,7 +246,15 @@ export function PublicMenuView() {
   
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
-  const [isFreeDelivery, setIsFreeDelivery] = useState(false)
+  
+  const [usarBeneficioNormal, setUsarBeneficioNormal] = useState(false)
+  const [usarSaldoVip, setUsarSaldoVip] = useState(false)
+  const [montoSaldoVip, setMontoSaldoVip] = useState('')
+  const [pinVip, setPinVip] = useState('')
+  const [pinError, setPinError] = useState(false)
+  const [pinAutorizado, setPinAutorizado] = useState(false)
+  const [verificandoPin, setVerificandoPin] = useState(false)
+  const [datosCliente, setDatosCliente] = useState<{es_vip: boolean, saldo: number, puntos: number, envios_gratis: number, nombre: string} | null>(null)
   const [checkingLoyalty, setCheckingLoyalty] = useState(false)
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null)
   const [procesando, setProcesando] = useState(false)
@@ -288,35 +296,61 @@ export function PublicMenuView() {
   // Estados de cálculo H3 abstraídos
   const { costoEnvioBase, fueraDeCobertura, calculandoEnvio } = useDeliveryCalculation(ubicacionGPS, tipoEntrega);
   
-  // Revisar si el cliente tiene envío gratis por lealtad
+  // Revisar si el cliente tiene envío gratis por lealtad o saldo VIP
   useEffect(() => {
     const telLimpio = clienteTel.replace(/\D/g, '')
     if (telLimpio.length === 10) {
       checkLoyaltyPoints(telLimpio)
     } else {
-      setIsFreeDelivery(false)
+      setDatosCliente(null)
+      setUsarBeneficioNormal(false)
+      setUsarSaldoVip(false)
+      setPinAutorizado(false)
     }
   }, [clienteTel])
+
+  const handlePinVerify = async () => {
+    if (!pinVip || pinVip.length < 4 || !clienteTel) return;
+    setVerificandoPin(true);
+    setPinError(false);
+    try {
+      const { data } = await supabase.rpc('verify_cliente_pin', {
+        p_telefono: clienteTel.replace(/\D/g, ''),
+        p_pin: pinVip,
+      });
+      if (data?.ok) {
+        setPinAutorizado(true);
+        setPinError(false);
+      } else {
+        setPinError(true);
+        setPinAutorizado(false);
+      }
+    } catch (e) {
+      setPinError(true);
+    } finally {
+      setVerificandoPin(false);
+    }
+  }
 
   const checkLoyaltyPoints = async (tel: string) => {
     setCheckingLoyalty(true)
     try {
       const { data, error } = await supabase
         .from('clientes')
-        .select('puntos, rango')
+        .select('puntos, rango, es_vip, saldo_billetera, envios_gratis_disponibles, nombre')
         .eq('telefono', tel)
         .single()
       
       if (!error && data) {
-        // En su sistema original, la meta VIP depende del rango
-        const meta = (data.rango === 'vip') ? 5 : 6; 
-        if (data.puntos % meta === (meta - 1)) {
-          setIsFreeDelivery(true)
-        } else {
-          setIsFreeDelivery(false)
-        }
+        setDatosCliente({
+          es_vip: data.es_vip || data.rango === 'vip',
+          saldo: data.saldo_billetera || 0,
+          puntos: data.puntos || 0,
+          envios_gratis: data.envios_gratis_disponibles || 0,
+          nombre: data.nombre || ''
+        })
       } else {
-        setIsFreeDelivery(false)
+        setDatosCliente(null)
       }
     } catch (e) {
       console.error(e)
@@ -641,15 +675,30 @@ export function PublicMenuView() {
   // Por cada artículo calificable, el restaurante recauda $8 pesos extra que se usan para subsidiar el envío
   const bolsaSubsidio = cantidadSubsidio * 8;
   
-  // El costo de envío se reduce usando la bolsa de subsidio (nunca baja de 0)
-  const costoEnvioNormal = costoEnvioBase > 0 ? Math.max(0, costoEnvioBase - bolsaSubsidio) : 0;
-  const costoEnvio = isFreeDelivery ? 0 : costoEnvioNormal;
+  // CÁLCULOS DE LEALTAD Y ENVIOS
+  const isFreeDelivery = usarBeneficioNormal && datosCliente && !datosCliente.es_vip;
+  
+  // Lógica de costo base: Si es VIP, su envío base es $10 o $7 (a partir de 26 puntos). Si no, usa el costo normal.
+  const tarifaBaseEnvio = datosCliente?.es_vip ? (datosCliente.puntos < 26 ? 10 : 7) : costoEnvioBase;
+  const costoEnvioCalculado = tarifaBaseEnvio > 0 ? Math.max(0, tarifaBaseEnvio - bolsaSubsidio) : 0;
+  
+  const costoEnvio = isFreeDelivery ? 0 : costoEnvioCalculado;
+  // Bugfix: Evitar que mediante la consola del navegador pongan un monto VIP negativo para sumar saldo
+  const descuentoVip = (usarSaldoVip && datosCliente?.es_vip && pinAutorizado) ? Math.max(0, parseFloat(montoSaldoVip || '0')) : 0;
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
     if (restaurante && !estaAbierto(restaurante)) {
       setShowClosedToast(true)
       setTimeout(() => setShowClosedToast(false), 3500)
       return
+    }
+
+    // Bugfix: Evitar fraude con cupones. Si cambia el carrito, obligar a re-evaluar el cupón.
+    if (cuponValido) {
+      setCuponValido(false)
+      setDescuento(0)
+      setCuponCliente('')
+      showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
     }
 
     setCarrito(prev => {
@@ -662,6 +711,14 @@ export function PublicMenuView() {
   }
 
   const removeFromCart = (cartItemId: string) => {
+    // Bugfix: Evitar fraude con cupones. Si quita cosas, podría evadir el monto mínimo.
+    if (cuponValido) {
+      setCuponValido(false)
+      setDescuento(0)
+      setCuponCliente('')
+      showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
+    }
+
     setCarrito(prev => {
       const exist = prev.find(p => p.item.cartItemId === cartItemId)
       if (exist && exist.cantidad === 1) {
@@ -890,8 +947,11 @@ export function PublicMenuView() {
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
 
   // BUG 4 fix: reset coupon if cart subtotal drops to 0 or below discount amount
-  const descuentoAplicable = subtotal > 0 ? Math.min(descuento, subtotal) : 0
-  const total = Math.max(0, subtotal - descuentoAplicable) + (tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0)
+  const costoTotalEnvio = (tipoEntrega === 'domicilio' && !fueraDeCobertura) ? costoEnvio : 0;
+  const descuentoAplicable = (subtotal + costoTotalEnvio) > 0 ? Math.min(descuento + descuentoVip, subtotal + costoTotalEnvio) : 0;
+  const total = Math.max(0, subtotal + costoTotalEnvio - descuentoAplicable);
+
+  console.log("=== LOGS DE CARRITO ===", { subtotal, costoEnvioBase, bolsaSubsidio, costoEnvioCalculado, isFreeDelivery, usarBeneficioNormal, datosCliente, costoEnvio, descuentoVip, usarSaldoVip, pinAutorizado, montoSaldoVip, costoTotalEnvio, descuentoAplicable, total });
 
   // Limpiar todos los campos del checkout y volver al paso 1
   const resetCheckout = () => {
@@ -961,7 +1021,11 @@ export function PublicMenuView() {
         (costoEnvio > 0 ? `\n🚚 *Costo Envío:* $${costoEnvio}` : '')
       : `\n\n🏪 *Tipo de entrega:* Recoger en tienda`
       
-    const pedidoCompleto = pedidoDetalles + detallesEntregaStr
+    const notasPagoStr = `\n\n💳 *Método de Pago:* ${metodoPago === 'efectivo' ? 'Efectivo al recibir' : 'Pago en línea'}` +
+                         (descuentoAplicable > 0 ? `\n🏷️ *Descuento Aplicado:* -${descuentoAplicable.toFixed(2)}` : '') +
+                         (descuentoVip > 0 ? ` (Billetera VIP)` : '');
+                         
+    const pedidoCompleto = pedidoDetalles + detallesEntregaStr + notasPagoStr;
 
     const pinSeguridad = total > 500 ? Math.floor(1000 + Math.random() * 9000).toString() : null
 
@@ -1963,6 +2027,140 @@ export function PublicMenuView() {
             <div className="p-6 border-t border-slate-100/50 shrink-0 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-10 relative rounded-t-[32px] sm:rounded-none">
               <div className="flex flex-col gap-4">
                 
+                {/* UI DEL CARRITO INTELIGENTE (LEALTAD Y VIP) */}
+                {checkoutStep === 3 && datosCliente && !calculandoEnvio && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 mb-2 overflow-hidden rounded-[20px] shadow-sm border border-slate-200/60 bg-white">
+                    {/* Caso VIP */}
+                    {datosCliente.es_vip ? (
+                      <div className="bg-gradient-to-r from-amber-50 to-amber-100/50 p-4 border-l-4 border-amber-400 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-2 opacity-10">
+                          <svg className="w-16 h-16 text-amber-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        </div>
+                        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <h4 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                              <span className="text-amber-500">🌟</span> Billetera VIP
+                            </h4>
+                            <p className="text-xs text-amber-800/80 mt-1">
+                              Tienes <strong className="text-amber-600 text-sm font-black">${datosCliente.saldo.toFixed(2)}</strong> disponibles.
+                            </p>
+                          </div>
+                          {!usarSaldoVip && (
+                            <button 
+                              onClick={() => {
+                                setUsarSaldoVip(true);
+                                setPinAutorizado(false);
+                                // Bugfix: El límite no debe superar el Subtotal + Envío, PERO debemos restarle si hay un cupon normal aplicado.
+                                const costoTotalMínimo = Math.max(0, subtotal + costoEnvioCalculado - descuento);
+                                setMontoSaldoVip(Math.min(datosCliente.saldo, 350, costoTotalMínimo).toFixed(2));
+                              }}
+                              className="shrink-0 bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-md shadow-amber-500/20 hover:bg-amber-600 transition-colors"
+                            >
+                              Usar Saldo
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Expandable Panel for VIP Amount and PIN */}
+                        <AnimatePresence>
+                          {usarSaldoVip && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }} 
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="relative z-10 overflow-hidden"
+                            >
+                              <div className="pt-4 mt-3 border-t border-amber-200/60 flex flex-col gap-3">
+                                {!pinAutorizado ? (
+                                  <>
+                                    <div className="flex gap-2 items-center">
+                                      <span className="text-xs font-bold text-amber-900">$</span>
+                                      <input 
+                                        type="number" 
+                                        value={montoSaldoVip}
+                                        onChange={(e) => setMontoSaldoVip(e.target.value)}
+                                        placeholder="Monto a descontar"
+                                        className="flex-1 bg-white border border-amber-200 rounded-lg px-3 py-2 text-sm font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                      />
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <input 
+                                        type="password" 
+                                        maxLength={4}
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        value={pinVip}
+                                        onChange={(e) => {
+                                          setPinVip(e.target.value.replace(/\D/g, ''));
+                                          setPinError(false);
+                                        }}
+                                        placeholder="PIN de 4 dígitos"
+                                        className={`w-32 bg-white border ${pinError ? 'border-red-400 bg-red-50' : 'border-amber-200'} rounded-lg px-3 py-2 text-sm font-bold text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500/30`}
+                                      />
+                                      <button 
+                                        onClick={handlePinVerify}
+                                        disabled={verificandoPin || pinVip.length < 4 || parseFloat(montoSaldoVip||'0') < 10}
+                                        className="flex-1 bg-amber-900 text-amber-50 font-bold text-xs rounded-lg px-3 py-2 hover:bg-amber-950 disabled:opacity-50 transition-colors flex items-center justify-center"
+                                      >
+                                        {verificandoPin ? '...' : 'Autorizar'}
+                                      </button>
+                                    </div>
+                                    {pinError && <p className="text-[10px] text-red-500 font-bold px-1">PIN Incorrecto</p>}
+                                    {parseFloat(montoSaldoVip||'0') < 10 && <p className="text-[10px] text-amber-700 px-1">El monto mínimo es de $10.</p>}
+                                    {parseFloat(montoSaldoVip||'0') > Math.min(350, datosCliente.saldo) && <p className="text-[10px] text-red-500 px-1">El monto supera tu saldo o el límite de $350.</p>}
+                                  </>
+                                ) : (
+                                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between">
+                                    <div>
+                                      <span className="block text-xs font-bold text-green-700 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3" /> PIN Autorizado
+                                      </span>
+                                      <span className="text-xs text-green-600 block mt-0.5">Descontando ${parseFloat(montoSaldoVip).toFixed(2)}</span>
+                                    </div>
+                                    <button onClick={() => { setPinAutorizado(false); setUsarSaldoVip(false); setPinVip(''); }} className="text-xs text-red-500 font-bold underline">
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    ) : (
+                      /* Caso Cliente Normal - Envío Gratis */
+                      /* Bugfix: Solo mostrar si de verdad necesita usarlo (si el envío no es $0 gracias al subsidio de artículos) */
+                      costoEnvioCalculado > 0 && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6) && (
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100/30 p-4 border-l-4 border-blue-500 relative">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <h4 className="font-bold text-blue-900 text-sm flex items-center gap-1.5">
+                                <span className="text-blue-500">🎁</span> ¡Felicidades, {datosCliente.nombre.split(' ')[0]}!
+                              </h4>
+                              <p className="text-xs text-blue-800/80 mt-1">
+                                Tienes <strong className="text-blue-600">1 envío gratis</strong> disponible por tu lealtad.
+                              </p>
+                            </div>
+                            
+                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                              <input 
+                                type="checkbox" 
+                                className="sr-only peer"
+                                checked={usarBeneficioNormal}
+                                onChange={(e) => setUsarBeneficioNormal(e.target.checked)}
+                              />
+                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                              <span className="ml-3 text-xs font-bold text-blue-900">
+                                {usarBeneficioNormal ? 'Aplicado' : 'Usar Ahora'}
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </motion.div>
+                )}
+
                 {/* Banner Motivacional Envío en Paso 3 */}
                 {checkoutStep === 3 && tipoEntrega === 'domicilio' && costoEnvioBase > 0 && !fueraDeCobertura && !calculandoEnvio && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[16px] p-3 flex items-center gap-3 border ${costoEnvio === 0 ? 'bg-green-50/80 border-green-200/50' : 'bg-blue-50/80 border-blue-200/50'}`}>
