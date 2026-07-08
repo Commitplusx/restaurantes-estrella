@@ -60,7 +60,7 @@ export function BeneficiosPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] mb-6"
           >
-            Pide inteligente. <br />
+            Tu comida al precio real. <br />
             <span className="text-slate-400">Paga lo justo.</span>
           </motion.h1>
           <motion.p 
