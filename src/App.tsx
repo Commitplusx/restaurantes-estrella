@@ -47,6 +47,23 @@ export default function App() {
     }
   }, []);
 
+  // Visitor tracking
+  useEffect(() => {
+    const trackVisit = async () => {
+      const isTracked = sessionStorage.getItem('visitTracked');
+      if (!isTracked) {
+        try {
+          const plataforma = window.navigator.userAgent.toLowerCase().includes('mobi') ? 'mobile' : 'web';
+          await supabase.from('app_visitas').insert([{ plataforma }]);
+          sessionStorage.setItem('visitTracked', 'true');
+        } catch (e) {
+          console.error('Error tracking visit:', e);
+        }
+      }
+    };
+    trackVisit();
+  }, []);
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
