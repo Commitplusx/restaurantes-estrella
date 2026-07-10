@@ -247,6 +247,14 @@ export function PublicMenuView() {
   const [cuponCliente, setCuponCliente] = useState('')
   const [telError, setTelError] = useState(false)
   
+  // ETA Dinamico
+  const [tiempoEstimado, setTiempoEstimado] = useState('25-35 min')
+  
+  // OTP States
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [verificandoOtp, setVerificandoOtp] = useState(false)
+  
   const [usarBeneficioNormal, setUsarBeneficioNormal] = useState(false)
   const [usarSaldoVip, setUsarSaldoVip] = useState(false)
   const [montoSaldoVip, setMontoSaldoVip] = useState('')
@@ -276,6 +284,8 @@ export function PublicMenuView() {
     libraries: LIBRARIES
   });
   const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
+  const idempotencyKeyRef = useRef<string | null>(null)
+  const ticketIdRef = useRef<string | null>(null)
   const [direccionReferencias, setDireccionReferencias] = useState('')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>('efectivo') // Forzado a efectivo por ahora
   const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
@@ -370,11 +380,29 @@ export function PublicMenuView() {
   useEffect(() => { sessionStorage.setItem('est_direccion', direccionEntrega) }, [direccionEntrega])
   useEffect(() => { if (ubicacionGPS) sessionStorage.setItem('est_ubicacion', JSON.stringify(ubicacionGPS)) }, [ubicacionGPS])
 
+  // Resetear idempotency key si el carrito o los datos cambian, para evitar mandar datos viejos en un reintento
+  useEffect(() => {
+    idempotencyKeyRef.current = null;
+    ticketIdRef.current = null;
+  }, [carrito, metodoPago, tipoEntrega, descuento, clienteNombre, clienteTel, direccionEntrega, ubicacionGPS]);
+
   // Estado del modal de opciones de producto
   type OptionableItem = (MenuItem | MenuCombo) & { __tipo: 'item' | 'combo' }
   const [selectedItemForOptions, setSelectedItemForOptions] = useState<OptionableItem | null>(null)
   // Resetear el paso del wizard cuando cambia el item seleccionado
   useEffect(() => { setOptionsStep(0) }, [selectedItemForOptions])
+
+  useEffect(() => {
+    const fetchEta = async () => {
+      try {
+        const { data: etaData } = await supabase.rpc('calcular_eta_dinamico');
+        if (etaData) setTiempoEstimado(etaData);
+      } catch (err) {
+        console.error('Error fetching ETA:', err);
+      }
+    };
+    fetchEta();
+  }, []);
 
   const [selectedOptionsState, setSelectedOptionsState] = useState<Record<string, Record<string, boolean>>>({})
 
@@ -972,7 +1000,7 @@ export function PublicMenuView() {
 
   const handlePedir = async () => {
     if (!restaurante || carrito.length === 0) return
-    if (submittingRef.current) return // BUG 5 fix: prevent double-submit
+    if (submittingRef.current) return
     
     if (!clienteNombre.trim()) {
       showToast('Falta el nombre', 'Por favor ingresa tu nombre para continuar', 'error')
@@ -1000,11 +1028,45 @@ export function PublicMenuView() {
       return
     }
     setTelError(false)
-    submittingRef.current = true
 
+    if (metodoPago === 'efectivo' && !showOtpModal) {
+      setProcesando(true)
+      try {
+        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp'
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+        
+        const res = await fetch(edgeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ action: 'request-client-otp', telefono: telLimpio })
+        })
+        if (!res.ok) throw new Error('No pudimos enviar el código SMS')
+        
+        setShowOtpModal(true)
+        setIsCartOpen(false) // Cierra el carrito para evitar problemas de superposición
+      } catch (err: any) {
+        showToast('Error', err.message, 'error')
+      } finally {
+        setProcesando(false)
+      }
+      return
+    }
+
+    procesarOrden()
+  }
+
+  const procesarOrden = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
     setProcesando(true)
-    // BUG 5 fix: generate ticketId immediately and use ref to prevent double-submit
-    const ticketId = Math.random().toString(36).substring(2, 8).toUpperCase()
+    const telLimpio = clienteTel.replace(/\D/g, '')
+
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = crypto.randomUUID()
+      ticketIdRef.current = Math.random().toString(36).substring(2, 8).toUpperCase()
+    }
+    const ticketId = ticketIdRef.current!
+
     const pedidoDetalles = carrito.map(p => {
       const tag = p.item.tipo === 'combo' ? '[COMBO] ' : p.item.tipo === 'promo' ? '[PROMO] ' : ''
       let optionsStr = ''
@@ -1045,14 +1107,17 @@ export function PublicMenuView() {
         metodo_pago: metodoPago,
         total: total,
         tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
-        pin_seguridad: pinSeguridad
+        pin_seguridad: pinSeguridad,
+        idempotency_key: idempotencyKeyRef.current
       }]).select('id').single()
 
-      if (insertError) throw insertError
-
-      // La notificación al restaurante la maneja el DB Webhook de Supabase (tabla pedidos → notificar-whatsapp)
-      // tanto para efectivo como para pagos en línea (este último vía webhook de MercadoPago).
-
+      if (insertError) {
+        if (insertError.code === '23505') {
+          console.warn("Pedido duplicado detectado (idempotency key), recuperando el existente...")
+        } else {
+          throw insertError
+        }
+      }
 
     } catch (err: any) {    
       alert('Hubo un problema registrando el pedido en la base de datos: ' + (err.message || 'Error desconocido') + '. Por favor intenta nuevamente.');
@@ -1078,7 +1143,8 @@ export function PublicMenuView() {
             costo_envio: tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0,
             descuento: descuento,
             total: total,
-            originUrl: window.location.origin
+            originUrl: window.location.origin,
+            idempotencyKey: idempotencyKeyRef.current
           })
         })
         
@@ -1119,8 +1185,35 @@ export function PublicMenuView() {
       setTipoEntrega(null)
       setUbicacionGPS(null)
       setDireccionEntrega('')
+      idempotencyKeyRef.current = null
+      ticketIdRef.current = null
       sessionStorage.clear()
       window.location.href = `/success?pedido=${ticketId}&success=true`
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length < 4) return
+    setVerificandoOtp(true)
+    try {
+      const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp'
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+      
+      const res = await fetch(edgeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        body: JSON.stringify({ action: 'verify-code', telefono: clienteTel.replace(/\D/g, ''), codigo: otpCode })
+      })
+      
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Código incorrecto')
+      
+      setShowOtpModal(false)
+      procesarOrden()
+    } catch (err: any) {
+      showToast('Código Incorrecto', err.message, 'error')
+    } finally {
+      setVerificandoOtp(false)
     }
   }
 
@@ -1893,7 +1986,17 @@ export function PublicMenuView() {
 
                 {/* PASO 3: ENTREGA Y MAPA */}
                 {checkoutStep === 3 && (
-                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-4">                    <div className="pt-2">
+                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-4">
+                    
+                    {/* Etiqueta Dinmica de Tiempo Estimado */}
+                    {tipoEntrega === 'domicilio' && (
+                      <div className="flex items-center justify-center gap-2 mb-2 bg-orange-50 text-orange-600 px-4 py-2 rounded-full border border-orange-100">
+                        <Clock size={16} strokeWidth={2.5} />
+                        <span className="text-sm font-bold">Tiempo estimado: {tiempoEstimado}</span>
+                      </div>
+                    )}
+                    
+                    <div className="pt-2">
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">¿Cómo quieres recibirlo?</label>
                       <motion.div layout className="flex flex-col sm:flex-row gap-3">
                         <AnimatePresence mode="popLayout">
@@ -2801,6 +2904,68 @@ export function PublicMenuView() {
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showOtpModal && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => { setShowOtpModal(false); setProcesando(false); setIsCartOpen(true); }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[32px] p-8 shadow-2xl z-[10000]"
+            >
+              <button 
+                onClick={() => { setShowOtpModal(false); setProcesando(false); setIsCartOpen(true); }}
+                className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 hover:text-slate-600 transition-colors"
+              >
+                <X size={16} strokeWidth={3} />
+              </button>
+              
+              <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <ShieldCheck size={32} strokeWidth={2} />
+              </div>
+              
+              <h3 className="text-2xl font-black text-slate-900 text-center mb-2 leading-tight">Verifica tu pedido</h3>
+              <p className="text-slate-500 text-center text-sm mb-8 leading-relaxed">
+                Para tu seguridad, ingresa el PIN de 4 dígitos que te enviamos por WhatsApp al <b>{clienteTel}</b>
+              </p>
+
+              <div className="flex gap-3 justify-center mb-8">
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full text-center text-4xl font-black tracking-[0.5em] text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-[20px] py-4 focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-500/10 transition-all outline-none"
+                  placeholder="••••"
+                  autoFocus
+                />
+              </div>
+
+              <button
+                onClick={handleVerifyOtp}
+                disabled={otpCode.length < 4 || verificandoOtp}
+                className="w-full bg-[#FA4A0C] text-white font-bold py-4 rounded-[20px] shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100 active:scale-95 transition-all"
+              >
+                {verificandoOtp ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Verificando...
+                  </>
+                ) : (
+                  'Confirmar Pedido'
+                )}
+              </button>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
