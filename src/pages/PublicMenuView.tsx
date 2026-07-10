@@ -1521,8 +1521,17 @@ export function PublicMenuView() {
                                   ) : null}
                                 </div>
                               </div>
-                              <div className="w-[100px] h-[100px] rounded-[12px] overflow-hidden bg-slate-50 shrink-0 relative">
-                                <LazyImage src={item.foto_url} alt={item.nombre} className="w-full h-full" />
+                              <div className="w-[100px] h-[100px] rounded-[12px] overflow-hidden bg-slate-50 shrink-0 relative flex items-center justify-center border border-slate-100">
+                                {item.foto_url ? (
+                                  <LazyImage src={item.foto_url} alt={item.nombre} className="w-full h-full" />
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center pb-4 pr-3 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-300">
+                                    <div className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center mb-1">
+                                      <span className="text-xs opacity-50">🍽️</span>
+                                    </div>
+                                    <span className="text-[9px] font-medium text-slate-400 text-center px-1 leading-tight">¡Pruébalo!</span>
+                                  </div>
+                                )}
                                 {(!item.agotado_hoy && !fueraDeHorario) && (
                                   <button
                                     onClick={(e) => {

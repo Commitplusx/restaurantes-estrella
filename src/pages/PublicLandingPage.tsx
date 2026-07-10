@@ -199,56 +199,65 @@ export function PublicLandingPage() {
   }, [])
 
   async function loadRestaurants(pageIndex: number) {
-    if (pageIndex === 0) {
-      const cached = sessionStorage.getItem('cache_restaurantes')
-      if (cached) {
-        setRestaurantes(JSON.parse(cached))
-        setLoading(false)
-      } else {
-        setLoading(true)
-      }
-    } else {
-      setLoadingMore(true)
-    }
-
-    let query = supabase
-      .from('restaurantes')
-      .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
-      .eq('activo', true)
-      .order('nombre')
-      .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
-
-    const { data, error } = await query.eq('perfil_completo', true)
-    let finalData = data;
-    if (error && error.code === '42703') { 
-        const { data: fallbackData } = await supabase
-          .from('restaurantes')
-          .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
-          .eq('activo', true)
-          .order('nombre')
-          .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
-        finalData = fallbackData;
-    } else if (error) {
-       console.error("Error fetching restaurants:", error)
-    }
-    
-    if (finalData) {
-      if (finalData.length < PAGE_SIZE) setHasMore(false)
+    try {
       if (pageIndex === 0) {
-        setRestaurantes(finalData)
-        sessionStorage.setItem('cache_restaurantes', JSON.stringify(finalData))
+        try {
+          const cached = sessionStorage.getItem('cache_restaurantes')
+          if (cached) {
+            setRestaurantes(JSON.parse(cached))
+            setLoading(false)
+          } else {
+            setLoading(true)
+          }
+        } catch (e) {
+          sessionStorage.removeItem('cache_restaurantes')
+          setLoading(true)
+        }
       } else {
-        setRestaurantes(prev => {
-          const newIds = finalData.map(d => d.id)
-          const combined = [...prev.filter(p => !newIds.includes(p.id)), ...finalData]
-          sessionStorage.setItem('cache_restaurantes', JSON.stringify(combined))
-          return combined
-        })
+        setLoadingMore(true)
       }
+
+      let query = supabase
+        .from('restaurantes')
+        .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
+        .eq('activo', true)
+        .order('nombre')
+        .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
+
+      const { data, error } = await query.eq('perfil_completo', true)
+      let finalData = data;
+      if (error && error.code === '42703') { 
+          const { data: fallbackData } = await supabase
+            .from('restaurantes')
+            .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
+            .eq('activo', true)
+            .order('nombre')
+            .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
+          finalData = fallbackData;
+      } else if (error) {
+         console.error("Error fetching restaurants:", error)
+      }
+      
+      if (finalData) {
+        if (finalData.length < PAGE_SIZE) setHasMore(false)
+        if (pageIndex === 0) {
+          setRestaurantes(finalData)
+          sessionStorage.setItem('cache_restaurantes', JSON.stringify(finalData))
+        } else {
+          setRestaurantes(prev => {
+            const newIds = finalData!.map(d => d.id)
+            const combined = [...prev.filter(p => !newIds.includes(p.id)), ...finalData!]
+            sessionStorage.setItem('cache_restaurantes', JSON.stringify(combined))
+            return combined
+          })
+        }
+      }
+    } catch (err) {
+      console.error("Exception in loadRestaurants:", err)
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
     }
-    
-    setLoading(false)
-    setLoadingMore(false)
   }
 
   async function loadPromos() {
