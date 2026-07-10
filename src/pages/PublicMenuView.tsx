@@ -21,7 +21,8 @@ import {
   Truck,
   LocateFixed,
   Tag,
-  ChevronDown
+  ChevronDown,
+  ShieldCheck
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
@@ -1029,7 +1030,9 @@ export function PublicMenuView() {
     }
     setTelError(false)
 
-    if (metodoPago === 'efectivo' && !showOtpModal) {
+    if (metodoPago === 'efectivo') {
+      if (showOtpModal || verificandoOtp) return
+      
       setProcesando(true)
       try {
         const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp'
@@ -1043,7 +1046,7 @@ export function PublicMenuView() {
         if (!res.ok) throw new Error('No pudimos enviar el código SMS')
         
         setShowOtpModal(true)
-        setIsCartOpen(false) // Cierra el carrito para evitar problemas de superposición
+        // No cerramos el carrito para que se quede de fondo
       } catch (err: any) {
         showToast('Error', err.message, 'error')
       } finally {
@@ -1055,10 +1058,7 @@ export function PublicMenuView() {
     procesarOrden()
   }
 
-  const procesarOrden = async () => {
-    if (submittingRef.current) return
-    submittingRef.current = true
-    setProcesando(true)
+  const generarPayloadPedido = () => {
     const telLimpio = clienteTel.replace(/\D/g, '')
 
     if (!idempotencyKeyRef.current) {
@@ -1091,25 +1091,35 @@ export function PublicMenuView() {
 
     const pinSeguridad = total > 500 ? Math.floor(1000 + Math.random() * 9000).toString() : null
 
+    return {
+      cliente_tel: telLimpio,
+      cliente_nombre: clienteNombre.trim(),
+      restaurante: restaurante?.nombre || '',
+      restaurante_id: restaurante?.id || '',
+      descripcion: pedidoCompleto,
+      direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
+      referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,
+      lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
+      lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
+      estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
+      wb_message_id: ticketId,
+      metodo_pago: metodoPago,
+      total: total,
+      tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
+      pin_seguridad: pinSeguridad,
+      idempotency_key: idempotencyKeyRef.current
+    }
+  }
+
+  const procesarOrden = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setProcesando(true)
+    
+    const payload = generarPayloadPedido()
+
     try {
-      const { error: insertError } = await supabase.from('pedidos').insert([{
-        cliente_tel: telLimpio,
-        cliente_nombre: clienteNombre.trim(),
-        restaurante: restaurante.nombre,
-        restaurante_id: restaurante.id,
-        descripcion: pedidoCompleto,
-        direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
-        referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,
-        lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
-        lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
-        estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
-        wb_message_id: ticketId,
-        metodo_pago: metodoPago,
-        total: total,
-        tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
-        pin_seguridad: pinSeguridad,
-        idempotency_key: idempotencyKeyRef.current
-      }]).select('id').single()
+      const { error: insertError } = await supabase.from('pedidos').insert([payload]).select('id').single()
 
       if (insertError) {
         if (insertError.code === '23505') {
@@ -1138,7 +1148,7 @@ export function PublicMenuView() {
             'Authorization': `Bearer ${anonKey}`
           },
           body: JSON.stringify({
-            pedidoId: ticketId, // Pasamos el ticketId para enlazar con la tabla pedidos
+            pedidoId: payload.wb_message_id, // Pasamos el ticketId para enlazar con la tabla pedidos
             items: carrito,
             costo_envio: tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0,
             descuento: descuento,
@@ -1188,7 +1198,7 @@ export function PublicMenuView() {
       idempotencyKeyRef.current = null
       ticketIdRef.current = null
       sessionStorage.clear()
-      window.location.href = `/success?pedido=${ticketId}&success=true`
+      window.location.href = `/success?pedido=${payload.wb_message_id}&success=true`
     }
   }
 
@@ -1196,20 +1206,38 @@ export function PublicMenuView() {
     if (otpCode.length < 4) return
     setVerificandoOtp(true)
     try {
+      const payload = generarPayloadPedido()
       const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp'
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
       
       const res = await fetch(edgeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-        body: JSON.stringify({ action: 'verify-code', telefono: clienteTel.replace(/\D/g, ''), codigo: otpCode })
+        body: JSON.stringify({ action: 'verify-and-order', telefono: clienteTel.replace(/\D/g, ''), codigo: otpCode, payload })
       })
       
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Código incorrecto')
       
       setShowOtpModal(false)
-      procesarOrden()
+      
+      // Limpiamos y redirigimos (Flujo Efectivo exitoso)
+      setIsCartOpen(false)
+      setCarrito([])
+      setClienteNombre('')
+      setClienteTel('')
+      setCuponCliente('')
+      setCuponValido(false)
+      setDescuento(0)
+      setDireccionReferencias('')
+      setTipoEntrega(null)
+      setUbicacionGPS(null)
+      setDireccionEntrega('')
+      idempotencyKeyRef.current = null
+      ticketIdRef.current = null
+      sessionStorage.clear()
+      window.location.href = `/success?pedido=${payload.wb_message_id}&success=true`
+      
     } catch (err: any) {
       showToast('Código Incorrecto', err.message, 'error')
     } finally {
@@ -2918,7 +2946,7 @@ export function PublicMenuView() {
 
       <AnimatePresence>
         {showOtpModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
