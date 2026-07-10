@@ -359,7 +359,8 @@ export function SuccessPage() {
                     <p className="text-slate-500 font-medium text-xs mb-2">
                       {pedido?.estado === 'aceptado' || pedido?.estado === 'en_cocina' ? '¡El restaurante está preparando tu comida! 🍳'
                       : pedido?.estado === 'listo_para_recoger' ? '¡Tu orden está lista para ser recogida! 🏃‍♂️'
-                      : pedido?.estado === 'recibido' || pedido?.estado === 'en_camino' ? '¡Tu repartidor recogió la orden y va en camino! 🛵'
+                      : pedido?.estado === 'recibido' ? '¡Tu repartidor está en el restaurante verificando tu orden! 🧑‍🍳'
+                      : pedido?.estado === 'en_camino' ? '¡Tu repartidor recogió la orden y va en camino! 🛵'
                       : 'Sigue el estado de tu pedido en tiempo real'}
                     </p>
                     {/* Progress Bar + estado del repartidor */}
