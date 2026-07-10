@@ -1095,7 +1095,7 @@ export function PublicMenuView() {
       cliente_tel: telLimpio,
       cliente_nombre: clienteNombre.trim(),
       restaurante: restaurante?.nombre || '',
-      restaurante_id: restaurante?.id || '',
+      restaurante_id: restaurante?.id || null,
       descripcion: pedidoCompleto,
       direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
       referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,
@@ -2976,14 +2976,36 @@ export function PublicMenuView() {
                 Para tu seguridad, ingresa el PIN de 4 dígitos que te enviamos por WhatsApp al <b>{clienteTel}</b>
               </p>
 
-              <div className="flex gap-3 justify-center mb-8">
+              <div className="relative flex justify-center mb-10 w-full max-w-[280px] mx-auto">
+                <div className="flex gap-3 justify-between w-full">
+                  {[0, 1, 2, 3].map((index) => {
+                    const digit = otpCode[index] || '';
+                    const isActive = otpCode.length === index || (otpCode.length === 4 && index === 3);
+                    return (
+                      <div
+                        key={index}
+                        className={`w-14 h-16 sm:w-16 sm:h-20 flex items-center justify-center text-3xl sm:text-4xl font-black rounded-2xl border-2 transition-all duration-300 ${
+                          isActive 
+                            ? 'border-orange-500 bg-orange-50/50 shadow-[0_0_0_4px_rgba(249,115,22,0.1)] scale-105 z-10' 
+                            : digit 
+                              ? 'border-slate-800 bg-slate-800 text-white shadow-md' 
+                              : 'border-slate-200 bg-slate-50 text-slate-300'
+                        }`}
+                      >
+                        {digit ? digit : '•'}
+                      </div>
+                    );
+                  })}
+                </div>
+                
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={4}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full text-center text-4xl font-black tracking-[0.5em] text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-[20px] py-4 focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-500/10 transition-all outline-none"
-                  placeholder="••••"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20"
                   autoFocus
                 />
               </div>
