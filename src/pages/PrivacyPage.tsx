@@ -36,12 +36,23 @@ export function PrivacyPage() {
     },
     {
       id: 4,
+      title: 'Procesamiento de Pagos en Línea',
+      icon: <ShieldCheck size={24} className="text-yellow-500" />,
+      content: 'Al realizar transacciones en línea, los pagos son procesados de forma segura a través de nuestro socio comercial, Mercado Pago. Estrella Eats declara que:',
+      bullets: [
+        'NUNCA almacena, procesa ni tiene acceso a la información sensible de su tarjeta (como el PAN, CVV o fecha de vencimiento).',
+        'Toda la información de su tarjeta de crédito o débito es ingresada directamente en la pasarela de Mercado Pago, la cual opera bajo sus propias estrictas políticas de privacidad y seguridad.',
+        'Solo retenemos "metadatos" de la transacción (monto, fecha y números de recibo) exclusivamente para historial, conciliación y soporte técnico.'
+      ]
+    },
+    {
+      id: 5,
       title: 'Uso de Cookies y Rastreo',
       icon: <Cookie size={24} className="text-orange-500" />,
       content: 'En nuestra página web utilizamos cookies o tecnologías similares. Estas nos permiten brindarle una experiencia fluida al mantener su sesión activa, guardar artículos en su carrito y recordar sus preferencias. Usted puede deshabilitar estas tecnologías desde su navegador, aunque algunas funciones podrían dejar de operar correctamente.'
     },
     {
-      id: 5,
+      id: 6,
       title: 'Derechos ARCO (Acceso, Rectificación, Cancelación u Oposición)',
       icon: <Scale size={24} className="text-indigo-500" />,
       content: 'Usted tiene derecho a conocer qué datos tenemos y cómo los usamos (Acceso); solicitar la corrección de información inexacta (Rectificación); pedir su eliminación de nuestros registros (Cancelación); o negarse a un uso específico (Oposición).',
@@ -51,7 +62,7 @@ export function PrivacyPage() {
       ]
     },
     {
-      id: 6,
+      id: 7,
       title: 'Cambios al Aviso de Privacidad',
       icon: <RefreshCcw size={24} className="text-teal-500" />,
       content: 'Este aviso puede sufrir modificaciones por requerimientos legales o cambios en nuestras prácticas. Nos comprometemos a mantenerlo informado publicando las versiones actualizadas en esta misma sección de la plataforma web.'

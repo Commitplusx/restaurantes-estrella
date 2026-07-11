@@ -289,6 +289,7 @@ export function PublicMenuView() {
   const ticketIdRef = useRef<string | null>(null)
   const [direccionReferencias, setDireccionReferencias] = useState('')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea'>('efectivo') // Forzado a efectivo por ahora
+  const [montoEfectivo, setMontoEfectivo] = useState('')
   const [toastMsg, setToastMsg] = useState<{ title: string, message?: string, type?: 'success' | 'error' | 'loading' } | null>(null)
 
   // Estado para validación de cupones
@@ -1031,6 +1032,14 @@ export function PublicMenuView() {
     setTelError(false)
 
     if (metodoPago === 'efectivo') {
+      if (!montoEfectivo) {
+        showToast('Falta el monto', 'Por favor ingresa con cuánto vas a pagar.', 'error')
+        return
+      }
+      if (Number(montoEfectivo) < total) {
+        showToast('Monto inválido', `El monto debe ser al menos de $${total.toFixed(2)}`, 'error')
+        return
+      }
       if (showOtpModal || verificandoOtp) return
       
       setProcesando(true)
@@ -1083,7 +1092,8 @@ export function PublicMenuView() {
         (costoEnvio > 0 ? `\n🚚 *Costo Envío:* $${costoEnvio}` : '')
       : `\n\n🏪 *Tipo de entrega:* Recoger en tienda`
       
-    const notasPagoStr = `\n\n💳 *Método de Pago:* ${metodoPago === 'efectivo' ? 'Efectivo al recibir' : 'Pago en línea'}` +
+    const montoPagaCon = metodoPago === 'efectivo' && montoEfectivo ? ` (Paga con: $${montoEfectivo})` : ''
+    const notasPagoStr = `\n\n💳 *Método de Pago:* ${metodoPago === 'efectivo' ? `Efectivo al recibir${montoPagaCon}` : 'Pago en línea'}` +
                          (descuentoAplicable > 0 ? `\n🏷️ *Descuento Aplicado:* -${descuentoAplicable.toFixed(2)}` : '') +
                          (descuentoVip > 0 ? ` (Billetera VIP)` : '');
                          
@@ -2128,7 +2138,9 @@ export function PublicMenuView() {
                 )}
 
                 {/* PASO 4: PAGO */}
-                {checkoutStep === 4 && (
+                {checkoutStep === 4 && (() => {
+                  const hasMercadoPago = Boolean(restaurante?.acepta_pago_online);
+                  return (
                   <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
                     <div>
                       <h3 className="font-black text-slate-900 text-lg mb-4 text-center">Selecciona tu Método de Pago</h3>
@@ -2141,24 +2153,46 @@ export function PublicMenuView() {
                           </div>
                           {metodoPago === 'efectivo' && <CheckCircle2 size={24} className="text-green-500" />}
                         </button>
-                        {/* 
-                        <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-5 px-6 rounded-[24px] border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${metodoPago === 'en_linea' ? 'bg-[#FA4A0C]/20' : 'bg-slate-100'}`}>💳</div>
-                          <div className="text-left flex-1">
-                            <span className="block text-base">Tarjeta o Mercado Pago</span>
-                            <span className="block text-xs opacity-70 mt-0.5">Pago seguro en línea</span>
+
+                        {metodoPago === 'efectivo' && (
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="px-2">
+                            <label className="block text-sm font-bold text-slate-700 mb-2">¿Con cuánto vas a pagar?</label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                              <input 
+                                type="number" 
+                                placeholder={`Ej. ${Math.ceil(total / 100) * 100}`}
+                                value={montoEfectivo}
+                                onChange={(e) => setMontoEfectivo(e.target.value)}
+                                className="w-full bg-white border-2 border-slate-200 rounded-2xl py-3 pl-8 pr-4 font-bold text-slate-900 focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/20 transition-all"
+                              />
+                            </div>
+                            {montoEfectivo && Number(montoEfectivo) < total && (
+                              <p className="text-red-500 text-xs font-bold mt-2">El monto no puede ser menor al total del pedido (${total.toFixed(2)}).</p>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {hasMercadoPago ? (
+                          <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-5 px-6 rounded-[24px] border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${metodoPago === 'en_linea' ? 'bg-[#FA4A0C]/20' : 'bg-slate-100'}`}>💳</div>
+                            <div className="text-left flex-1">
+                              <span className="block text-base">Tarjeta o Mercado Pago</span>
+                              <span className="block text-xs opacity-70 mt-0.5">Pago seguro en línea</span>
+                            </div>
+                            {metodoPago === 'en_linea' && <CheckCircle2 size={24} className="text-[#FA4A0C]" />}
+                          </button>
+                        ) : (
+                          <div className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-[16px] text-center flex items-center gap-3">
+                            <span className="text-2xl">⏳</span>
+                            <p className="text-sm text-slate-600 font-medium">¡Próximamente tendremos pagos en línea! Por el momento, el pago es exclusivo en efectivo al recibir.</p>
                           </div>
-                          {metodoPago === 'en_linea' && <CheckCircle2 size={24} className="text-[#FA4A0C]" />}
-                        </button>
-                        */}
-                        <div className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-[16px] text-center flex items-center gap-3">
-                          <span className="text-2xl">⏳</span>
-                          <p className="text-sm text-slate-600 font-medium">¡Próximamente tendremos pagos en línea! Por el momento, el pago es exclusivo en efectivo al recibir.</p>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>

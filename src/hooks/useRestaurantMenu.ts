@@ -81,7 +81,7 @@ export function useRestaurantMenu(id: string | undefined) {
         }
 
         const [resRes, resCat, resProd, resProm, resComb, resGrup] = await Promise.all([
-          supabase.from('restaurantes').select('*').eq('id', actualId).single(),
+          supabase.from('restaurantes').select('id, nombre, telefono, direccion, activo, slug, maps_url, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, acepta_pago_online, es_socio, programa_lealtad_activo, lat, lng, costo_envio_base, costo_envio_km, radio_cobertura_km, envio_gratis_monto_minimo, envio_gratis_tope, puntos_por_pedido, puntos_por_mxn').eq('id', actualId).single(),
           supabase.from('menu_categorias').select('*').eq('restaurante_id', actualId).eq('activa', true).order('orden', { ascending: true }),
           supabase.from('menu_items').select('*').eq('restaurante_id', actualId).eq('disponible', true).order('orden'),
           supabase.from('menu_promociones').select('*').eq('restaurante_id', actualId).eq('activa', true).or(`fecha_fin.gte.${new Date().toISOString()},fecha_fin.is.null`),

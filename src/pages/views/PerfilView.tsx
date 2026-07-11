@@ -48,6 +48,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
     descripcion_corta: restaurante.descripcion_corta || '',
     foto_fachada_url: restaurante.foto_fachada_url || '',
     categorias: restaurante.categorias || [] as string[],
+    acepta_pago_online: restaurante.acepta_pago_online || false,
   })
   const [horarios, setHorarios] = useState<HorariosRestaurante>(() => initHorarios(restaurante.horarios))
 
@@ -165,6 +166,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
         descripcion_corta: formData.descripcion_corta,
         foto_fachada_url: formData.foto_fachada_url,
         categorias: formData.categorias,
+        acepta_pago_online: formData.acepta_pago_online,
         horarios: horarios,
         // Mantener legados compatibles con PublicMenuView
         hora_apertura: horarios.lunes?.activo ? horarios.lunes.abre : (horarios.viernes?.activo ? horarios.viernes.abre : null),
@@ -250,9 +252,24 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
                 <p className="font-bold text-slate-800">
                   {restaurante.mp_access_token ? 'Cuenta Vinculada' : 'Cuenta No Vinculada'}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 mt-1 mb-3">
                   {restaurante.mp_access_token ? 'Ya puedes recibir pagos con tarjeta y SPEI directamente.' : 'Los clientes solo podrán pagar en efectivo o al cajero general por ahora.'}
                 </p>
+                
+                {restaurante.mp_access_token && (
+                  <label className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 cursor-pointer hover:border-blue-400 transition-colors w-max">
+                    <div className="relative inline-block w-10 h-6">
+                      <input 
+                        type="checkbox" 
+                        className="peer opacity-0 w-0 h-0" 
+                        checked={formData.acepta_pago_online}
+                        onChange={(e) => setFormData({...formData, acepta_pago_online: e.target.checked})}
+                      />
+                      <span className="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-slate-300 rounded-full duration-300 peer-checked:bg-[#009EE3] before:absolute before:content-[''] before:h-4 before:w-4 before:left-1 before:bottom-1 before:bg-white before:rounded-full before:duration-300 peer-checked:before:translate-x-4"></span>
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">Aceptar Pagos en Línea</span>
+                  </label>
+                )}
               </div>
               <button
                 type="button"

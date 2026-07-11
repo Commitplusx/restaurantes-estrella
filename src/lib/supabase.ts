@@ -48,6 +48,7 @@ export interface Restaurante {
   horarios?: HorariosRestaurante
   categorias?: string[]
   perfil_completo?: boolean
+  acepta_pago_online?: boolean
   es_socio?: boolean
   programa_lealtad_activo?: boolean
   lat?: number | null
@@ -175,7 +176,7 @@ export async function getMyRestaurante(): Promise<Restaurante | null> {
   // Intentar con todos los campos nuevos
   const { data, error } = await supabase
     .from('restaurantes')
-    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo')
+    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo, mp_access_token, acepta_pago_online')
     .eq('admin_id', user.id)
     .maybeSingle()
 

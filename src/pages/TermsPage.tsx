@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronLeft, FileText, CheckCircle2, Store, UserCheck, ShoppingBag, Star, AlertTriangle, RefreshCw, Mail } from 'lucide-react'
+import { ChevronLeft, FileText, CheckCircle2, Store, UserCheck, ShoppingBag, Star, AlertTriangle, RefreshCw, Mail, CreditCard } from 'lucide-react'
 import { motion, type Variants } from 'framer-motion'
 
 export function TermsPage() {
@@ -39,6 +39,17 @@ export function TermsPage() {
     },
     {
       id: 5,
+      title: 'Pagos en Línea, Reembolsos y Contracargos',
+      icon: <CreditCard size={24} className="text-emerald-500" />,
+      content: 'Estrella Eats actúa únicamente como un intermediario tecnológico. Los pagos realizados mediante tarjetas de crédito o débito son procesados directamente por la pasarela de Mercado Pago. Al utilizar este método de pago, usted acepta que:',
+      bullets: [
+        'Responsabilidad de Reembolsos: Cualquier solicitud de reembolso por productos en mal estado, faltantes o demoras extremas deberá gestionarse de forma directa y exclusiva con el Restaurante que preparó la comida. Estrella Eats no emite reembolsos desde sus propios fondos.',
+        'Contracargos y Fraude: El riesgo de fraude por contracargos bancarios (chargebacks) es asumido en su totalidad por el Restaurante asociado que recibe los fondos de la venta. Estrella Eats no ofrece seguro contra fraudes financieros.',
+        'Disponibilidad del Servicio: Estrella Eats no se hace responsable por transacciones fallidas, cobros duplicados o caídas del sistema imputables a Mercado Pago o a la institución bancaria del usuario.'
+      ]
+    },
+    {
+      id: 6,
       title: 'Programa de Lealtad (Estrellas)',
       icon: <Star size={24} className="text-yellow-500 fill-yellow-500/20" />,
       content: 'La Plataforma ofrece un programa de lealtad donde los usuarios pueden acumular puntos ("Estrellas") por sus compras:',
@@ -49,19 +60,19 @@ export function TermsPage() {
       ]
     },
     {
-      id: 6,
+      id: 7,
       title: 'Responsabilidad',
       icon: <AlertTriangle size={24} className="text-red-500" />,
       content: 'La preparación de los alimentos, su calidad y el cumplimiento de las normas de salubridad son responsabilidad exclusiva de cada restaurante asociado. Estrella Eats no se hace responsable por problemas de salud, alergias o cualquier daño derivado del consumo de los alimentos adquiridos a través de la plataforma.'
     },
     {
-      id: 7,
+      id: 8,
       title: 'Modificaciones',
       icon: <RefreshCw size={24} className="text-teal-500" />,
       content: 'Nos reservamos el derecho de modificar o reemplazar estos Términos en cualquier momento. El uso continuo de la plataforma después de cualquier cambio constituye su aceptación de los nuevos Términos.'
     },
     {
-      id: 8,
+      id: 9,
       title: 'Contacto',
       icon: <Mail size={24} className="text-slate-500" />,
       content: 'Si tiene alguna pregunta sobre estos Términos, por favor contacte a nuestro equipo de soporte técnico a través de los canales oficiales.'
