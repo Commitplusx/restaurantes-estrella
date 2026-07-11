@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
-import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal } from 'lucide-react'
+import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal, Package, ChefHat, Truck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript } from '@react-google-maps/api';
@@ -143,6 +143,38 @@ export function PublicLandingPage() {
   const [userAddress, setUserAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
   const [locationLoading, setLocationLoading] = useState(false)
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0)
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
+  const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    const checkOrder = () => {
+      const storedId = localStorage.getItem('est_active_order');
+      if (storedId !== activeOrderId) {
+        setActiveOrderId(storedId);
+      }
+    };
+    checkOrder();
+    const interval = setInterval(checkOrder, 3000);
+    return () => clearInterval(interval);
+  }, [activeOrderId]);
+
+  useEffect(() => {
+    if (!activeOrderId) {
+      setActiveOrderStatus(null);
+      return;
+    }
+    const fetchStatus = async () => {
+      const { data } = await supabase.from('pedidos').select('estado').eq('id', activeOrderId).single();
+      if (data) setActiveOrderStatus(data.estado);
+    };
+    fetchStatus();
+
+    const channel = supabase.channel(`landing-tracker-${activeOrderId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${activeOrderId}` }, (payload) => {
+         setActiveOrderStatus(payload.new.estado);
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [activeOrderId]);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('est_favorites')
     return saved ? JSON.parse(saved) : []
@@ -568,11 +600,59 @@ export function PublicLandingPage() {
                          <h3 className="font-bold text-slate-800">Notificaciones</h3>
                        </div>
                        <div className="p-5 flex flex-col items-center justify-center text-center gap-2">
-                         <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mb-1">
-                           <Bell size={24} className="text-orange-500 opacity-50" />
-                         </div>
-                         <p className="text-[13px] font-bold text-slate-700">No hay notificaciones nuevas</p>
-                         <p className="text-[12px] text-slate-500">Aquí te avisaremos sobre el estado de tus pedidos y promociones exclusivas.</p>
+                         {activeOrderId ? (
+                           (() => {
+                             let NotifIcon = Package;
+                             let statusTitle = 'Tienes un pedido activo';
+                             let statusDesc = 'Tu pedido está siendo procesado.';
+                             let colorClass = 'text-emerald-500';
+                             let bgClass = 'bg-emerald-50';
+
+                             if (['pendiente', 'pagado', 'asignado'].includes(activeOrderStatus || '')) {
+                               NotifIcon = Clock;
+                               statusTitle = 'Pedido Confirmado';
+                               statusDesc = 'El restaurante ha recibido tu orden.';
+                               colorClass = 'text-emerald-500';
+                               bgClass = 'bg-emerald-50';
+                             } else if (['en_cocina', 'listo_para_recoger', 'recibido', 'preparando'].includes(activeOrderStatus || '')) {
+                               NotifIcon = ChefHat;
+                               statusTitle = 'Preparando Orden';
+                               statusDesc = 'El restaurante está cocinando tu comida.';
+                               colorClass = 'text-orange-500';
+                               bgClass = 'bg-orange-50';
+                             } else if (activeOrderStatus === 'en_camino') {
+                               NotifIcon = Truck;
+                               statusTitle = '¡Va en camino!';
+                               statusDesc = 'Tu repartidor se dirige hacia ti.';
+                               colorClass = 'text-blue-500';
+                               bgClass = 'bg-blue-50';
+                             }
+
+                             return (
+                               <>
+                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-1 ${bgClass}`}>
+                                   <NotifIcon size={24} className={colorClass} />
+                                 </div>
+                                 <p className="text-[13px] font-bold text-slate-800">{statusTitle}</p>
+                                 <p className="text-[12px] text-slate-500 leading-relaxed">{statusDesc}</p>
+                                 <button 
+                                   onClick={() => navigate(`/success?pedido=${activeOrderId}`)}
+                                   className="mt-3 w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-200 transition-colors"
+                                 >
+                                   Seguir Pedido
+                                 </button>
+                               </>
+                             );
+                           })()
+                         ) : (
+                           <>
+                             <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mb-1">
+                               <Bell size={24} className="text-orange-500 opacity-50" />
+                             </div>
+                             <p className="text-[13px] font-bold text-slate-700">No hay notificaciones nuevas</p>
+                             <p className="text-[12px] text-slate-500 leading-relaxed">Aquí te avisaremos sobre el estado de tus pedidos y promociones exclusivas.</p>
+                           </>
+                         )}
                        </div>
                        <div className="p-3 bg-slate-50 border-t border-slate-100">
                          <button 
