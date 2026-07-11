@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
 import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal, Package, ChefHat, Truck } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript } from '@react-google-maps/api';
 
@@ -145,6 +145,7 @@ export function PublicLandingPage() {
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
   const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const checkOrder = () => {

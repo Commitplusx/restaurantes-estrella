@@ -98,6 +98,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
       descripcion_corta: restaurante.descripcion_corta || '',
       foto_fachada_url: restaurante.foto_fachada_url || '',
       categorias: restaurante.categorias || [],
+      acepta_pago_online: Boolean(restaurante.acepta_pago_online),
     })
     setHorarios(initHorarios(restaurante.horarios))
   }, [restaurante])
