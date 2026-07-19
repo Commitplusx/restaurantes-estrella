@@ -5,13 +5,29 @@ import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
 import { BottomSheet } from '../../components/BottomSheet'
 
-export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
+export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight }: { restaurante: Restaurante, highlightedPedidoId?: string | null, onClearHighlight?: () => void }) {
   const [pedidos, setPedidos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [pedidoToPrepare, setPedidoToPrepare] = useState<any>(null)
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'denied'
   )
+
+  // Scroll al pedido resaltado cuando carga
+  useEffect(() => {
+    if (highlightedPedidoId && pedidos.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`pedido-${highlightedPedidoId}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Limpiamos después de 3 segundos para que deje de brillar
+          setTimeout(() => {
+            if (onClearHighlight) onClearHighlight()
+          }, 3000)
+        }
+      }, 500)
+    }
+  }, [highlightedPedidoId, pedidos, onClearHighlight])
 
   useEffect(() => {
     if (!restaurante) return
@@ -284,6 +300,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
                   actionLabel="Empezar a Preparar" 
                   actionColor="bg-orange-500 hover:bg-orange-600"
                   onAction={() => setPedidoToPrepare(p)}
+                  isHighlighted={p.id === highlightedPedidoId}
                 />
               ))}
               {nuevos.length === 0 && <EmptyState text="No hay pedidos nuevos." />}
@@ -310,6 +327,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
                   actionLabel="¡Listo para recoger!" 
                   actionColor="bg-emerald-500 hover:bg-emerald-600"
                   onAction={() => updateEstado(p.id, 'listo_para_recoger')}
+                  isHighlighted={p.id === highlightedPedidoId}
                 />
               ))}
               {enCocina.length === 0 && <EmptyState text="Nada preparándose ahora." />}
@@ -383,7 +401,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
   )
 }
 
-function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: any, actionLabel: string, actionColor: string, onAction: () => void }) {
+function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted }: { pedido: any, actionLabel: string, actionColor: string, onAction: () => void, isHighlighted?: boolean }) {
   // Parse items safely if it's JSON or string
   let items = []
   try {
@@ -392,11 +410,12 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: an
 
   return (
     <motion.div
+      id={`pedido-${pedido.id}`}
       initial={{ opacity: 0, scale: 0.95, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -10 }}
       layout
-      className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100"
+      className={`bg-white rounded-2xl p-4 shadow-sm border transition-all duration-500 ${isHighlighted ? 'border-orange-500 shadow-orange-500/20 shadow-lg scale-[1.02]' : 'border-slate-100'}`}
     >
       <div className="flex justify-between items-start mb-3">
         <div>
