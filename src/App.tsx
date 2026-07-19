@@ -10,6 +10,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ defau
 const PortalPage = lazy(() => import('./pages/PortalPage').then(module => ({ default: module.PortalPage })))
 const PublicLandingPage = lazy(() => import('./pages/PublicLandingPage').then(module => ({ default: module.PublicLandingPage })))
 const PublicMenuView = lazy(() => import('./pages/PublicMenuView').then(module => ({ default: module.PublicMenuView })))
+const CartPage = lazy(() => import('./pages/CartPage').then(module => ({ default: module.default })))
 const SuccessPage = lazy(() => import('./pages/SuccessPage').then(module => ({ default: module.SuccessPage })))
 const BeneficiosPage = lazy(() => import('./pages/BeneficiosPage').then(module => ({ default: module.BeneficiosPage })))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })))
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/privacidad" element={<PrivacyPage />} />
           <Route path="/terminos" element={<TermsPage />} />
           <Route path="/menu/:id" element={<PublicMenuView />} />
+          <Route path="/menu/:id/carrito" element={<CartPage />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />
           <Route path="/portal/*" element={session ? <PortalPage /> : <Navigate to="/login" replace />} />

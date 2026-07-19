@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 // import * as h3 from 'h3-js' (movido al hook)
@@ -22,7 +22,9 @@ import {
   LocateFixed,
   Tag,
   ChevronDown,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles,
+  Gift
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
@@ -296,6 +298,9 @@ export function PublicMenuView() {
   const [validandoCupon, setValidandoCupon] = useState(false)
   const [cuponValido, setCuponValido] = useState(false)
   const [descuento, setDescuento] = useState(0)
+  const [cuponPlataformaAuto, setCuponPlataformaAuto] = useState<any>(null)
+  const [cuponPlataformaIdManual, setCuponPlataformaIdManual] = useState<string | null>(null)
+  const [costoEnvioFijoOverride, setCostoEnvioFijoOverride] = useState<number | null>(null)
 
   // Estados del nuevo carrito paso a paso
   const [checkoutStep, setCheckoutStep] = useState(() => {
@@ -307,6 +312,52 @@ export function PublicMenuView() {
 
   // Estados de cálculo H3 abstraídos
   const { costoEnvioBase, fueraDeCobertura, calculandoEnvio } = useDeliveryCalculation(ubicacionGPS, tipoEntrega);
+
+  // Lógica de Upsell Inteligente
+  const recomendaciones = useMemo(() => {
+    if (!carrito.length || !items.length) return [];
+    
+    const inCartIds = carrito.map(p => p.item.id);
+    const cartNames = carrito.map(p => p.item.nombre.toLowerCase());
+    
+    const hasDrink = cartNames.some(n => n.includes('coca') || n.includes('agua') || n.includes('refresco') || n.includes('jugo') || n.includes('bebida') || n.includes('limonada') || n.includes('fresa') || n.includes('frappe') || n.includes('horchata'));
+    const hasDessert = cartNames.some(n => n.includes('postre') || n.includes('pastel') || n.includes('helado') || n.includes('crepa') || n.includes('flan') || n.includes('churro'));
+    const hasSnack = cartNames.some(n => n.includes('papas') || n.includes('snack') || n.includes('extra') || n.includes('guarnicion') || n.includes('queso') || n.includes('nachos') || n.includes('dedos'));
+    
+    let pools: MenuItem[] = [];
+    
+    if (!hasDrink) {
+      pools = items.filter(i => {
+        const n = i.nombre.toLowerCase();
+        return n.includes('coca') || n.includes('agua') || n.includes('refresco') || n.includes('jugo') || n.includes('bebida') || n.includes('limonada') || n.includes('horchata');
+      });
+    } 
+    
+    if (pools.length === 0 && !hasSnack) {
+      pools = items.filter(i => {
+        const n = i.nombre.toLowerCase();
+        return n.includes('papas') || n.includes('snack') || n.includes('extra') || n.includes('nachos') || n.includes('dedos');
+      });
+    }
+    
+    if (pools.length === 0 && !hasDessert) {
+      pools = items.filter(i => {
+        const n = i.nombre.toLowerCase();
+        return n.includes('postre') || n.includes('pastel') || n.includes('helado') || n.includes('crepa') || n.includes('flan') || n.includes('churro');
+      });
+    }
+    
+    // Fallback: items baratos que no están en el carrito
+    if (pools.length === 0) {
+      pools = items.filter(i => i.precio > 0 && i.precio < 80);
+    }
+    
+    // Filtrar los que ya están en el carrito
+    pools = pools.filter(i => !inCartIds.includes(i.id));
+    
+    // Escoger hasta 3 recomendaciones semi-aleatorias (basadas en precio para ser estables pero variadas)
+    return pools.sort((a, b) => a.precio - b.precio).slice(0, 3);
+  }, [carrito, items]);
   
   // Revisar si el cliente tiene envío gratis por lealtad o saldo VIP
   useEffect(() => {
@@ -423,9 +474,16 @@ export function PublicMenuView() {
       const { data, error } = await supabase.rpc('validar_cupon_publico', { p_codigo: cuponCliente })
 
       if (!error && data?.ok) {
-        showToast('Cupón Aplicado', `¡Se descontarán $${data.monto.toFixed(2)} de tu orden!`, 'success')
+        if (data.tipo === 'envio_fijo') {
+          setCostoEnvioFijoOverride(data.monto)
+          setDescuento(0)
+          showToast('Cupón Aplicado', `¡Envío a $${data.monto.toFixed(2)}!`, 'success')
+        } else {
+          showToast('Cupón Aplicado', `¡Se descontarán $${data.monto.toFixed(2)} de tu orden!`, 'success')
+          setDescuento(data.monto)
+          setCostoEnvioFijoOverride(null)
+        }
         setCuponValido(true)
-        setDescuento(data.monto)
         return
       }
 
@@ -452,22 +510,71 @@ export function PublicMenuView() {
           }
           // Calcular descuento
           const subtotalActual = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
-          const descuentoCalculado = cuponPropio.tipo === 'porcentaje'
-            ? subtotalActual * (cuponPropio.valor / 100)
-            : cuponPropio.valor
-          const descuentoFinal = Math.min(descuentoCalculado, subtotalActual)
+          if (cuponPropio.tipo === 'envio_fijo') {
+            setCostoEnvioFijoOverride(cuponPropio.valor)
+            setDescuento(0)
+            showToast('¡Cupón Aplicado!', `Envío a $${cuponPropio.valor.toFixed(2)}`, 'success')
+          } else {
+            const descuentoCalculado = cuponPropio.tipo === 'porcentaje'
+              ? subtotalActual * (cuponPropio.valor / 100)
+              : cuponPropio.valor
+            const descuentoFinal = Math.min(descuentoCalculado, subtotalActual)
+            setDescuento(descuentoFinal)
+            setCostoEnvioFijoOverride(null)
+            showToast('¡Cupón Aplicado!', `Descuento de $${descuentoFinal.toFixed(2)} aplicado`, 'success')
+          }
           setCuponValido(true)
-          setDescuento(descuentoFinal)
-          showToast('¡Cupón Aplicado!', `Descuento de $${descuentoFinal.toFixed(2)} aplicado`, 'success')
           // El incremento de usos_actuales se hará en el backend o al confirmar la orden, NO aquí en la validación visual.
           return
         }
       }
 
+      // Buscar en cupones de plataforma (Globales)
+      const { data: cuponPlat } = await supabase
+        .from('cupones_plataforma')
+        .select('*')
+        .eq('codigo', cuponCliente.toUpperCase())
+        .eq('activo', true)
+        .maybeSingle()
+        
+      if (cuponPlat) {
+        if (cuponPlat.fecha_fin && new Date(`${cuponPlat.fecha_fin}T23:59:59`) < new Date()) {
+          showToast('Cupón expirado', 'Este cupón global ya no está disponible', 'error')
+          return
+        }
+        if (cuponPlat.uso_maximo && cuponPlat.usos_actuales >= cuponPlat.uso_maximo) {
+          showToast('Cupón agotado', 'Este cupón global ya alcanzó su límite de usos', 'error')
+          return
+        }
+        
+        const subtotalActual = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0)
+        let descuentoFinal = 0
+        
+        // El costo de envío se calculará después, por ahora calculamos base subtotal
+        if (cuponPlat.tipo === 'porcentaje') {
+          descuentoFinal = subtotalActual * (cuponPlat.valor / 100)
+          setCostoEnvioFijoOverride(null)
+        } else if (cuponPlat.tipo === 'monto_fijo') {
+          descuentoFinal = cuponPlat.valor
+          setCostoEnvioFijoOverride(null)
+        } else if (cuponPlat.tipo === 'envio_fijo') {
+          setCostoEnvioFijoOverride(cuponPlat.valor)
+          descuentoFinal = 0 
+        }
+        
+        setCuponValido(true)
+        setDescuento(descuentoFinal)
+        setCuponPlataformaIdManual(cuponPlat.id)
+        showToast('¡Cupón de Plataforma Aplicado!', 'Descuento aplicado correctamente', 'success')
+        return
+      }
+
       // Ningún cupón encontrado
+      setCuponPlataformaIdManual(null)
       showToast('Cupón Inválido', data?.error || 'El cupón no es válido o ya expiró', 'error')
       setCuponValido(false)
       setDescuento(0)
+      setCostoEnvioFijoOverride(null)
     } catch (err) {
       showToast('Error', 'Hubo un error de conexión', 'error')
     } finally {
@@ -494,33 +601,37 @@ export function PublicMenuView() {
 
       if (isUUID) {
         // ⚡ UUID: lanzar TODO en paralelo — 1 solo roundtrip
-        const [restRes, catsRes, prodsRes, cmbsRes, prmsRes] = await Promise.all([
+        const [restRes, catsRes, prodsRes, cmbsRes, prmsRes, cupRes] = await Promise.all([
           supabase.from('restaurantes').select('*').eq('id', id).maybeSingle(),
           supabase.from('menu_categorias').select('*').eq('restaurante_id', id).order('orden'),
           supabase.from('menu_items').select('*').eq('restaurante_id', id).eq('disponible', true).order('orden'),
           supabase.from('menu_combos').select('*').eq('restaurante_id', id).eq('disponible', true),
-          supabase.from('menu_promociones').select('*').eq('restaurante_id', id).eq('activa', true)
+          supabase.from('menu_promociones').select('*').eq('restaurante_id', id).eq('activa', true),
+          supabase.from('cupones_plataforma').select('*').eq('activo', true).is('codigo', null).order('created_at', { ascending: false }).limit(1).maybeSingle()
         ])
         rest = restRes.data
         cats = catsRes.data
         prods = prodsRes.data
         cmbs = cmbsRes.data
         prms = prmsRes.data
+        if (cupRes?.data) setCuponPlataformaAuto(cupRes.data)
       } else {
         // Slug: primero resolver el ID real, luego el menú en paralelo
         const { data: restData } = await supabase.from('restaurantes').select('*').eq('slug', id).maybeSingle()
         rest = restData
         if (rest) {
-          const [catsRes, prodsRes, cmbsRes, prmsRes] = await Promise.all([
+          const [catsRes, prodsRes, cmbsRes, prmsRes, cupRes] = await Promise.all([
             supabase.from('menu_categorias').select('*').eq('restaurante_id', rest.id).order('orden'),
             supabase.from('menu_items').select('*').eq('restaurante_id', rest.id).eq('disponible', true).order('orden'),
             supabase.from('menu_combos').select('*').eq('restaurante_id', rest.id).eq('disponible', true),
-            supabase.from('menu_promociones').select('*').eq('restaurante_id', rest.id).eq('activa', true)
+            supabase.from('menu_promociones').select('*').eq('restaurante_id', rest.id).eq('activa', true),
+            supabase.from('cupones_plataforma').select('*').eq('activo', true).is('codigo', null).order('created_at', { ascending: false }).limit(1).maybeSingle()
           ])
           cats = catsRes.data
           prods = prodsRes.data
           cmbs = cmbsRes.data
           prms = prmsRes.data
+          if (cupRes?.data) setCuponPlataformaAuto(cupRes.data)
         }
       }
 
@@ -706,7 +817,7 @@ export function PublicMenuView() {
   const bolsaSubsidio = cantidadSubsidio * 8;
   
   // CÁLCULOS DE LEALTAD Y ENVIOS
-  const isFreeDelivery = usarBeneficioNormal && datosCliente && !datosCliente.es_vip;
+  const isFreeDelivery = usarBeneficioNormal && datosCliente && !datosCliente.es_vip && ubicacionGPS !== null && tipoEntrega === 'domicilio';
   
   // Lógica de costo base: Si es VIP, su envío base es $10 o $7 (a partir de 26 puntos). Si no, usa el costo normal.
   const tarifaBaseEnvio = datosCliente?.es_vip ? (datosCliente.puntos < 26 ? 10 : 7) : costoEnvioBase;
@@ -728,6 +839,7 @@ export function PublicMenuView() {
       setCuponValido(false)
       setDescuento(0)
       setCuponCliente('')
+      setCuponPlataformaIdManual(null)
       showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
     }
 
@@ -746,6 +858,7 @@ export function PublicMenuView() {
       setCuponValido(false)
       setDescuento(0)
       setCuponCliente('')
+      setCuponPlataformaIdManual(null)
       showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
     }
 
@@ -977,19 +1090,50 @@ export function PublicMenuView() {
   const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
 
   // BUG 4 fix: reset coupon if cart subtotal drops to 0 or below discount amount
-  const costoTotalEnvio = (tipoEntrega === 'domicilio' && !fueraDeCobertura) ? costoEnvio : 0;
-  const descuentoAplicable = (subtotal + costoTotalEnvio) > 0 ? Math.min(descuento + descuentoVip, subtotal + costoTotalEnvio) : 0;
-  const total = Math.max(0, subtotal + costoTotalEnvio - descuentoAplicable);
+  const costoTotalEnvioBase = (tipoEntrega === 'domicilio' && !fueraDeCobertura) ? costoEnvio : 0;
+  
+  // Procesar Cupon de Plataforma Automático o Manual (envio_fijo, porcentaje, monto_fijo)
+  let costoEnvioFinal = costoTotalEnvioBase;
+  let descuentoTotal = descuento;
+  let cuponPlataformaActivo = null;
 
-  console.log("=== LOGS DE CARRITO ===", { subtotal, costoEnvioBase, bolsaSubsidio, costoEnvioCalculado, isFreeDelivery, usarBeneficioNormal, datosCliente, costoEnvio, descuentoVip, usarSaldoVip, pinAutorizado, montoSaldoVip, costoTotalEnvio, descuentoAplicable, total });
+  if (cuponValido && costoEnvioFijoOverride !== null) {
+    if (costoEnvioFinal > costoEnvioFijoOverride) {
+      costoEnvioFinal = costoEnvioFijoOverride;
+    }
+  }
+
+  if (cuponValido && cuponPlataformaIdManual) {
+    cuponPlataformaActivo = { id: cuponPlataformaIdManual, tipo: costoEnvioFijoOverride !== null ? 'envio_fijo' : 'monto_fijo' }; 
+  } else if (!cuponValido && cuponPlataformaAuto) {
+    const cp = cuponPlataformaAuto;
+    const isValidAuto = !cp.uso_maximo || cp.usos_actuales < cp.uso_maximo;
+    if (isValidAuto) {
+      cuponPlataformaActivo = cp;
+      if (cp.tipo === 'envio_fijo' && costoTotalEnvioBase > cp.valor) {
+        costoEnvioFinal = cp.valor;
+      } else if (cp.tipo === 'porcentaje') {
+        descuentoTotal += (subtotal * (cp.valor / 100));
+      } else if (cp.tipo === 'monto_fijo') {
+        descuentoTotal += cp.valor;
+      }
+    }
+  }
+
+  const descuentoAplicable = (subtotal + costoEnvioFinal) > 0 ? Math.min(descuentoTotal + descuentoVip, subtotal + costoEnvioFinal) : 0;
+  const total = Math.max(0, subtotal + costoEnvioFinal - descuentoAplicable);
+
+  console.log("=== LOGS DE CARRITO ===", { subtotal, costoEnvioBase, bolsaSubsidio, costoEnvioCalculado, isFreeDelivery, usarBeneficioNormal, datosCliente, costoEnvio, descuentoVip, usarSaldoVip, pinAutorizado, montoSaldoVip, costoEnvioFinal, descuentoAplicable, total });
 
   // Limpiar todos los campos del checkout y volver al paso 1
   const resetCheckout = () => {
     setCheckoutStep(1)
     setTipoEntrega(null)
     setCuponCliente('')
+    setCuponPlataformaIdManual(null)
     setCuponValido(false)
     setDescuento(0)
+    setCostoEnvioFijoOverride(null)
     setDireccionReferencias('')
     sessionStorage.removeItem('est_tipoentrega')
     sessionStorage.removeItem('est_checkoutstep')
@@ -1117,7 +1261,9 @@ export function PublicMenuView() {
       total: total,
       tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
       pin_seguridad: pinSeguridad,
-      idempotency_key: idempotencyKeyRef.current
+      idempotency_key: idempotencyKeyRef.current,
+      cupon_plataforma_id: cuponPlataformaActivo?.id || null,
+      descuento_plataforma: cuponPlataformaActivo ? (costoTotalEnvioBase - costoEnvioFinal + (cuponPlataformaActivo.tipo !== 'envio_fijo' ? descuentoTotal : 0)) : 0
     }
   }
 
@@ -1160,8 +1306,8 @@ export function PublicMenuView() {
           body: JSON.stringify({
             pedidoId: payload.wb_message_id, // Pasamos el ticketId para enlazar con la tabla pedidos
             items: carrito,
-            costo_envio: tipoEntrega === 'domicilio' && !fueraDeCobertura ? costoEnvio : 0,
-            descuento: descuento,
+            costo_envio: costoEnvioFinal,
+            descuento: descuentoTotal,
             total: total,
             originUrl: window.location.origin,
             idempotencyKey: idempotencyKeyRef.current
@@ -1201,6 +1347,7 @@ export function PublicMenuView() {
       setCuponCliente('')
       setCuponValido(false)
       setDescuento(0)
+      setCostoEnvioFijoOverride(null)
       setDireccionReferencias('')
       setTipoEntrega(null)
       setUbicacionGPS(null)
@@ -1239,6 +1386,7 @@ export function PublicMenuView() {
       setCuponCliente('')
       setCuponValido(false)
       setDescuento(0)
+      setCostoEnvioFijoOverride(null)
       setDireccionReferencias('')
       setTipoEntrega(null)
       setUbicacionGPS(null)
@@ -1854,8 +2002,17 @@ export function PublicMenuView() {
           >
             <motion.button 
               whileTap={{ scale: 0.9 }}
-              className="bg-[#FA4A0C] text-white px-8 py-3.5 rounded-full font-bold shadow-xl shadow-[#FA4A0C]/30 flex items-center gap-3 text-sm overflow-hidden pointer-events-auto"
-              onClick={() => setIsCartOpen(true)}
+              className="bg-[#FA4A0C] text-white px-8 py-3.5 rounded-full font-bold shadow-xl shadow-[#FA4A0C]/30 flex items-center gap-3 text-sm overflow-hidden pointer-events-auto origin-center"
+              onClick={(e) => {
+                const btn = e.currentTarget;
+                btn.animate([
+                  { transform: 'scale(1)' },
+                  { transform: 'scale(0.8)' },
+                  { transform: 'scale(1.1)' },
+                  { transform: 'scale(1)' }
+                ], { duration: 400, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+                setTimeout(() => navigate(`/menu/${id}/carrito`), 300);
+              }}
             >
               <ShoppingBag size={18} />
               Ver Carrito • 
@@ -1968,7 +2125,38 @@ export function PublicMenuView() {
                       ))}
                     </div>
                     
-                    <div className="mt-8 bg-slate-50 rounded-[24px] p-5 border border-slate-100">
+                    {/* RECOMENDACIONES SMART */}
+                    {recomendaciones.length > 0 && (
+                      <div className="mt-6 mb-2">
+                        <h4 className="font-bold text-slate-800 text-[13px] mb-3 flex items-center gap-1.5 px-1">
+                          <Sparkles size={16} className="text-amber-500 fill-amber-500"/> Completa tu pedido con:
+                        </h4>
+                        <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-3 snap-x -mx-6 px-6">
+                          {recomendaciones.map((rec) => (
+                            <div key={rec.id} className="snap-start shrink-0 w-[140px] bg-white border border-slate-100 rounded-[20px] p-2.5 shadow-sm flex flex-col hover:border-slate-300 transition-colors">
+                               <div className="w-full h-20 bg-slate-50 rounded-xl mb-2.5 overflow-hidden border border-slate-50">
+                                 <LazyImage src={rec.foto_url} alt={rec.nombre} className="w-full h-full object-cover" />
+                               </div>
+                               <h5 className="font-bold text-slate-700 text-[11px] leading-tight line-clamp-2 mb-2">{rec.nombre}</h5>
+                               <div className="mt-auto flex items-center justify-between">
+                                 <span className="font-black text-slate-900 text-[13px]">${rec.precio}</span>
+                                 <button onClick={() => {
+                                   if (rec.opciones && rec.opciones.length > 0) {
+                                     setSelectedItemForOptions({...rec, __tipo: 'item'})
+                                   } else {
+                                     addToCart({...rec, foto_url: rec.foto_url || undefined, tipo: 'item', cartItemId: crypto.randomUUID()})
+                                   }
+                                 }} className="bg-[#FA4A0C] text-white w-7 h-7 rounded-full flex items-center justify-center shadow-[0_4px_10px_rgba(250,74,12,0.3)] hover:scale-110 active:scale-95 transition-all">
+                                   <Plus size={14} strokeWidth={3}/>
+                                 </button>
+                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-6 bg-slate-50 rounded-[24px] p-5 border border-slate-100">
                       <h4 className="font-bold text-slate-800 mb-3 text-[13px] flex items-center gap-2 uppercase tracking-widest"><Ticket size={16} className="text-[#FA4A0C]"/> ¿Tienes un cupón?</h4>
                       <div className="flex gap-2">
                         <input type="text" placeholder="Código de descuento" value={cuponCliente} onChange={e => {setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0)}} className="flex-1 bg-white border border-slate-200 rounded-[16px] px-4 py-3 text-sm uppercase outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 font-bold shadow-sm transition-all" disabled={validandoCupon} />
@@ -2044,41 +2232,45 @@ export function PublicMenuView() {
                     )}
                     
                     <div className="pt-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">¿Cómo quieres recibirlo?</label>
-                      <motion.div layout className="flex flex-col sm:flex-row gap-3">
-                        <AnimatePresence mode="popLayout">
-                          {tipoEntrega !== 'tienda' && (
-                            <motion.button 
-                              layout
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.8, display: 'none' }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => {
-                                setTipoEntrega(tipoEntrega === 'domicilio' ? null : 'domicilio')
-                              }}
-                              className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
-                            >
-                              <span className="text-2xl">🛵</span>
-                              <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'domicilio' ? 'Elegiste A Domicilio (toca para cambiar)' : 'A Domicilio'}</span>
-                            </motion.button>
-                          )}
-                          {tipoEntrega !== 'domicilio' && (
-                            <motion.button 
-                              layout
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.8, display: 'none' }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => setTipoEntrega(tipoEntrega === 'tienda' ? null : 'tienda')} 
-                              className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
-                            >
-                              <span className="text-2xl">🏪</span>
-                              <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'tienda' ? 'Elegiste Recoger en Tienda (toca para cambiar)' : 'Recoger en Tienda'}</span>
-                            </motion.button>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
+                      {(!ubicacionGPS || tipoEntrega !== 'domicilio') && (
+                        <>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">¿Cómo quieres recibirlo?</label>
+                          <motion.div layout className="flex flex-col sm:flex-row gap-3">
+                            <AnimatePresence mode="popLayout">
+                              {tipoEntrega !== 'tienda' && (
+                                <motion.button 
+                                  layout
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8, display: 'none' }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => {
+                                    setTipoEntrega(tipoEntrega === 'domicilio' ? null : 'domicilio')
+                                  }}
+                                  className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
+                                >
+                                  <span className="text-2xl">🛵</span>
+                                  <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'domicilio' ? 'Elegiste A Domicilio (toca para cambiar)' : 'A Domicilio'}</span>
+                                </motion.button>
+                              )}
+                              {tipoEntrega !== 'domicilio' && (
+                                <motion.button 
+                                  layout
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8, display: 'none' }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => setTipoEntrega(tipoEntrega === 'tienda' ? null : 'tienda')} 
+                                  className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
+                                >
+                                  <span className="text-2xl">🏪</span>
+                                  <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'tienda' ? 'Elegiste Recoger en Tienda (toca para cambiar)' : 'Recoger en Tienda'}</span>
+                                </motion.button>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        </>
+                      )}
                     </div>
 
                     <AnimatePresence>
@@ -2093,39 +2285,50 @@ export function PublicMenuView() {
                       )}
 
                       {tipoEntrega === 'domicilio' && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-4 rounded-[20px] border border-slate-200 mt-2 flex flex-col items-center text-center shadow-sm relative">
+                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className={`mb-6 ${ubicacionGPS ? 'mt-2' : 'mt-4'} relative`}>
                            
                            {ubicacionGPS ? (
                              <div className="w-full text-left">
-                               <div className="flex items-center justify-between mb-2">
-                                 <div className="flex items-center gap-1.5">
-                                   <MapPin className="text-[#FA4A0C] w-4 h-4" />
-                                   <p className="text-sm text-slate-800 font-bold">Entregar en</p>
+                               <div className="flex justify-between items-center mb-3">
+                                 <div className="flex items-center gap-2">
+                                   <MapPin size={22} className="text-[#FA4A0C] shrink-0" />
+                                   <span className="font-black text-slate-800 text-[15px] whitespace-nowrap">Entregar en</span>
+                                   {isFreeDelivery && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ml-1"><Star size={10} className="fill-green-700"/> ¡GRATIS!</span>}
                                  </div>
-                                 <button onClick={() => setIsMapModalOpen(true)} className="text-[#FA4A0C] text-xs font-bold hover:underline">
+                                 <button onClick={() => setIsMapModalOpen(true)} className="text-[#FA4A0C] text-[13px] font-bold hover:underline transition-colors shrink-0">
                                    Cambiar
                                  </button>
                                </div>
                                
-                               <p className="text-[12px] text-slate-500 mb-3 line-clamp-2 leading-snug">
+                               <p className="text-[14px] text-slate-600 mb-4 leading-relaxed pl-7">
                                  {direccionEntrega}
                                </p>
-                               
-                               <input 
-                                 type="text" 
-                                 value={direccionReferencias} 
-                                 onChange={(e) => setDireccionReferencias(e.target.value)} 
-                                 placeholder="Referencias: Ej. Casa verde, portón negro..." 
-                                 className="w-full bg-white border border-slate-200 rounded-[12px] px-3 py-2.5 outline-none focus:border-[#FA4A0C] focus:ring-2 focus:ring-[#FA4A0C]/10 transition-all font-medium text-slate-800 text-[12px] placeholder:text-slate-400 shadow-sm" 
-                               />
+
+                               <div className="mt-2 pl-7 relative">
+                                 {isFreeDelivery ? (
+                                   <p className="text-[13px] font-bold text-orange-600 mb-2 flex items-center gap-1.5">
+                                     <Gift size={16} /> ¡Envío GRATIS! Ayúdanos con una referencia.
+                                   </p>
+                                 ) : (
+                                   <label className="text-[13px] font-bold text-slate-500 mb-2 block">Referencia para encontrar tu casa (Opcional)</label>
+                                 )}
+                                 
+                                 <textarea 
+                                   value={direccionReferencias} 
+                                   onChange={(e) => setDireccionReferencias(e.target.value)} 
+                                   rows={2}
+                                   placeholder="Ej. Casa verde, portón negro..." 
+                                   className="w-full bg-slate-100/80 border-0 rounded-2xl px-5 py-4 text-[15px] outline-none focus:bg-orange-50 focus:ring-2 focus:ring-[#FA4A0C]/20 transition-all font-medium text-slate-800 placeholder:text-slate-400 shadow-inner resize-none" 
+                                 />
+                               </div>
                              </div>
                            ) : (
                              <>
-                               <MapPin className="text-[#FA4A0C] mb-2 w-8 h-8" />
-                               <p className="text-sm text-slate-800 font-bold mb-3">¿A dónde enviamos tu pedido?</p>
+                               <MapPin className="text-[#FA4A0C] mb-3 w-10 h-10" />
+                               <p className="text-[16px] text-slate-800 font-bold mb-4">¿A dónde enviamos tu pedido?</p>
                                <button 
                                  onClick={() => setIsMapModalOpen(true)}
-                                 className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-3 rounded-[12px] font-bold text-sm flex items-center justify-center transition-colors shadow-md"
+                                 className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-4 rounded-[20px] font-bold text-[16px] flex items-center justify-center transition-colors shadow-lg"
                                >
                                  Establecer Ubicación
                                </button>
@@ -2134,6 +2337,7 @@ export function PublicMenuView() {
                         </motion.div>
                       )}
                     </AnimatePresence>
+                    {/* VIP LEALTAD WIDGET MOVIDO AL FOOTER */}
                   </motion.div>
                 )}
 
@@ -2201,140 +2405,49 @@ export function PublicMenuView() {
             <div className="p-6 border-t border-slate-100/50 shrink-0 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-10 relative rounded-t-[32px] sm:rounded-none">
               <div className="flex flex-col gap-4">
                 
-                {/* UI DEL CARRITO INTELIGENTE (LEALTAD Y VIP) */}
-                {checkoutStep === 3 && datosCliente && !calculandoEnvio && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 mb-2 overflow-hidden rounded-[20px] shadow-sm border border-slate-200/60 bg-white">
-                    {/* Caso VIP */}
-                    {datosCliente.es_vip ? (
-                      <div className="bg-gradient-to-r from-amber-50 to-amber-100/50 p-4 border-l-4 border-amber-400 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-2 opacity-10">
-                          <svg className="w-16 h-16 text-amber-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                        </div>
-                        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <h4 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
-                              <span className="text-amber-500">🌟</span> Billetera VIP
-                            </h4>
-                            <p className="text-xs text-amber-800/80 mt-1">
-                              Tienes <strong className="text-amber-600 text-sm font-black">${datosCliente.saldo.toFixed(2)}</strong> disponibles.
-                            </p>
-                          </div>
-                          {!usarSaldoVip && (
-                            <button 
-                              onClick={() => {
-                                setUsarSaldoVip(true);
-                                setPinAutorizado(false);
-                                // Bugfix: El límite no debe superar el Subtotal + Envío, PERO debemos restarle si hay un cupon normal aplicado.
-                                const costoTotalMínimo = Math.max(0, subtotal + costoEnvioCalculado - descuento);
-                                setMontoSaldoVip(Math.min(datosCliente.saldo, 350, costoTotalMínimo).toFixed(2));
-                              }}
-                              className="shrink-0 bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-md shadow-amber-500/20 hover:bg-amber-600 transition-colors"
-                            >
-                              Usar Saldo
-                            </button>
-                          )}
-                        </div>
 
-                        {/* Expandable Panel for VIP Amount and PIN */}
-                        <AnimatePresence>
-                          {usarSaldoVip && (
-                            <motion.div 
-                              initial={{ height: 0, opacity: 0 }} 
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              className="relative z-10 overflow-hidden"
-                            >
-                              <div className="pt-4 mt-3 border-t border-amber-200/60 flex flex-col gap-3">
-                                {!pinAutorizado ? (
-                                  <>
-                                    <div className="flex gap-2 items-center">
-                                      <span className="text-xs font-bold text-amber-900">$</span>
-                                      <input 
-                                        type="number" 
-                                        value={montoSaldoVip}
-                                        onChange={(e) => setMontoSaldoVip(e.target.value)}
-                                        placeholder="Monto a descontar"
-                                        className="flex-1 bg-white border border-amber-200 rounded-lg px-3 py-2 text-sm font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                      />
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <input 
-                                        type="password" 
-                                        maxLength={4}
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        value={pinVip}
-                                        onChange={(e) => {
-                                          setPinVip(e.target.value.replace(/\D/g, ''));
-                                          setPinError(false);
-                                        }}
-                                        placeholder="PIN de 4 dígitos"
-                                        className={`w-32 bg-white border ${pinError ? 'border-red-400 bg-red-50' : 'border-amber-200'} rounded-lg px-3 py-2 text-sm font-bold text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500/30`}
-                                      />
-                                      <button 
-                                        onClick={handlePinVerify}
-                                        disabled={verificandoPin || pinVip.length < 4 || parseFloat(montoSaldoVip||'0') < 10}
-                                        className="flex-1 bg-amber-900 text-amber-50 font-bold text-xs rounded-lg px-3 py-2 hover:bg-amber-950 disabled:opacity-50 transition-colors flex items-center justify-center"
-                                      >
-                                        {verificandoPin ? '...' : 'Autorizar'}
-                                      </button>
-                                    </div>
-                                    {pinError && <p className="text-[10px] text-red-500 font-bold px-1">PIN Incorrecto</p>}
-                                    {parseFloat(montoSaldoVip||'0') < 10 && <p className="text-[10px] text-amber-700 px-1">El monto mínimo es de $10.</p>}
-                                    {parseFloat(montoSaldoVip||'0') > Math.min(350, datosCliente.saldo) && <p className="text-[10px] text-red-500 px-1">El monto supera tu saldo o el límite de $350.</p>}
-                                  </>
-                                ) : (
-                                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between">
-                                    <div>
-                                      <span className="block text-xs font-bold text-green-700 flex items-center gap-1">
-                                        <CheckCircle2 className="w-3 h-3" /> PIN Autorizado
-                                      </span>
-                                      <span className="text-xs text-green-600 block mt-0.5">Descontando ${parseFloat(montoSaldoVip).toFixed(2)}</span>
-                                    </div>
-                                    <button onClick={() => { setPinAutorizado(false); setUsarSaldoVip(false); setPinVip(''); }} className="text-xs text-red-500 font-bold underline">
-                                      Cancelar
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+
+                {/* VIP LEALTAD WIDGET EN EL FOOTER (Solo en paso 3) */}
+                {checkoutStep === 3 && datosCliente && !calculandoEnvio && (tipoEntrega === 'tienda' || ubicacionGPS) && (
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-[16px] p-3 shadow-sm border border-amber-200 overflow-hidden relative">
+                    <div className="absolute -right-4 -top-4 text-amber-200/40 transform rotate-12 pointer-events-none">
+                      <Star size={80} fill="currentColor" />
+                    </div>
+                    {datosCliente.es_vip ? (
+                      <div className="relative z-10 flex items-center justify-between">
+                        <div>
+                          <h4 className="font-black text-amber-900 flex items-center gap-1 text-sm"><Star size={14} className="text-amber-500 fill-amber-500"/> Cliente VIP</h4>
+                          <p className="text-[10px] text-amber-800 mt-0.5 font-medium">Saldo: <b className="text-amber-900">${datosCliente.saldo.toFixed(2)}</b></p>
+                        </div>
+                        {!usarSaldoVip ? (
+                          <button onClick={() => setUsarSaldoVip(true)} className="bg-amber-500 hover:bg-amber-600 transition-colors text-white px-3 py-1.5 rounded-lg font-bold text-[11px] shadow-md">Usar Saldo</button>
+                        ) : (
+                          <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} className="flex gap-2">
+                             <input type="number" value={montoSaldoVip} onChange={e => setMontoSaldoVip(e.target.value)} placeholder="$0.00" className="w-16 bg-white border border-amber-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 rounded-lg px-2 py-1 text-[11px] font-bold outline-none transition-all" />
+                             <input type="password" value={pinVip} onChange={e => { setPinVip(e.target.value.replace(/\D/g, '')); setPinError(false); }} maxLength={4} placeholder="PIN" className={`w-12 bg-white border ${pinError ? 'border-red-400 focus:ring-red-400/20' : 'border-amber-200 focus:border-amber-400 focus:ring-amber-500/20'} focus:ring-2 rounded-lg px-2 py-1 text-[11px] text-center font-black tracking-widest outline-none transition-all`} />
+                             <button onClick={handlePinVerify} disabled={verificandoPin || pinVip.length < 4} className="bg-amber-900 text-white rounded-lg px-2 text-[11px] font-bold shadow-md hover:bg-amber-950 transition-colors disabled:opacity-50 flex justify-center items-center">
+                               {verificandoPin ? <Loader2 size={12} className="animate-spin" /> : 'OK'}
+                             </button>
+                          </motion.div>
+                        )}
                       </div>
                     ) : (
-                      /* Caso Cliente Normal - Envío Gratis */
-                      /* Bugfix: Solo mostrar si de verdad necesita usarlo (si el envío no es $0 gracias al subsidio de artículos) */
                       costoEnvioCalculado > 0 && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6) && (
-                        <div className="bg-gradient-to-r from-blue-50 to-blue-100/30 p-4 border-l-4 border-blue-500 relative">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex-1">
-                              <h4 className="font-bold text-blue-900 text-sm flex items-center gap-1.5">
-                                <span className="text-blue-500">🎁</span> ¡Felicidades, {datosCliente.nombre.split(' ')[0]}!
-                              </h4>
-                              <p className="text-xs text-blue-800/80 mt-1">
-                                Tienes <strong className="text-blue-600">1 envío gratis</strong> disponible por tu lealtad.
-                              </p>
-                            </div>
-                            
-                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                              <input 
-                                type="checkbox" 
-                                className="sr-only peer"
-                                checked={usarBeneficioNormal}
-                                onChange={(e) => setUsarBeneficioNormal(e.target.checked)}
-                              />
-                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                              <span className="ml-3 text-xs font-bold text-blue-900">
-                                {usarBeneficioNormal ? 'Aplicado' : 'Usar Ahora'}
-                              </span>
-                            </label>
-                          </div>
+                        <div className="flex justify-between items-center relative z-10">
+                           <div>
+                             <h4 className="font-black text-amber-900 flex items-center gap-1.5 text-[13px] leading-none">🎁 Envío Gratis</h4>
+                             <p className="text-[10px] text-amber-800 mt-1 font-medium leading-none">Tu recompensa estrella</p>
+                           </div>
+                           <label className="relative inline-flex items-center cursor-pointer scale-90 origin-right">
+                            <input type="checkbox" className="sr-only peer" checked={usarBeneficioNormal} onChange={e => setUsarBeneficioNormal(e.target.checked)}/>
+                            <div className="w-11 h-6 bg-amber-200/50 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-amber-200 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                           </label>
                         </div>
                       )
                     )}
-                  </motion.div>
+                  </div>
                 )}
-
+                
                 {/* Banner Motivacional Envío en Paso 3 */}
                 {checkoutStep === 3 && tipoEntrega === 'domicilio' && costoEnvioBase > 0 && !fueraDeCobertura && !calculandoEnvio && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[16px] p-3 flex items-center gap-3 border ${costoEnvio === 0 ? 'bg-green-50/80 border-green-200/50' : 'bg-blue-50/80 border-blue-200/50'}`}>
@@ -2357,10 +2470,10 @@ export function PublicMenuView() {
                     <span>Subtotal</span>
                     <span className="text-slate-800">${carrito.reduce((s, p) => s + (p.item.precio * p.cantidad), 0).toFixed(2)}</span>
                   </div>
-                  {descuento > 0 && (
+                  {descuentoTotal > 0 && (
                     <div className="flex justify-between text-green-500 text-[13px] font-bold tracking-wide">
                       <span>Descuento</span>
-                      <span>-${descuento.toFixed(2)}</span>
+                      <span>-${descuentoTotal.toFixed(2)}</span>
                     </div>
                   )}
                   {tipoEntrega === 'domicilio' && (
@@ -2376,18 +2489,18 @@ export function PublicMenuView() {
                             <Loader2 size={12} className="animate-spin inline" />
                           ) : fueraDeCobertura ? (
                             <span className="text-red-500">Sin cobertura</span>
-                          ) : costoEnvio === 0 ? (
+                          ) : costoEnvioFinal === 0 ? (
                             <span className="flex items-center gap-1.5">
                               <span className="text-slate-400 line-through text-[12px] font-medium">${costoEnvioBase.toFixed(2)}</span>
                               <span className="text-green-500 font-black">¡GRATIS!</span>
                             </span>
-                          ) : costoEnvio < costoEnvioBase ? (
+                          ) : costoEnvioFinal < costoEnvioBase ? (
                             <span className="flex items-center gap-1.5">
                               <span className="text-slate-400 line-through text-[12px] font-medium">${costoEnvioBase.toFixed(2)}</span>
-                              <span className="text-[#FA4A0C] font-black">+${costoEnvio.toFixed(2)}</span>
+                              <span className="text-[#FA4A0C] font-black">+${costoEnvioFinal.toFixed(2)}</span>
                             </span>
                           ) : (
-                            <span className="text-slate-800">+${costoEnvio.toFixed(2)}</span>
+                            <span className="text-slate-800">+${costoEnvioFinal.toFixed(2)}</span>
                           )}
                         </motion.span>
                       </AnimatePresence>

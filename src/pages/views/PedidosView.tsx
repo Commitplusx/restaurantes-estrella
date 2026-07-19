@@ -151,6 +151,13 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
         updateData.tiempo_preparacion_minutos = tiempoMinutos
       }
       
+      // FLUJO DE APPS GRANDES (UberEats/Rappi):
+      // Al aceptar el pedido (empezar a preparar), automáticamente detonamos la búsqueda
+      // de repartidor para que vaya en camino al restaurante mientras cocinan.
+      if (nuevoEstado === 'en_cocina') {
+        updateData.estado = 'buscando_repartidor'
+      }
+
       const { error } = await supabase.from('pedidos').update(updateData).eq('id', id)
       if (error) throw error
       
@@ -198,7 +205,7 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 items-start">
         {/* Columna: Nuevos */}
         <div className="bg-slate-50/50 rounded-3xl p-4 border border-slate-100 h-full flex flex-col gap-4">
           <div className="flex items-center gap-3 px-2">
@@ -340,6 +347,19 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction }: { pedido: an
         <div className="mb-3 flex items-start gap-2 bg-amber-50 p-2 rounded-lg text-xs text-amber-800 border border-amber-100">
           <AlertCircle size={14} className="mt-0.5 shrink-0" />
           <p className="leading-tight">{pedido.descripcion}</p>
+        </div>
+      )}
+
+      {/* Control de estado del Repartidor (Flujo UberEats/Rappi) */}
+      {pedido.estado_cocina !== 'pendiente' && (
+        <div className="mb-3 flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Repartidor</span>
+          {pedido.estado === 'buscando_repartidor' && <span className="text-xs font-bold text-purple-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span> Buscando...</span>}
+          {pedido.estado === 'asignado' && <span className="text-xs font-bold text-blue-600">Asignado (En camino al local)</span>}
+          {pedido.estado === 'en_camino' && <span className="text-xs font-bold text-emerald-600">En camino al cliente</span>}
+          {pedido.estado === 'entregado' && <span className="text-xs font-bold text-emerald-600">Entregado</span>}
+          {pedido.estado === 'cancelado' && <span className="text-xs font-bold text-red-600">Cancelado</span>}
+          {['pendiente', null].includes(pedido.estado) && <span className="text-xs font-medium text-slate-400">En espera</span>}
         </div>
       )}
 
