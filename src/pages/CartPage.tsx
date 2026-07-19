@@ -587,6 +587,7 @@ export default function CartPage() {
       lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
       lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
       estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
+      estado_cocina: 'pendiente',
       metodo_pago: metodoPago,
       total: total,
       tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
@@ -610,7 +611,7 @@ export default function CartPage() {
         const res = await fetch(edgeUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ action: 'send', telefono: clienteTel.replace(/\D/g, '') })
+          body: JSON.stringify({ action: 'request-client-otp', telefono: clienteTel.replace(/\D/g, '') })
         });
         if (!res.ok) throw new Error('No se pudo enviar el OTP');
         setShowOtpModal(true);
@@ -706,7 +707,8 @@ export default function CartPage() {
       setShowOtpModal(false);
       setCarrito([]);
       sessionStorage.clear();
-      navigate(`/success?pedido=${data.pedidoId || 'desconocido'}&success=true`);
+      const wbMsgId = data.pedido?.[0]?.wb_message_id || 'desconocido';
+      navigate(`/success?pedido=${wbMsgId}&success=true`);
       
     } catch (err: any) {
       showToast('Código Incorrecto', err.message, 'error');

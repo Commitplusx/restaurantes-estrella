@@ -1256,6 +1256,7 @@ export function PublicMenuView() {
       lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
       lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
       estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
+      estado_cocina: 'pendiente',
       wb_message_id: ticketId,
       metodo_pago: metodoPago,
       total: total,

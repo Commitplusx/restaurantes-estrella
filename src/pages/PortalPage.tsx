@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams } from 'react-router-dom'
 import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2, Ticket, BellRing } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
@@ -15,9 +16,11 @@ const CuponesView = lazy(() => import('./views/CuponesView').then(m => ({ defaul
 const PerfilView = lazy(() => import('./views/PerfilView').then(m => ({ default: m.PerfilView })))
 const PedidosView = lazy(() => import('./views/PedidosView').then(m => ({ default: m.PedidosView })))
 
-export function PortalPage() {
+export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' }) {
+  const { pedidoId } = useParams<{ pedidoId?: string }>()
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil'>(initialTab ?? 'dashboard')
+  const [highlightedPedidoId, setHighlightedPedidoId] = useState<string | null>(pedidoId ?? null)
   const [loading, setLoading] = useState(true)
   const [networkError, setNetworkError] = useState(false)
   const [audioDesbloqueado, setAudioDesbloqueado] = useState(false)
@@ -453,7 +456,7 @@ export function PortalPage() {
                     </div>
                   }>
                     {activeTab === 'dashboard' && <DashboardView restaurante={restaurante} />}
-                    {activeTab === 'pedidos'   && <PedidosView restaurante={restaurante} />}
+                    {activeTab === 'pedidos'   && <PedidosView restaurante={restaurante} highlightedPedidoId={highlightedPedidoId} onClearHighlight={() => setHighlightedPedidoId(null)} />}
                     {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
                     {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
                     {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}

@@ -107,6 +107,43 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
     }
   }, [restaurante.id, notifPermission])
 
+  // Desbloqueo de audio universal para Celulares/Tablets (iOS Safari / Chrome Android)
+  // Los navegadores móviles bloquean el audio automático. Este truco lo "desbloquea"
+  // de forma invisible en el primer toque a la pantalla.
+  useEffect(() => {
+    const unlockAudio = () => {
+      const audio = document.getElementById('alarm-audio') as HTMLAudioElement;
+      if (audio) {
+        // Reproducir y pausar instantáneamente en silencio total
+        const prevVolume = audio.volume;
+        audio.volume = 0;
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = prevVolume;
+            // Una vez desbloqueado, quitamos los listeners para no gastar recursos
+            document.removeEventListener('click', unlockAudio);
+            document.removeEventListener('touchstart', unlockAudio);
+          }).catch(() => {
+            // Si falla, restaurar el volumen para intentar de nuevo
+            audio.volume = prevVolume;
+          });
+        }
+      }
+    };
+
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
   const playBellSound = () => {
     try {
       const audioElement = document.getElementById('alarm-audio') as HTMLAudioElement;
@@ -123,12 +160,15 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
   }
 
   const requestNotifications = async () => {
+    // Hacemos sonar el timbre de forma SÍNCRONA al momento del clic
+    // Esto garantiza que el navegador no bloquee el audio por ser una promesa asíncrona.
+    playBellSound()
+
     if ('Notification' in window) {
       const perm = await Notification.requestPermission()
       setNotifPermission(perm)
       if (perm === 'granted') {
-        playBellSound()
-        alert('✅ Notificaciones activadas correctamente. ¡Ya escucharás el timbre cuando lleguen pedidos!')
+        alert('✅ Notificaciones activadas correctamente. ¡Asegúrate de NO tener el celular en silencio físico!')
       } else if (perm === 'denied') {
         alert('⚠️ Tu navegador bloqueó las notificaciones.\n\nPara activarlas, haz clic en el ícono de candado (o configuración) junto a la dirección web en la parte de arriba, busca "Notificaciones", cámbialo a "Permitir" y recarga la página.')
       }
@@ -138,8 +178,10 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
   }
 
   const updateEstado = async (id: string, nuevoEstado: string, tiempoMinutos?: number) => {
+    console.log(`[updateEstado] INICIANDO - ID: ${id} | Nuevo: ${nuevoEstado} | Tiempo: ${tiempoMinutos}`)
     // Guardar estado previo para rollback
     const estadoPrevio = pedidos.find(p => p.id === id)?.estado_cocina
+    console.log(`[updateEstado] Estado previo guardado: ${estadoPrevio}`)
     try {
       // Actualización optimista del UI
       setPedidos((prev) =>
@@ -150,17 +192,31 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
       if (tiempoMinutos) {
         updateData.tiempo_preparacion_minutos = tiempoMinutos
       }
-      
-      // FLUJO DE APPS GRANDES (UberEats/Rappi):
-      // Al aceptar el pedido (empezar a preparar), automáticamente detonamos la búsqueda
-      // de repartidor para que vaya en camino al restaurante mientras cocinan.
+      // Cuando el restaurante acepta y manda a cocina, activar la búsqueda de repartidor
       if (nuevoEstado === 'en_cocina') {
         updateData.estado = 'buscando_repartidor'
       }
-
-      const { error } = await supabase.from('pedidos').update(updateData).eq('id', id)
-      if (error) throw error
       
+      console.log(`[updateEstado] Objeto a enviar a Supabase:`, updateData)
+      const { error, data } = await supabase.from('pedidos').update(updateData).eq('id', id).select()
+      
+      if (error) {
+        console.error(`[updateEstado] ERROR SUPABASE UPDATE:`, JSON.stringify(error, null, 2))
+        throw error
+      }
+      console.log(`[updateEstado] EXITO SUPABASE:`, data)
+      
+      if (nuevoEstado === 'en_cocina') {
+        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/asignar-repartidor';
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        console.log(`[updateEstado] Disparando Edge Function a: ${edgeUrl}`)
+        fetch(edgeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ record: { id: id } })
+        }).catch(e => console.error('Error disparando asignar-repartidor:', e));
+      }
+
       // NOTA: Si cambia de estado en cocina, el Webhook de BD ahora detectará
       // el UPDATE y disparará automáticamente 'notificar-whatsapp' al cliente.
       setPedidoToPrepare(null)
@@ -175,10 +231,13 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
     }
   }
 
-  // Ahora las columnas se basan exclusivamente en el estado_cocina, no se mezclan con el repartidor.
-  const nuevos = pedidos.filter(p => p.estado_cocina === 'pendiente')
-  const enCocina = pedidos.filter(p => p.estado_cocina === 'en_cocina')
-  const listos = pedidos.filter(p => p.estado_cocina === 'listo_para_recoger')
+  // Ahora las columnas se filtran reaccionando también al estado del repartidor (Global)
+  const pedidosActivos = pedidos.filter(p => p.estado !== 'cancelado')
+  
+  const nuevos = pedidosActivos.filter(p => p.estado_cocina === 'pendiente' || p.estado_cocina == null)
+  const enCocina = pedidosActivos.filter(p => p.estado_cocina === 'en_cocina')
+  // Un pedido desaparece de Listos si el repartidor ya marcó "en_camino" (lo recogió) o si se entregó.
+  const listos = pedidosActivos.filter(p => p.estado_cocina === 'listo_para_recoger' && !['en_camino', 'entregado'].includes(p.estado))
 
   if (loading) {
     return <div className="p-8 text-slate-400">Cargando pedidos...</div>
@@ -270,15 +329,19 @@ export function PedidosView({ restaurante }: { restaurante: Restaurante }) {
           
           <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-1 pb-4">
             <AnimatePresence>
-              {listos.map(p => (
-                <PedidoCard 
-                  key={p.id} 
-                  pedido={p} 
-                  actionLabel="Esperando al Repartidor..." 
-                  actionColor="bg-slate-200 text-slate-400 cursor-not-allowed"
-                  onAction={() => {}}
-                />
-              ))}
+              {listos.map(p => {
+                // Si el repartidor ya está asignado/llegando, sugerimos entregarlo
+                const driverCerca = p.estado === 'asignado' || p.estado === 'buscando_repartidor'
+                return (
+                  <PedidoCard 
+                    key={p.id} 
+                    pedido={p} 
+                    actionLabel={driverCerca ? "Entregar al Repartidor" : "Cerrar Pedido"} 
+                    actionColor="bg-slate-800 hover:bg-slate-900 text-white"
+                    onAction={() => updateEstado(p.id, 'entregado')}
+                  />
+                )
+              })}
               {listos.length === 0 && <EmptyState text="No hay pedidos listos." />}
             </AnimatePresence>
           </div>
