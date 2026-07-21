@@ -1323,6 +1323,8 @@ export function PublicMenuView() {
       cliente_nombre: clienteNombre.trim(),
       restaurante: restaurante?.nombre || '',
       restaurante_id: restaurante?.id || null,
+      restaurante_lat: restaurante?.lat || null,
+      restaurante_lng: restaurante?.lng || null,
       descripcion: pedidoCompleto,
       direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
       referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,

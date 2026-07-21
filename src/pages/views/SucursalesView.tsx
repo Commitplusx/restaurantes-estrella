@@ -133,8 +133,8 @@ export function SucursalesView({ restaurante }: { restaurante: Restaurante }) {
     }
 
     try {
-      const nuevaSucursal = {
-        admin_id: restaurante.admin_id,
+      const nuevaSucursal: any = {
+        admin_id: (restaurante as any).admin_id,
         nombre: formData.nombre,
         telefono: formData.telefono,
         direccion: formData.direccion,
@@ -205,7 +205,7 @@ export function SucursalesView({ restaurante }: { restaurante: Restaurante }) {
         lat = parseFloat(parts[0].trim());
         lng = parseFloat(parts[1].trim());
       }
-      if (lat === null || isNaN(lat) || isNaN(lng)) {
+      if (lat === null || Number.isNaN(lat) || lng === null || Number.isNaN(lng)) {
         alert('Las coordenadas no tienen el formato correcto (lat, lng)');
         setSavingCoords(false);
         return;
