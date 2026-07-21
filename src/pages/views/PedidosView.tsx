@@ -29,16 +29,33 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     }
   }, [highlightedPedidoId, pedidos, onClearHighlight])
 
+  const [linkedIds, setLinkedIds] = useState<string[]>([restaurante.id])
+
+  // Cargar IDs vinculados (matriz + sucursales) al montar
   useEffect(() => {
     if (!restaurante) return
-    loadPedidos()
+    const init = async () => {
+      const { data } = await supabase
+        .from('restaurantes')
+        .select('id')
+        .eq('matriz_id', restaurante.id)
+      
+      const ids = [restaurante.id, ...(data?.map(s => s.id) || [])]
+      setLinkedIds(ids)
+      await loadPedidos(ids)
+    }
+    init()
+  }, [restaurante.id])
 
-    // Suscribirse a cambios en tiempo real
+  useEffect(() => {
+    if (!restaurante || linkedIds.length === 0) return
+
+    // Suscribirse a cambios en tiempo real para todos los IDs
     const channel = supabase
-      .channel(`public:pedidos:${restaurante.id}`)
+      .channel(`public:pedidos:group:${restaurante.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
+        { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=in.(${linkedIds.join(',')})` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             setPedidos((prev) => [payload.new, ...prev])
@@ -56,13 +73,13 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [restaurante.id])
+  }, [restaurante.id, linkedIds])
 
-  const loadPedidos = async () => {
+  const loadPedidos = async (ids: string[]) => {
     const { data } = await supabase
       .from('pedidos')
-      .select('*')
-      .eq('restaurante_id', restaurante.id)
+      .select('*, restaurantes(nombre)')
+      .in('restaurante_id', ids)
       // Solo mostramos pedidos activos en base al estado de la cocina
       .in('estado_cocina', ['pendiente', 'en_cocina', 'listo_para_recoger'])
       .order('created_at', { ascending: false })
@@ -101,12 +118,12 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
 
   // Enviar Notificación Push real al detectar nuevos pedidos (usando un listener al websocket)
   useEffect(() => {
-    if (!restaurante) return
+    if (!restaurante || linkedIds.length === 0) return
     const channel = supabase
       .channel(`public:pedidos:notif:${restaurante.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
+        { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=in.(${linkedIds.join(',')})` },
         () => {
           if (notifPermission === 'granted' && 'Notification' in window) {
             new Notification('¡NUEVO PEDIDO!', {
@@ -121,7 +138,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [restaurante.id, notifPermission])
+  }, [restaurante.id, notifPermission, linkedIds])
 
   // Desbloqueo de audio universal para Celulares/Tablets (iOS Safari / Chrome Android)
   // Los navegadores móviles bloquean el audio automático. Este truco lo "desbloquea"
@@ -419,7 +436,14 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
     >
       <div className="flex justify-between items-start mb-3">
         <div>
-          <span className="text-xs font-bold text-slate-400 tracking-wider">#{pedido?.wb_message_id || pedido?.id?.replace(/-/g, '').slice(-5).toUpperCase() || 'N/A'}</span>
+          <div className="flex flex-col items-start gap-1">
+            <span className="text-xs font-bold text-slate-400 tracking-wider">#{pedido?.wb_message_id || pedido?.id?.replace(/-/g, '').slice(-5).toUpperCase() || 'N/A'}</span>
+            {pedido.restaurantes?.nombre && (
+              <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full inline-block mb-1">
+                📍 {pedido.restaurantes.nombre}
+              </span>
+            )}
+          </div>
           <h5 className="font-bold text-slate-800 mt-1">{pedido.cliente_nombre || 'Cliente Web'}</h5>
         </div>
         <span className="text-sm font-bold text-[#FF7A6A]">${pedido.total}</span>

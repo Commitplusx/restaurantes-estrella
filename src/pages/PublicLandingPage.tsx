@@ -254,6 +254,7 @@ export function PublicLandingPage() {
         .from('restaurantes')
         .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
         .eq('activo', true)
+        .is('matriz_id', null)
         .order('nombre')
         .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
 
@@ -264,6 +265,7 @@ export function PublicLandingPage() {
             .from('restaurantes')
             .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
             .eq('activo', true)
+            .is('matriz_id', null)
             .order('nombre')
             .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
           finalData = fallbackData;

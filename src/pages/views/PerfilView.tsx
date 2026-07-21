@@ -44,6 +44,7 @@ function calcularPasosFaltantes(restaurante: Restaurante): string[] {
 export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante; onUpdate?: () => void }) {
   const [formData, setFormData] = useState({
     nombre: restaurante.nombre || '',
+    nombre_sucursal: restaurante.nombre_sucursal || '',
     telefono: restaurante.telefono || '',
     descripcion_corta: restaurante.descripcion_corta || '',
     foto_fachada_url: restaurante.foto_fachada_url || '',
@@ -94,6 +95,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
   useEffect(() => {
     setFormData({
       nombre: restaurante.nombre || '',
+      nombre_sucursal: restaurante.nombre_sucursal || '',
       telefono: restaurante.telefono || '',
       descripcion_corta: restaurante.descripcion_corta || '',
       foto_fachada_url: restaurante.foto_fachada_url || '',
@@ -163,6 +165,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
       .from('restaurantes')
       .update({
         nombre: formData.nombre,
+        nombre_sucursal: formData.nombre_sucursal.trim() || null,
         telefono: formData.telefono,
         descripcion_corta: formData.descripcion_corta,
         foto_fachada_url: formData.foto_fachada_url,
@@ -310,6 +313,25 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
                 />
                 <p className="text-xs text-slate-500 mt-1">Este número recibirá los pedidos por WhatsApp.</p>
               </div>
+
+              {/* Solo visible si el restaurante forma parte de una familia de sucursales */}
+              {(restaurante.matriz_id || restaurante.es_matriz) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <label className="text-sm font-semibold text-slate-700 block mb-1">
+                    📍 Nombre de esta sucursal
+                    <span className="text-slate-400 font-normal ml-1">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={40}
+                    value={formData.nombre_sucursal}
+                    onChange={e => setFormData({ ...formData, nombre_sucursal: e.target.value })}
+                    className="w-full p-3 border border-amber-200 bg-white rounded-xl focus:border-orange-400 outline-none transition-colors"
+                    placeholder="Ej. Centro, Belisario, Norte..."
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Este nombre aparece en el selector de sucursales para que el cliente elija. No cambia el nombre de tu marca.</p>
+                </div>
+              )}
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-1">Descripción Corta <span className="text-slate-400 font-normal">(opcional)</span></label>
                 <input

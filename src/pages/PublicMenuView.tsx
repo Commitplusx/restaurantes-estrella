@@ -176,6 +176,55 @@ export const estaAbierto = (res: Restaurante) => {
   return isOpenRange(res.hora_apertura, res.hora_cierre)
 }
 
+// Componente que convierte coordenadas lat/lng a nombre de colonia/calle
+const SucursalAddress = ({ sucursal }: { sucursal: Restaurante }) => {
+  const [label, setLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let lat = sucursal.lat;
+    let lng = sucursal.lng;
+
+    // Si no tiene lat/lng pero la direccion contiene 'GPS: lat, lng', parsear
+    if ((!lat || !lng) && sucursal.direccion?.startsWith('GPS:')) {
+      const parts = sucursal.direccion.replace('GPS:', '').split(',');
+      if (parts.length >= 2) {
+        lat = parseFloat(parts[0].trim());
+        lng = parseFloat(parts[1].trim());
+      }
+    }
+
+    if (lat && lng && window.google?.maps) {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          const components = results[0].address_components;
+          const sublocality = components.find(c =>
+            c.types.includes('sublocality') ||
+            c.types.includes('sublocality_level_1') ||
+            c.types.includes('neighborhood')
+          );
+          const route = components.find(c => c.types.includes('route'));
+          if (sublocality) {
+            setLabel(route ? `${route.long_name}, ${sublocality.long_name}` : sublocality.long_name);
+          } else if (route) {
+            setLabel(route.long_name);
+          } else {
+            setLabel(sucursal.direccion || 'Sin dirección');
+          }
+        } else {
+          setLabel(sucursal.direccion || 'Sin dirección');
+        }
+      });
+    } else if (sucursal.direccion && !sucursal.direccion.startsWith('GPS:')) {
+      setLabel(sucursal.direccion);
+    } else {
+      setLabel('Sin dirección especificada');
+    }
+  }, [sucursal.id]);
+
+  return <>{label ?? <span className="opacity-40">Cargando...</span>}</>;
+};
+
 export function PublicMenuView() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -183,6 +232,8 @@ export function PublicMenuView() {
   
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
   const [restaurantePausado, setRestaurantePausado] = useState(false)
+  const [sucursalesFamilia, setSucursalesFamilia] = useState<Restaurante[]>([])
+  const [showSucursalesModal, setShowSucursalesModal] = useState(false)
 
   const [categorias, setCategorias] = useState<MenuCategoria[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
@@ -642,6 +693,15 @@ export function PublicMenuView() {
         return null
       }
 
+      // Buscar sucursales si es Matriz
+      let familia: any[] = []
+      if (!rest.matriz_id) {
+        const { data: sucs } = await supabase.from('restaurantes').select('*').eq('matriz_id', rest.id).eq('activo', true)
+        if (sucs && sucs.length > 0) {
+          familia = [rest, ...sucs]
+        }
+      }
+
       const actualId = rest.id;
 
       const currentDay = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'][new Date().getDay()];
@@ -667,11 +727,24 @@ export function PublicMenuView() {
       }
 
       if (isMounted) {
-        setRestaurante(rest)
         setCategorias(cats || [])
         setItems(prods || [])
         setCombos(cmbs || [])
         setPromos(validPromos)
+        
+        if (familia.length > 0) {
+          setSucursalesFamilia(familia)
+          const savedBranchId = sessionStorage.getItem('est_branch_id')
+          const found = familia.find(f => f.id === savedBranchId)
+          if (found) {
+            setRestaurante(found)
+          } else {
+            // Mostrar menú por defecto; el modal aparecerá al hacer clic en el carrito
+            setRestaurante(rest)
+          }
+        } else {
+          setRestaurante(rest)
+        }
         
         // Sincronizar el carrito si hay items que se actualizaron en tiempo real
         setCarrito(prevCart => {
@@ -1465,14 +1538,16 @@ export function PublicMenuView() {
     </div>
   )
 
-  if (!restaurante) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAFAFA] px-4 text-center">
-      <AlertCircle className="w-16 h-16 text-red-400 mb-4" />
-      <h2 className="text-2xl font-bold text-slate-800 mb-2">Restaurante no disponible</h2>
-      <p className="text-slate-500 mb-6">El menú que buscas no existe o fue desactivado.</p>
-      <Link to="/" className="bg-[#FF7A6A] text-white px-8 py-3 rounded-[24px] font-bold shadow-lg shadow-orange-200">Volver al Inicio</Link>
-    </div>
-  )
+  if (!restaurante) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAFAFA] px-4 text-center">
+        <AlertCircle className="w-16 h-16 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Restaurante no disponible</h2>
+        <p className="text-slate-500 mb-6">El menú que buscas no existe o fue desactivado.</p>
+        <Link to="/" className="bg-[#FF7A6A] text-white px-8 py-3 rounded-[24px] font-bold shadow-lg shadow-orange-200">Volver al Inicio</Link>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 selection:bg-[#FA4A0C]/20 font-sans pb-32">
@@ -1524,9 +1599,19 @@ export function PublicMenuView() {
           
           <div className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div className="flex-1 min-w-0 flex flex-col items-center sm:items-start">
-              <h1 className="text-2xl sm:text-3xl font-brother font-bold uppercase tracking-widest text-slate-900 mb-1 mt-1 text-balance leading-none break-words px-2 sm:px-0">
-                {restaurante.nombre}
-              </h1>
+              <div className="flex flex-col sm:flex-row items-center gap-2 mb-1 mt-1 px-2 sm:px-0">
+                <h1 className="text-2xl sm:text-3xl font-brother font-bold uppercase tracking-widest text-slate-900 text-balance leading-none break-words">
+                  {restaurante.nombre}
+                </h1>
+                {sucursalesFamilia.length > 0 && (
+                  <button 
+                    onClick={() => setShowSucursalesModal(true)} 
+                    className="bg-slate-50 hover:bg-slate-100 text-[#FA4A0C] border border-[#FA4A0C]/20 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                  >
+                    {sessionStorage.getItem('est_branch_id') ? 'Cambiar sucursal' : 'Seleccionar sucursal'}
+                  </button>
+                )}
+              </div>
               
               <p className="text-slate-500 text-sm mb-4 flex items-center justify-center sm:justify-start gap-1 px-2 sm:px-0">
                 <Star size={14} className="text-amber-400 fill-amber-400" /> 
@@ -2012,6 +2097,12 @@ export function PublicMenuView() {
                   { transform: 'scale(1.1)' },
                   { transform: 'scale(1)' }
                 ], { duration: 400, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+                
+                if (sucursalesFamilia.length > 0 && !sessionStorage.getItem('est_branch_id')) {
+                  setTimeout(() => setShowSucursalesModal(true), 300);
+                  return;
+                }
+                
                 setTimeout(() => navigate(`/menu/${id}/carrito`), 300);
               }}
             >
@@ -3173,6 +3264,99 @@ export function PublicMenuView() {
               </button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MODAL DE SELECCIÓN DE SUCURSAL ── */}
+      <AnimatePresence>
+        {showSucursalesModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex flex-col justify-end md:justify-center items-center bg-slate-900/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white w-full max-w-md md:max-w-3xl lg:max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] md:max-h-[85vh] rounded-t-[2rem] md:rounded-[2rem] relative"
+            >
+              {/* Handle mobile */}
+              <div className="w-full flex justify-center pt-3 pb-1 md:hidden">
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+              </div>
+              
+              {sessionStorage.getItem('est_branch_id') && (
+                <button 
+                  onClick={() => setShowSucursalesModal(false)}
+                  className="absolute top-4 right-4 w-8 h-8 bg-slate-100 text-slate-500 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors z-10 hidden md:flex"
+                >
+                  <X size={16} strokeWidth={3} />
+                </button>
+              )}
+              
+              <div className="px-6 pt-2 pb-5 text-center relative">
+                <div className="w-14 h-14 bg-orange-100 text-[#FA4A0C] rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                  <MapPin size={28} />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 mb-1">Elige tu sucursal</h3>
+                <p className="text-sm text-slate-500 font-medium">Selecciona la ubicación más cercana a ti.</p>
+              </div>
+              
+              <div className="px-4 md:px-6 pb-8 md:pb-6 overflow-y-auto bg-slate-50 flex-1 pt-4 md:pt-6 border-t border-slate-100">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                  {sucursalesFamilia.map((sucursal) => {
+                  const isOpen = estaAbierto(sucursal);
+                  const isSelected = sessionStorage.getItem('est_branch_id') === sucursal.id;
+                  const isMatriz = sucursal.es_matriz || !sucursal.matriz_id;
+                  
+                  return (
+                    <button
+                      key={sucursal.id}
+                      onClick={() => {
+                        sessionStorage.setItem('est_branch_id', sucursal.id)
+                        setRestaurante(sucursal)
+                        setShowSucursalesModal(false)
+                        setCarrito([]) // Vaciar carrito si cambian de sucursal
+                      }}
+                      className={`relative w-full text-left p-4 rounded-[1.5rem] border-2 transition-all flex items-center gap-4 group bg-white shadow-sm overflow-hidden ${isSelected ? 'border-[#FA4A0C] bg-orange-50/30' : 'border-transparent hover:border-orange-200 hover:shadow-md'}`}
+                    >
+                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 group-hover:border-orange-200 transition-colors shadow-sm">
+                        {sucursal.foto_fachada_url ? (
+                           <img src={sucursal.foto_fachada_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                           <Store size={26} className="text-slate-400 group-hover:text-[#FA4A0C]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 py-0.5 pr-8">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h4 className={`font-bold text-[16px] leading-tight ${isSelected ? 'text-[#FA4A0C]' : 'text-slate-800'}`}>
+                            {sucursal.nombre_sucursal || sucursal.nombre}
+                          </h4>
+                          {isMatriz && (
+                            <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 shadow-sm">
+                              ⭐ Original
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[13px] text-slate-500 mb-2 leading-snug">
+                          <SucursalAddress sucursal={sucursal} />
+                        </p>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider inline-block border ${isOpen ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                          {isOpen ? 'Abierto' : 'Cerrado'}
+                        </span>
+                      </div>
+                      
+                      {isSelected && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-[#FA4A0C] text-white flex items-center justify-center shadow-md">
+                          <CheckCircle2 size={16} strokeWidth={3} />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

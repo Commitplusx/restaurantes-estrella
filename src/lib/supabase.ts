@@ -55,6 +55,9 @@ export interface Restaurante {
   lng?: number | null
   envio_gratis_monto_minimo?: number
   envio_gratis_tope?: number
+  es_matriz?: boolean
+  matriz_id?: string | null
+  nombre_sucursal?: string | null
 }
 
 export interface MenuCategoria {

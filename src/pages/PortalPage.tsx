@@ -15,11 +15,12 @@ const MenuPromosView = lazy(() => import('./views/MenuPromosView').then(m => ({ 
 const CuponesView = lazy(() => import('./views/CuponesView').then(m => ({ default: m.CuponesView })))
 const PerfilView = lazy(() => import('./views/PerfilView').then(m => ({ default: m.PerfilView })))
 const PedidosView = lazy(() => import('./views/PedidosView').then(m => ({ default: m.PedidosView })))
+const SucursalesView = lazy(() => import('./views/SucursalesView').then(m => ({ default: m.SucursalesView })))
 
-export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' }) {
+export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales' }) {
   const { pedidoId } = useParams<{ pedidoId?: string }>()
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil'>(initialTab ?? 'dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales'>(initialTab ?? 'dashboard')
   const [highlightedPedidoId, setHighlightedPedidoId] = useState<string | null>(pedidoId ?? null)
   const [loading, setLoading] = useState(true)
   const [networkError, setNetworkError] = useState(false)
@@ -358,6 +359,14 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
             active={activeTab === 'perfil'} icon={<Store size={20}/>} label="Perfil del Negocio" 
             onClick={() => setActiveTab('perfil')} 
           />
+
+          {!restaurante.matriz_id && (
+            <NavButton 
+              id="desktop-tour-sucursales"
+              active={activeTab === 'sucursales'} icon={<Store size={20}/>} label="Sucursales" 
+              onClick={() => setActiveTab('sucursales')} 
+            />
+          )}
           
           <div className="flex-1" />
 
@@ -389,7 +398,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
           <header id="tour-welcome" className="px-6 lg:px-8 py-6 flex items-center justify-between z-20 sticky top-0 bg-white/80 backdrop-blur-xl">
             <div>
               <h2 className="text-2xl lg:text-3xl font-bold text-slate-800">
-                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'pedidos' ? 'Pedidos Activos' : activeTab === 'productos' ? 'Platillos' : activeTab === 'combos' ? 'Combos' : activeTab === 'promos' ? 'Promociones' : activeTab === 'cupones' ? 'Cupones de Descuento' : 'Perfil'}
+                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'pedidos' ? 'Pedidos Activos' : activeTab === 'productos' ? 'Platillos' : activeTab === 'combos' ? 'Combos' : activeTab === 'promos' ? 'Promociones' : activeTab === 'cupones' ? 'Cupones de Descuento' : activeTab === 'sucursales' ? 'Mis Sucursales' : 'Perfil'}
               </h2>
               <div className="text-sm text-slate-400 font-medium mt-1">Inicio / {activeTab}</div>
             </div>
@@ -462,6 +471,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
                     {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
                     {activeTab === 'cupones'   && <CuponesView restaurante={restaurante} />}
                     {activeTab === 'perfil'    && <PerfilView restaurante={restaurante} onUpdate={loadRestaurante} />}
+                    {activeTab === 'sucursales' && <SucursalesView restaurante={restaurante} />}
                   </Suspense>
                 </motion.div>
               </AnimatePresence>
@@ -469,7 +479,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
           </main>
         </div>
       {/* ── Bottom Nav (Mobile) ── */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex justify-between">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex justify-between overflow-x-auto">
         <MobileNavBtn id="mobile-tour-dashboard" active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => setActiveTab('dashboard')} />
         <MobileNavBtn id="mobile-tour-pedidos" active={activeTab === 'pedidos'} icon={<BellRing size={22}/>} label="Pedidos" onClick={() => setActiveTab('pedidos')} />
         <MobileNavBtn id="mobile-tour-platillos" active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => setActiveTab('productos')} />
@@ -477,6 +487,9 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
         <MobileNavBtn id="mobile-tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />
         <MobileNavBtn id="mobile-tour-cupones" active={activeTab === 'cupones'} icon={<Ticket size={22}/>} label="Cupones" onClick={() => setActiveTab('cupones')} />
         <MobileNavBtn id="mobile-tour-perfil" active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
+        {!restaurante.matriz_id && (
+          <MobileNavBtn id="mobile-tour-sucursales" active={activeTab === 'sucursales'} icon={<Store size={22}/>} label="Sucursales" onClick={() => setActiveTab('sucursales')} />
+        )}
       </div>
     </div>
   )
