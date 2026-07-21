@@ -907,6 +907,21 @@ export function PublicMenuView() {
       return
     }
 
+    // Bugfix: Solamente permitir pedir de un restaurante a la vez
+    const currentRestId = sessionStorage.getItem('est_carrito_restaurante')
+    if (carrito.length > 0 && currentRestId && restaurante && currentRestId !== restaurante.id) {
+      const confirm = window.confirm('Tienes productos de otro restaurante en tu carrito. ¿Deseas vaciarlo para iniciar un nuevo pedido en este restaurante?');
+      if (confirm) {
+        setCarrito([{ item: product, cantidad: 1 }])
+        sessionStorage.setItem('est_carrito_restaurante', restaurante.id)
+        sessionStorage.removeItem('est_checkoutstep')
+        showToast('Carrito nuevo', 'Iniciaste un pedido en este restaurante.', 'success')
+      }
+      return
+    } else if (carrito.length === 0 && restaurante) {
+      sessionStorage.setItem('est_carrito_restaurante', restaurante.id)
+    }
+
     // Bugfix: Evitar fraude con cupones. Si cambia el carrito, obligar a re-evaluar el cupón.
     if (cuponValido) {
       setCuponValido(false)

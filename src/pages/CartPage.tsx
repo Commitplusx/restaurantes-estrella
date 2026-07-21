@@ -289,14 +289,89 @@ export default function CartPage() {
     });
   };
 
+  const obtenerUbicacionPorIP = async () => {
+    const googleKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+    if (googleKey) {
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/geolocation/v1/geolocate?key=${googleKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(6000) }
+        );
+        const data = await res.json();
+        if (data.location?.lat && data.location?.lng) {
+          let ciudad = 'Tu ubicación aproximada';
+          try {
+            const geoRes = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${data.location.lat},${data.location.lng}&key=${googleKey}&language=es`,
+              { signal: AbortSignal.timeout(5000) }
+            );
+            const geoData = await geoRes.json();
+            if (geoData.results?.[0]?.formatted_address) {
+              ciudad = geoData.results[0].formatted_address;
+            }
+          } catch (_) { /* usar ciudad genérica */ }
+          return { lat: data.location.lat, lng: data.location.lng, ciudad };
+        }
+      } catch (_) { /* continuar con el siguiente */ }
+    }
+
+    try {
+      const res = await fetch('https://freeipapi.com/api/json', { signal: AbortSignal.timeout(5000) });
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        return { lat: data.latitude, lng: data.longitude, ciudad: `${data.cityName}, ${data.regionName}` };
+      }
+    } catch (_) { /* ignorar */ }
+
+    return null;
+  };
+
   const obtenerUbicacionGPS = () => {
+    const TIMEOUT_GPS_MS = 8000;
+
     if (!('geolocation' in navigator)) {
       showToast('GPS no disponible', 'Escribe tu dirección manualmente en el campo de abajo 👇', 'error');
       return;
     }
+
     setBuscandoGPS(true);
+    let yaResuelto = false;
+
+    const timeoutId = setTimeout(async () => {
+      if (yaResuelto) return;
+      yaResuelto = true;
+      const ipLoc = await obtenerUbicacionPorIP();
+      if (ipLoc) {
+        setDraftUbicacion({ lat: ipLoc.lat, lng: ipLoc.lng });
+        setDraftDireccion(ipLoc.ciudad);
+        
+        if (!isMapModalOpen) {
+           setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng });
+           setDireccionEntrega(ipLoc.ciudad);
+        }
+        
+        if (mapInstance) {
+          mapInstance.panTo({ lat: ipLoc.lat, lng: ipLoc.lng });
+          mapInstance.setZoom(16);
+        }
+        showToast('Ubicación aproximada', `Detectamos que estás en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`, 'success');
+      } else {
+        showToast(
+          'No pudimos detectar tu ubicación',
+          'Escribe tu dirección manualmente o arrastra el pin en el mapa 📍',
+          'error'
+        );
+      }
+      setBuscandoGPS(false);
+    }, TIMEOUT_GPS_MS);
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (yaResuelto) return;
+        yaResuelto = true;
+        clearTimeout(timeoutId);
+
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setDraftUbicacion({ lat, lng });
@@ -324,11 +399,42 @@ export default function CartPage() {
           setBuscandoGPS(false);
         }
       },
-      (error) => {
-        showToast('Error', `No pudimos acceder a tu ubicación (${error.message})`, 'error');
+      async (error) => {
+        if (yaResuelto) return;
+        yaResuelto = true;
+        clearTimeout(timeoutId);
+
+        const ipLoc = await obtenerUbicacionPorIP();
+        if (ipLoc) {
+          setDraftUbicacion({ lat: ipLoc.lat, lng: ipLoc.lng });
+          setDraftDireccion(ipLoc.ciudad);
+          
+          if (!isMapModalOpen) {
+            setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng });
+            setDireccionEntrega(ipLoc.ciudad);
+          }
+
+          if (mapInstance) {
+            mapInstance.panTo({ lat: ipLoc.lat, lng: ipLoc.lng });
+            mapInstance.setZoom(16);
+          }
+          const tituloToast = error.code === 1 ? 'Tu navegador bloqueó el GPS' : 'Ubicación aproximada por red';
+          const msjToast = error.code === 1 
+            ? `Por favor dale permisos o ajusta el pin manualmente. Te ubicamos en ${ipLoc.ciudad} por ahora.`
+            : `No pudimos usar tu GPS. Te ubicamos en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`;
+
+          showToast(tituloToast, msjToast, error.code === 1 ? 'error' : 'success');
+        } else {
+          const mensajeError = error.code === 1
+            ? 'Bloqueaste el GPS. Escribe tu dirección en el campo de abajo 👇'
+            : error.code === 2
+            ? 'GPS no disponible. Escribe tu dirección manualmente 👇'
+            : 'GPS tardó demasiado. Escribe tu dirección manualmente 👇';
+          showToast('No pudimos obtener tu ubicación', mensajeError, 'error');
+        }
         setBuscandoGPS(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   };
 
@@ -1291,6 +1397,13 @@ export default function CartPage() {
                 if (checkoutStep === 3 && (!tipoEntrega || (tipoEntrega === 'domicilio' && (!direccionEntrega || fueraDeCobertura)))) {
                   showToast('Error', 'Completa los datos de entrega', 'error');
                   return;
+                }
+                if (checkoutStep === 4 && metodoPago === 'efectivo') {
+                  const montoInt = parseFloat(montoEfectivo || '0');
+                  if (montoInt < total) {
+                    showToast('Error', `El monto debe ser mayor o igual al total ($${total.toFixed(2)})`, 'error');
+                    return;
+                  }
                 }
                 setCheckoutStep(prev => prev + 1);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
