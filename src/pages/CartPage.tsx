@@ -324,10 +324,11 @@ export default function CartPage() {
           setBuscandoGPS(false);
         }
       },
-      () => {
-        showToast('Error', 'No pudimos acceder a tu ubicación', 'error');
+      (error) => {
+        showToast('Error', `No pudimos acceder a tu ubicación (${error.message})`, 'error');
         setBuscandoGPS(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
