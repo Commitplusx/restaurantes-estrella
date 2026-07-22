@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
+import { useCartStore } from '../store/useCartStore'
 import { supabase } from '../lib/supabase'
 // import * as h3 from 'h3-js' (movido al hook)
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
@@ -97,8 +98,10 @@ function getEmojiForCategory(name: string): string {
 }
 
 export type OpcionSeleccionada = {
-  grupo: string;
+  opcion_id: string;
   opcion: string;
+  grupo_id: string;
+  grupo: string;
   precio_extra: number;
 }
 
@@ -268,12 +271,13 @@ export function PublicMenuView() {
   // Wizard de opciones — paso actual
   const [optionsStep, setOptionsStep] = useState(0)
 
-  // Estado del carrito y drawer
-  const [carrito, setCarrito] = useState<{ item: CartItem & { foto_url?: string }, cantidad: number }[]>(() => {
-    const saved = sessionStorage.getItem('est_carrito')
-    return saved ? JSON.parse(saved) : []
-  })
-  const [isCartOpen, setIsCartOpen] = useState(false)
+  // Estado del carrito y drawer (Global via Zustand)
+  const carrito = useCartStore(state => state.carrito as { item: CartItem & { foto_url?: string }, cantidad: number }[])
+  const isCartOpen = useCartStore(state => state.isCartOpen)
+  const setIsCartOpen = useCartStore(state => state.setIsCartOpen)
+  const _addToCart = useCartStore(state => state.addToCart)
+  const _removeFromCart = useCartStore(state => state.removeFromCart)
+  const _clearCart = useCartStore(state => state.clearCart)
   const [clienteNombre, setClienteNombre] = useState(() => sessionStorage.getItem('est_nombre') || '')
   const [clienteTel, setClienteTel] = useState(() => sessionStorage.getItem('est_tel') || '')
   const [isScrolled, setIsScrolled] = useState(false)
@@ -473,9 +477,7 @@ export function PublicMenuView() {
     }
   }
 
-  useEffect(() => {
-    sessionStorage.setItem('est_carrito', JSON.stringify(carrito))
-  }, [carrito])
+  // useEffect eliminado: sessionStorage manejado por Zustand
   useEffect(() => { sessionStorage.setItem('est_nombre', clienteNombre) }, [clienteNombre])
   useEffect(() => { sessionStorage.setItem('est_tel', clienteTel) }, [clienteTel])
   useEffect(() => { sessionStorage.setItem('est_metodopago', metodoPago) }, [metodoPago])
@@ -747,31 +749,35 @@ export function PublicMenuView() {
         }
         
         // Sincronizar el carrito si hay items que se actualizaron en tiempo real
-        setCarrito(prevCart => {
-          if (!prevCart || prevCart.length === 0) return prevCart;
-          let hasChanges = false;
-          const newCart = prevCart.map(cObj => {
-            let latestItem;
-            if (cObj.item.tipo === 'item') latestItem = (prods || []).find((p: any) => p.id === cObj.item.id);
-            else if (cObj.item.tipo === 'combo') latestItem = (cmbs || []).find((c: any) => c.id === cObj.item.id);
-            else if (cObj.item.tipo === 'promo') latestItem = validPromos.find(p => p.id === cObj.item.id);
+        const prevCart = useCartStore.getState().carrito;
+        if (!prevCart || prevCart.length === 0) {
+          if (!silently) setLoading(false);
+          return;
+        }
+        let hasChanges = false;
+        const newCart = prevCart.map(cObj => {
+          let latestItem;
+          if (cObj.item.tipo === 'item') latestItem = (prods || []).find((p: any) => p.id === cObj.item.id);
+          else if (cObj.item.tipo === 'combo') latestItem = (cmbs || []).find((c: any) => c.id === cObj.item.id);
+          else if (cObj.item.tipo === 'promo') latestItem = validPromos.find(p => p.id === cObj.item.id);
 
-            // Si el item ya no está disponible o se eliminó, lo quitamos del carrito
-            if (!latestItem) {
-              hasChanges = true;
-              return null;
-            }
+          // Si el item ya no está disponible o se eliminó, lo quitamos del carrito
+          if (!latestItem) {
+            hasChanges = true;
+            return null;
+          }
 
-            // Actualizamos la bandera del subsidio si cambió en tiempo real
-            if (cObj.item.aplica_subsidio !== latestItem.aplica_subsidio) {
-              hasChanges = true;
-              return { ...cObj, item: { ...cObj.item, aplica_subsidio: latestItem.aplica_subsidio } };
-            }
-            return cObj;
-          }).filter(Boolean) as typeof prevCart;
-          
-          return hasChanges ? newCart : prevCart;
-        });
+          // Actualizamos la bandera del subsidio si cambió en tiempo real
+          if (cObj.item.aplica_subsidio !== latestItem.aplica_subsidio) {
+            hasChanges = true;
+            return { ...cObj, item: { ...cObj.item, aplica_subsidio: latestItem.aplica_subsidio } };
+          }
+          return cObj;
+        }).filter(Boolean) as typeof prevCart;
+        
+        if (hasChanges) {
+          useCartStore.setState({ carrito: newCart });
+        }
         
         if (!silently) {
           setLoading(false)
@@ -912,7 +918,8 @@ export function PublicMenuView() {
     if (carrito.length > 0 && currentRestId && restaurante && currentRestId !== restaurante.id) {
       const confirm = window.confirm('Tienes productos de otro restaurante en tu carrito. ¿Deseas vaciarlo para iniciar un nuevo pedido en este restaurante?');
       if (confirm) {
-        setCarrito([{ item: product, cantidad: 1 }])
+        _clearCart()
+        _addToCart(product)
         sessionStorage.setItem('est_carrito_restaurante', restaurante.id)
         sessionStorage.removeItem('est_checkoutstep')
         showToast('Carrito nuevo', 'Iniciaste un pedido en este restaurante.', 'success')
@@ -931,13 +938,7 @@ export function PublicMenuView() {
       showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
     }
 
-    setCarrito(prev => {
-      const exist = prev.find(p => p.item.cartItemId === product.cartItemId)
-      if (exist) {
-        return prev.map(p => p.item.cartItemId === product.cartItemId ? { ...p, cantidad: p.cantidad + 1 } : p)
-      }
-      return [...prev, { item: product, cantidad: 1 }]
-    })
+    _addToCart(product)
   }
 
   const removeFromCart = (cartItemId: string) => {
@@ -950,15 +951,7 @@ export function PublicMenuView() {
       showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
     }
 
-    setCarrito(prev => {
-      const exist = prev.find(p => p.item.cartItemId === cartItemId)
-      if (exist && exist.cantidad === 1) {
-        return prev.filter(p => p.item.cartItemId !== cartItemId)
-      }
-      return prev
-        .map(p => p.item.cartItemId === cartItemId ? { ...p, cantidad: p.cantidad - 1 } : p)
-        .filter(p => p.cantidad > 0)
-    })
+    _removeFromCart(cartItemId)
   }
 
   useEffect(() => {
@@ -1432,7 +1425,7 @@ export function PublicMenuView() {
     } else {
       // Flujo 100% Web para pagos en Efectivo — limpiar todo
       setIsCartOpen(false)
-      setCarrito([])
+      _clearCart()
       setClienteNombre('')
       setClienteTel('')
       setCuponCliente('')
@@ -1471,7 +1464,7 @@ export function PublicMenuView() {
       
       // Limpiamos y redirigimos (Flujo Efectivo exitoso)
       setIsCartOpen(false)
-      setCarrito([])
+      _clearCart()
       setClienteNombre('')
       setClienteTel('')
       setCuponCliente('')
@@ -2253,7 +2246,7 @@ export function PublicMenuView() {
                                    if (rec.opciones && rec.opciones.length > 0) {
                                      setSelectedItemForOptions({...rec, __tipo: 'item'})
                                    } else {
-                                     addToCart({...rec, foto_url: rec.foto_url || undefined, tipo: 'item', cartItemId: crypto.randomUUID()})
+                                     addToCart({...rec, foto_url: rec.foto_url || undefined, tipo: 'item', cartItemId: rec.id})
                                    }
                                  }} className="bg-[#FA4A0C] text-white w-7 h-7 rounded-full flex items-center justify-center shadow-[0_4px_10px_rgba(250,74,12,0.3)] hover:scale-110 active:scale-95 transition-all">
                                    <Plus size={14} strokeWidth={3}/>
@@ -2747,7 +2740,13 @@ export function PublicMenuView() {
                 g.opciones.forEach((o: any) => {
                   if (selectedOptionsState[g.titulo]?.[o.nombre]) {
                     precioExtra += o.precio_extra;
-                    opcionesSel.push({ grupo: g.titulo, opcion: o.nombre, precio_extra: o.precio_extra });
+                    opcionesSel.push({ 
+                      grupo_id: g.id || '', 
+                      grupo: g.titulo, 
+                      opcion_id: o.id || '', 
+                      opcion: o.nombre, 
+                      precio_extra: o.precio_extra 
+                    });
                   }
                 });
               });
@@ -3332,7 +3331,7 @@ export function PublicMenuView() {
                         sessionStorage.setItem('est_branch_id', sucursal.id)
                         setRestaurante(sucursal)
                         setShowSucursalesModal(false)
-                        setCarrito([]) // Vaciar carrito si cambian de sucursal
+                        _clearCart() // Vaciar carrito si cambian de sucursal
                       }}
                       className={`relative w-full text-left p-4 rounded-[1.5rem] border-2 transition-all flex items-center gap-4 group bg-white shadow-sm overflow-hidden ${isSelected ? 'border-[#FA4A0C] bg-orange-50/30' : 'border-transparent hover:border-orange-200 hover:shadow-md'}`}
                     >

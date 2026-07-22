@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, Plus, Minus, X, CheckCircle2, AlertCircle, 
@@ -16,15 +17,17 @@ interface CartItem {
   cartItemId: string; 
   nombre: string;
   precio: number;
-  tipo: string;
+  tipo: 'item' | 'combo' | 'promo';
   opcionesSeleccionadas?: OpcionSeleccionada[];
   aplica_subsidio?: boolean;
   foto_url?: string;
 }
 
 interface OpcionSeleccionada {
-  grupo: string;
+  opcion_id: string;
   opcion: string;
+  grupo_id: string;
+  grupo: string;
   precio_extra: number;
 }
 
@@ -78,34 +81,46 @@ export default function CartPage() {
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const [carrito, setCarrito] = useState<{ item: CartItem, cantidad: number }[]>(() => {
-    const saved = sessionStorage.getItem('est_carrito');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const carrito = useCartStore(state => state.carrito as { item: CartItem, cantidad: number }[]);
+  const _clearCart = useCartStore(state => state.clearCart);
 
-  const [checkoutStep, setCheckoutStep] = useState(() => {
-    const saved = sessionStorage.getItem('est_checkoutstep');
-    return saved ? parseInt(saved) : 1;
-  });
+  const checkoutStep = useCartStore(state => state.checkoutStep);
+  const setCheckoutStep = useCartStore(state => state.setCheckoutStep);
 
-  const [clienteNombre, setClienteNombre] = useState(() => sessionStorage.getItem('est_nombre') || '');
-  const [clienteTel, setClienteTel] = useState(() => sessionStorage.getItem('est_tel') || '');
+  const clienteNombre = useCartStore(state => state.clienteNombre);
+  const setClienteNombre = useCartStore(state => state.setClienteNombre);
+  
+  const clienteTel = useCartStore(state => state.clienteTel);
+  const setClienteTel = useCartStore(state => state.setClienteTel);
+
+  const tipoEntrega = useCartStore(state => state.tipoEntrega);
+  const setTipoEntrega = useCartStore(state => state.setTipoEntrega);
+  
+  const direccionEntrega = useCartStore(state => state.direccionEntrega);
+  const setDireccionEntrega = useCartStore(state => state.setDireccionEntrega);
+  
+  const cuponCliente = useCartStore(state => state.cuponCliente);
+  const setCuponCliente = useCartStore(state => state.setCuponCliente);
+  
+  const descuento = useCartStore(state => state.descuento);
+  const setDescuento = useCartStore(state => state.setDescuento);
+  
+  const cuponValido = useCartStore(state => state.cuponValido);
+  const setCuponValido = useCartStore(state => state.setCuponValido);
+  
+  const metodoPago = useCartStore(state => state.metodoPago);
+  const setMetodoPago = useCartStore(state => state.setMetodoPago);
+
   const [pinError, setPinError] = useState(false);
   const [telError, setTelError] = useState(false);
   const [datosCliente, setDatosCliente] = useState<any>(null);
   const [checkingLoyalty, setCheckingLoyalty] = useState(false);
 
-  const [tipoEntrega, setTipoEntrega] = useState<'domicilio' | 'tienda' | null>(() => {
-    const saved = sessionStorage.getItem('est_tipoentrega');
-    return saved === 'domicilio' || saved === 'tienda' ? (saved as 'domicilio' | 'tienda') : null;
-  });
-  
   const [ubicacionGPS, setUbicacionGPS] = useState<{ lat: number; lng: number } | null>(() => {
     const saved = sessionStorage.getItem('est_ubicacion');
     return saved ? JSON.parse(saved) : null;
   });
   
-  const [direccionEntrega, setDireccionEntrega] = useState(() => sessionStorage.getItem('est_direccion') || '');
   const [direccionReferencias, setDireccionReferencias] = useState(() => sessionStorage.getItem('est_referencias') || '');
   
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
@@ -114,14 +129,10 @@ export default function CartPage() {
   const [draftUbicacion, setDraftUbicacion] = useState<{lat: number, lng: number} | null>(null);
   const [draftDireccion, setDraftDireccion] = useState('');
   
-  const [cuponCliente, setCuponCliente] = useState('');
   const [cuponPlataformaIdManual, setCuponPlataformaIdManual] = useState<string | null>(null);
-  const [cuponValido, setCuponValido] = useState(false);
-  const [descuento, setDescuento] = useState(0);
   const [validandoCupon, setValidandoCupon] = useState(false);
   const [costoEnvioFijoOverride, setCostoEnvioFijoOverride] = useState<number | null>(null);
 
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'en_linea' | null>(null);
   const [montoEfectivo, setMontoEfectivo] = useState('');
   const [procesando, setProcesando] = useState(false);
   
@@ -158,35 +169,14 @@ export default function CartPage() {
     }
   };
 
-  useEffect(() => {
-    sessionStorage.setItem('est_carrito', JSON.stringify(carrito));
-  }, [carrito]);
+  // useEffect para est_carrito eliminado: ahora es manejado por Zustand
 
-  useEffect(() => {
-    sessionStorage.setItem('est_checkoutstep', checkoutStep.toString());
-  }, [checkoutStep]);
-
-  useEffect(() => {
-    sessionStorage.setItem('est_nombre', clienteNombre);
-  }, [clienteNombre]);
-
-  useEffect(() => {
-    sessionStorage.setItem('est_tel', clienteTel);
-  }, [clienteTel]);
-
-  useEffect(() => {
-    if (tipoEntrega) sessionStorage.setItem('est_tipoentrega', tipoEntrega);
-    else sessionStorage.removeItem('est_tipoentrega');
-  }, [tipoEntrega]);
+  // useEffect para est_carrito eliminado: ahora es manejado por Zustand
 
   useEffect(() => {
     if (ubicacionGPS) sessionStorage.setItem('est_ubicacion', JSON.stringify(ubicacionGPS));
     else sessionStorage.removeItem('est_ubicacion');
   }, [ubicacionGPS]);
-
-  useEffect(() => {
-    sessionStorage.setItem('est_direccion', direccionEntrega);
-  }, [direccionEntrega]);
 
   useEffect(() => {
     sessionStorage.setItem('est_referencias', direccionReferencias);
@@ -267,27 +257,11 @@ export default function CartPage() {
     return () => clearTimeout(debounceTimer);
   }, [clienteTel]);
 
-  const addToCart = (product: CartItem) => {
-    setCarrito(prev => {
-      const exist = prev.find(p => p.item.cartItemId === product.cartItemId);
-      if (exist) {
-        return prev.map(p => p.item.cartItemId === product.cartItemId ? { ...p, cantidad: p.cantidad + 1 } : p);
-      }
-      return [...prev, { item: product, cantidad: 1 }];
-    });
-  };
+  const _addToCart = useCartStore(state => state.addToCart);
+  const addToCart = (product: CartItem) => _addToCart(product);
 
-  const removeFromCart = (cartItemId: string) => {
-    setCarrito(prev => {
-      const exist = prev.find(p => p.item.cartItemId === cartItemId);
-      if (exist && exist.cantidad === 1) {
-        return prev.filter(p => p.item.cartItemId !== cartItemId);
-      }
-      return prev
-        .map(p => p.item.cartItemId === cartItemId ? { ...p, cantidad: p.cantidad - 1 } : p)
-        .filter(p => p.cantidad > 0);
-    });
-  };
+  const _removeFromCart = useCartStore(state => state.removeFromCart);
+  const removeFromCart = (cartItemId: string) => _removeFromCart(cartItemId);
 
   const obtenerUbicacionPorIP = async () => {
     const googleKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -626,7 +600,8 @@ export default function CartPage() {
     : costoEnvio;
 
   const descuentoAplicable = (subtotal + costoEnvioFinal) > 0 ? Math.min(descuentoTotal + descuentoVip, subtotal + costoEnvioFinal) : 0;
-  const total = Math.max(0, subtotal + costoEnvioFinal - descuentoAplicable);
+  const rawTotal = Math.max(0, subtotal + costoEnvioFinal - descuentoAplicable);
+  const total = Math.round(rawTotal * 100) / 100;
 
   // Ahorro total (para mostrar en la UI premium)
   const ahorroTotal = descuentoAplicable + (isFreeDelivery || (cuponValido && costoEnvioFijoOverride !== null) ? Math.max(0, costoEnvioBase - costoEnvioFinal) : 0);
@@ -697,18 +672,39 @@ export default function CartPage() {
       estado_cocina: 'pendiente',
       metodo_pago: metodoPago,
       total: total,
+      precio_entrega: costoEnvioCalculado, // El pago real que recibirá el repartidor (incluso si costoEnvioFinal es 0 para el cliente)
       tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
       pin_seguridad: pinSeguridad,
+      pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(), // Generamos un PIN anti-robo de 4 dígitos
       wb_message_id: Math.random().toString(36).substring(2, 8).toUpperCase(),
       idempotency_key: crypto.randomUUID(),
       cupon_plataforma_id: cuponPlataformaIdManual || null,
-      descuento_plataforma: descuentoTotal
+      descuento_plataforma: descuentoTotal + (costoEnvioCalculado - costoEnvioFinal), // Registramos que hubo un descuento en el envío si aplica
+      cupon_cliente: cuponCliente || null,
+      usar_saldo_vip: usarSaldoVip,
+      monto_saldo_vip: usarSaldoVip && montoSaldoVip ? Number(montoSaldoVip) : 0,
+      pin_vip: pinVip || null,
+      usar_beneficio_fidelidad: usarBeneficioNormal
     };
   };
 
   const handlePedir = async () => {
     if (!restaurante || carrito.length === 0) return;
     
+    setProcesando(true);
+    // SOFT-CHECK: Consultar la base de datos justo antes de pagar
+    const { data: restData } = await supabase.from('restaurantes').select('activo, hora_apertura, hora_cierre, horarios').eq('id', restaurante.id).single();
+    
+    if (restData) {
+      // Re-evaluar lógica de horarios o simplemente `activo`. Si el dashboard lo apaga, activo = false.
+      if (!restData.activo) {
+        showToast('Restaurante Cerrado', 'Lo sentimos, el restaurante acaba de pausar sus pedidos.', 'error');
+        setProcesando(false);
+        return;
+      }
+    }
+    setProcesando(false);
+
     const isReturningCustomer = !!datosCliente;
     if (!isReturningCustomer && metodoPago === 'efectivo') {
       try {
@@ -742,15 +738,25 @@ export default function CartPage() {
     let pedidoCreadoId = '';
     
     try {
-      const { data, error } = await supabase.from('pedidos').insert([payload]).select('wb_message_id').single();
-      if (error) throw error;
-      if (data) pedidoCreadoId = data.wb_message_id;
+      const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp';
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(edgeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+        body: JSON.stringify({ 
+          action: 'direct-order', 
+          payload, 
+          carrito 
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al crear pedido');
+      pedidoCreadoId = data.pedido?.wb_message_id || 'desconocido';
     } catch (err: any) {    
       console.error('Error insertando en supabase:', err);
       if (err.details) console.error('Detalles:', err.details);
-      if (err.hint) console.error('Hint:', err.hint);
       
-      alert('Hubo un problema registrando el pedido. Intenta nuevamente.');
+      alert(`Hubo un problema registrando el pedido: ${err.message}. Intenta nuevamente.`);
       submittingRef.current = false;
       setProcesando(false);
       return;
@@ -788,7 +794,7 @@ export default function CartPage() {
         return;
       }
     } else {
-      setCarrito([]);
+      _clearCart();
       sessionStorage.clear();
       navigate(`/success?pedido=${pedidoCreadoId}&success=true`);
     }
@@ -805,16 +811,16 @@ export default function CartPage() {
       const res = await fetch(edgeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-        body: JSON.stringify({ action: 'verify-and-order', telefono: clienteTel.replace(/\D/g, ''), codigo: otpCode, payload })
+        body: JSON.stringify({ action: 'verify-and-order', telefono: clienteTel.replace(/\D/g, ''), codigo: otpCode, payload, carrito })
       });
       
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Código incorrecto');
       
       setShowOtpModal(false);
-      setCarrito([]);
+      _clearCart();
       sessionStorage.clear();
-      const wbMsgId = data.pedido?.[0]?.wb_message_id || 'desconocido';
+      const wbMsgId = data.pedido?.wb_message_id || 'desconocido';
       navigate(`/success?pedido=${wbMsgId}&success=true`);
       
     } catch (err: any) {
@@ -919,7 +925,7 @@ export default function CartPage() {
         <button 
           onClick={() => {
             if (checkoutStep > 1) {
-              setCheckoutStep(prev => prev - 1);
+              setCheckoutStep(checkoutStep - 1);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
               navigate(`/menu/${id}`);
@@ -1405,7 +1411,7 @@ export default function CartPage() {
                     return;
                   }
                 }
-                setCheckoutStep(prev => prev + 1);
+                setCheckoutStep(checkoutStep + 1);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               disabled={!isStepValid() || checkingLoyalty}

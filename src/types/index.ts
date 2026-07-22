@@ -14,6 +14,7 @@ export type CartItem = {
   tipo: 'item' | 'combo' | 'promo';
   foto_url?: string;
   opcionesSeleccionadas?: CartItemOption[];
+  aplica_subsidio?: boolean;
 };
 
 export type CheckoutStep = 1 | 2 | 3 | 4;

@@ -1,9 +1,51 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BellRing, Check, ChefHat, Clock, AlertCircle, Store } from 'lucide-react'
+import { BellRing, Store } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
 import { BottomSheet } from '../../components/BottomSheet'
+
+// Componente Genérico Anti-Doble Toque
+function ActionButton({ onClick, children, className, loadingText = "Cargando..." }: {
+  onClick: () => Promise<void> | void;
+  children: React.ReactNode;
+  className?: string;
+  loadingText?: string;
+}) {
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleClick = async () => {
+    if (isProcessing) return; // Cortafuegos
+    try {
+      setIsProcessing(true);
+      await onClick();
+    } catch (error) {
+      console.error("Error en el botón:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isProcessing}
+      className={`${className} ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.97]'} transition-all`}
+    >
+      {isProcessing ? (
+        <span className="flex items-center justify-center gap-2">
+          <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {loadingText}
+        </span>
+      ) : (
+        children
+      )}
+    </button>
+  );
+}
 
 export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight }: { restaurante: Restaurante, highlightedPedidoId?: string | null, onClearHighlight?: () => void }) {
   const [pedidos, setPedidos] = useState<any[]>([])
@@ -12,6 +54,8 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'denied'
   )
+  // Incrementar este valor fuerza la reconexión del canal de Supabase Realtime
+  const [channelKey, setChannelKey] = useState(0)
 
   // Scroll al pedido resaltado cuando carga
   useEffect(() => {
@@ -50,9 +94,10 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   useEffect(() => {
     if (!restaurante || linkedIds.length === 0) return
 
-    // Suscribirse a cambios en tiempo real para todos los IDs
+    // channelKey en las deps garantiza que al subir (wake-up) el canal se destruye
+    // y se vuelve a crear con .subscribe() fresco.
     const channel = supabase
-      .channel(`public:pedidos:group:${restaurante.id}`)
+      .channel(`public:pedidos:group:${restaurante.id}:${channelKey}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=in.(${linkedIds.join(',')})` },
@@ -73,7 +118,34 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [restaurante.id, linkedIds])
+  }, [restaurante.id, linkedIds, channelKey])
+
+  // ─── Wake-up: reconectar canales y recargar pedidos cuando la pestaña vuelve ───
+  // Browsers throttle WebSockets + timers when a tab is hidden. When the tab
+  // becomes visible again we: 1) reload orders from DB (catch missed events),
+  // 2) remove+re-add all Supabase channels (force reconnect), 3) restart alarm.
+  useEffect(() => {
+    if (linkedIds.length === 0) return
+
+    const handleWakeUp = async () => {
+      if (document.hidden) return  // tab going to sleep – nothing to do
+
+      // 1. Refetch pedidos from DB (catch events missed while sleeping)
+      await loadPedidos(linkedIds)
+
+      // 2. Bump channelKey → React destroys + recreates the Supabase channel
+      setChannelKey(k => k + 1)
+    }
+
+    document.addEventListener('visibilitychange', handleWakeUp)
+    window.addEventListener('focus', handleWakeUp)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleWakeUp)
+      window.removeEventListener('focus', handleWakeUp)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedIds])
 
   const loadPedidos = async (ids: string[]) => {
     const { data } = await supabase
@@ -88,33 +160,74 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     setLoading(false)
   }
 
-  // Alarma continua y título dinámico para pedidos sin aceptar
+  // ─── Alarma continua: título dinámico + sonido cada 4s ─────────────────────
+  const playBellSound = React.useCallback(() => {
+    try {
+      const audioElement = document.getElementById('alarm-audio') as HTMLAudioElement;
+      if (audioElement) {
+        audioElement.currentTime = 0;
+        const playPromise = audioElement.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((e) => console.error('Audio bloqueado:', e))
+        }
+      }
+    } catch (e) {
+      console.error('Error playing sound:', e)
+    }
+  }, [])
+
+  // Ref para el intervalo – permite reiniciarlo desde el wake-up handler
+  const alarmIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const startAlarm = React.useCallback(() => {
+    if (alarmIntervalRef.current) return  // ya está corriendo
+    playBellSound()
+    alarmIntervalRef.current = setInterval(() => {
+      playBellSound()
+    }, 4000)
+  }, [playBellSound])
+
+  const stopAlarm = React.useCallback(() => {
+    if (alarmIntervalRef.current) {
+      clearInterval(alarmIntervalRef.current)
+      alarmIntervalRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     const pendientes = pedidos.filter(p => p.estado_cocina === 'pendiente' || p.estado_cocina == null)
-    
+
     if (pendientes.length > 0) {
       document.title = `(${pendientes.length}) ¡NUEVO PEDIDO! 🔔`
-      
-      // Hacemos sonar la campana cada 4 segundos
-      const interval = setInterval(() => {
-        if (notifPermission === 'granted') {
-          playBellSound()
-        }
-      }, 4000)
-      
-      // Reproducir también inmediatamente al detectar
-      if (notifPermission === 'granted') {
-        playBellSound()
-      }
-
-      return () => {
-        clearInterval(interval)
-        document.title = 'Estrella Restaurantes'
-      }
+      if (notifPermission === 'granted') startAlarm()
     } else {
       document.title = 'Estrella Restaurantes'
+      stopAlarm()
     }
-  }, [pedidos, notifPermission])
+
+    return () => {
+      // No detener la alarma en el cleanup: queremos que siga sonando
+      // aunque el efecto re-corra. stopAlarm() se llama cuando pendientes===0.
+    }
+  }, [pedidos, notifPermission, startAlarm, stopAlarm])
+
+  // Reiniciar alarma cuando la pestaña despierta (los setInterval se throttlean)
+  useEffect(() => {
+    const onWake = () => {
+      if (document.hidden) return
+      const pendientes = pedidos.filter(p => p.estado_cocina === 'pendiente' || p.estado_cocina == null)
+      if (pendientes.length > 0 && notifPermission === 'granted') {
+        stopAlarm()   // matar el intervalo viejo throttleado
+        startAlarm()  // arrancar uno nuevo limpio
+      }
+    }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('focus', onWake)
+    return () => {
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
+    }
+  }, [pedidos, notifPermission, startAlarm, stopAlarm])
 
   // Enviar Notificación Push real al detectar nuevos pedidos (usando un listener al websocket)
   useEffect(() => {
@@ -177,20 +290,6 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     };
   }, []);
 
-  const playBellSound = () => {
-    try {
-      const audioElement = document.getElementById('alarm-audio') as HTMLAudioElement;
-      if (audioElement) {
-        audioElement.currentTime = 0; // Reiniciar
-        const playPromise = audioElement.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((e) => console.error('Audio play blocked. Interactúa con la página para activar el sonido.', e))
-        }
-      }
-    } catch (e) {
-      console.error('Error playing sound:', e)
-    }
-  }
 
   const requestNotifications = async () => {
     // Hacemos sonar el timbre de forma SÍNCRONA al momento del clic
@@ -277,136 +376,113 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Audio oculto cargado previamente para evitar bloqueos del navegador al reproducir */}
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Audio oculto */}
       <audio id="alarm-audio" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-slate-800">Monitor de Cocina</h3>
-        <div className="flex gap-4">
+
+      {/* Barra superior */}
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <h3 className="text-base font-bold text-slate-700">Monitor de Cocina</h3>
+        <div className="flex items-center gap-2">
           {notifPermission !== 'granted' && (
-            <button 
-              onClick={requestNotifications} 
-              className="text-sm bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
+            <button
+              onClick={requestNotifications}
+              className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg font-semibold hover:bg-blue-100 transition-colors flex items-center gap-1.5"
             >
-              <BellRing size={16} /> Activar Notificaciones
+              <BellRing size={13} /> Activar alarma
             </button>
           )}
-          <button onClick={playBellSound} className="text-sm text-slate-400 flex items-center gap-2 hover:text-slate-600 transition-colors">
-            <BellRing size={16} /> Probar Timbre
+          <button onClick={playBellSound} className="text-xs text-slate-400 flex items-center gap-1.5 hover:text-slate-600 transition-colors">
+            <BellRing size={13} /> Probar
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 items-start">
-        {/* Columna: Nuevos */}
-        <div className="bg-slate-50/50 rounded-3xl p-4 border border-slate-100 h-full flex flex-col gap-4">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-              <Clock size={16} className="stroke-[2.5]" />
-            </div>
-            <h4 className="font-bold text-slate-700">Nuevos</h4>
-            <div className="ml-auto bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full">{nuevos.length}</div>
-          </div>
-          
-          <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-1 pb-4">
-            <AnimatePresence>
-              {nuevos.map(p => (
-                <PedidoCard 
-                  key={p.id} 
-                  pedido={p} 
-                  actionLabel="Empezar a Preparar" 
-                  actionColor="bg-orange-500 hover:bg-orange-600"
-                  onAction={() => setPedidoToPrepare(p)}
-                  isHighlighted={p.id === highlightedPedidoId}
-                />
-              ))}
-              {nuevos.length === 0 && <EmptyState text="No hay pedidos nuevos." />}
-            </AnimatePresence>
-          </div>
-        </div>
+      {/* Kanban: 3 columnas con altura fija y scroll interno */}
+      <div className="grid grid-cols-3 gap-3 flex-1 min-h-0">
 
-        {/* Columna: En Cocina */}
-        <div className="bg-orange-50/30 rounded-3xl p-4 border border-orange-100/50 h-full flex flex-col gap-4">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
-              <ChefHat size={16} className="stroke-[2.5]" />
-            </div>
-            <h4 className="font-bold text-slate-700">En Cocina</h4>
-            <div className="ml-auto bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">{enCocina.length}</div>
-          </div>
-          
-          <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-1 pb-4">
-            <AnimatePresence>
-              {enCocina.map(p => (
-                <PedidoCard 
-                  key={p.id} 
-                  pedido={p} 
-                  actionLabel="¡Listo para recoger!" 
-                  actionColor="bg-emerald-500 hover:bg-emerald-600"
-                  onAction={() => updateEstado(p.id, 'listo_para_recoger')}
-                  isHighlighted={p.id === highlightedPedidoId}
-                />
-              ))}
-              {enCocina.length === 0 && <EmptyState text="Nada preparándose ahora." />}
-            </AnimatePresence>
-          </div>
-        </div>
+        {/* ─── Nuevos ─── */}
+        <KanbanCol
+          title="Nuevos"
+          count={nuevos.length}
+          headerCls="text-blue-700 bg-blue-600"
+          colCls="border-blue-100 bg-blue-50/40"
+        >
+          <AnimatePresence>
+            {nuevos.map(p => (
+              <PedidoCard
+                key={p.id}
+                pedido={p}
+                actionLabel="Preparar"
+                actionColor="bg-orange-500 hover:bg-orange-600"
+                onAction={() => setPedidoToPrepare(p)}
+                isHighlighted={p.id === highlightedPedidoId}
+              />
+            ))}
+            {nuevos.length === 0 && <EmptyCol />}
+          </AnimatePresence>
+        </KanbanCol>
 
-        {/* Columna: Listos */}
-        <div className="bg-emerald-50/30 rounded-3xl p-4 border border-emerald-100/50 h-full flex flex-col gap-4">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-              <Check size={16} className="stroke-[2.5]" />
-            </div>
-            <h4 className="font-bold text-slate-700">Listos</h4>
-            <div className="ml-auto bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full">{listos.length}</div>
-          </div>
-          
-          <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-1 pb-4">
-            <AnimatePresence>
-              {listos.map(p => {
-                // Si el repartidor ya está asignado/llegando, sugerimos entregarlo
-                const driverCerca = p.estado === 'asignado' || p.estado === 'buscando_repartidor'
-                return (
-                  <PedidoCard 
-                    key={p.id} 
-                    pedido={p} 
-                    actionLabel={driverCerca ? "Entregar al Repartidor" : "Cerrar Pedido"} 
-                    actionColor="bg-slate-800 hover:bg-slate-900 text-white"
-                    onAction={() => updateEstado(p.id, 'entregado')}
-                  />
-                )
-              })}
-              {listos.length === 0 && <EmptyState text="No hay pedidos listos." />}
-            </AnimatePresence>
-          </div>
-        </div>
+        {/* ─── En Cocina ─── */}
+        <KanbanCol
+          title="En Cocina"
+          count={enCocina.length}
+          headerCls="text-orange-700 bg-orange-500"
+          colCls="border-orange-100 bg-orange-50/30"
+        >
+          <AnimatePresence>
+            {enCocina.map(p => (
+              <PedidoCard
+                key={p.id}
+                pedido={p}
+                actionLabel="¡Listo!"
+                actionColor="bg-emerald-500 hover:bg-emerald-600"
+                onAction={() => updateEstado(p.id, 'listo_para_recoger')}
+                isHighlighted={p.id === highlightedPedidoId}
+              />
+            ))}
+            {enCocina.length === 0 && <EmptyCol />}
+          </AnimatePresence>
+        </KanbanCol>
+
+        {/* ─── Listos ─── */}
+        <KanbanCol
+          title="Listos"
+          count={listos.length}
+          headerCls="text-emerald-700 bg-emerald-500"
+          colCls="border-emerald-100 bg-emerald-50/30"
+        >
+          <AnimatePresence>
+            {listos.map(p => {
+              const driverCerca = p.estado === 'asignado' || p.estado === 'buscando_repartidor'
+              return (
+                <PedidoCard
+                  key={p.id}
+                  pedido={p}
+                  actionLabel={driverCerca ? 'Entregar' : 'Cerrar'}
+                  actionColor="bg-slate-700 hover:bg-slate-800"
+                  onAction={() => updateEstado(p.id, 'entregado')}
+                />
+              )
+            })}
+            {listos.length === 0 && <EmptyCol />}
+          </AnimatePresence>
+        </KanbanCol>
 
       </div>
 
-      <BottomSheet
-        isOpen={!!pedidoToPrepare}
-        onClose={() => setPedidoToPrepare(null)}
-        title="Tiempo Estimado"
-      >
-        <div className="flex flex-col gap-5">
-          <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3">
-            <Clock className="text-orange-500 shrink-0 mt-0.5" size={20} />
-            <p className="text-sm text-slate-700 font-medium leading-relaxed">
-              ¿En cuánto tiempo estará listo este pedido? Le avisaremos al cliente y asignaremos un repartidor para que llegue justo a tiempo.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3">
-            {[15, 25, 35, 45, 60].map(mins => (
+      {/* Modal: elegir tiempo de preparación */}
+      <BottomSheet isOpen={!!pedidoToPrepare} onClose={() => setPedidoToPrepare(null)} title="¿Cuánto tiempo tardará?">
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-slate-500 leading-relaxed">
+            Elige el tiempo estimado de preparación. El cliente recibirá una notificación y asignaremos un repartidor.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {[15, 20, 25, 35, 45, 60].map(mins => (
               <button
                 key={mins}
-                onClick={() => {
-                  if (pedidoToPrepare) {
-                    updateEstado(pedidoToPrepare.id, 'en_cocina', mins)
-                  }
-                }}
-                className="bg-white border-2 border-slate-100 hover:border-orange-500 hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-black py-4 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all"
+                onClick={() => { if (pedidoToPrepare) updateEstado(pedidoToPrepare.id, 'en_cocina', mins) }}
+                className="bg-white border-2 border-slate-100 hover:border-orange-400 hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-black py-3 rounded-xl text-sm transition-all"
               >
                 {mins} min
               </button>
@@ -418,104 +494,150 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   )
 }
 
-function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted }: { pedido: any, actionLabel: string, actionColor: string, onAction: () => void, isHighlighted?: boolean }) {
-  // Parse items safely if it's JSON or string
-  let items = []
+/* ─── Columna Kanban ─────────────────────────────────────── */
+function KanbanCol({ title, count, headerCls, colCls, children }: {
+  title: string
+  count: number
+  headerCls: string
+  colCls: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={`flex flex-col rounded-xl border overflow-hidden ${colCls}`}>
+      {/* Cabecera */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-white/60 border-b border-inherit shrink-0">
+        <span className="text-xs font-bold text-slate-700 flex-1 truncate">{title}</span>
+        <span className={`text-white text-[10px] font-black px-1.5 py-0.5 rounded-md ${headerCls}`}>{count}</span>
+      </div>
+      {/* Scroll interno */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 custom-scrollbar">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/* ─── Tarjeta de Pedido ──────────────────────────────────── */
+function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted }: {
+  pedido: any
+  actionLabel: string
+  actionColor: string
+  onAction: () => void
+  isHighlighted?: boolean
+}) {
+  let items: any[] = []
   try {
-    items = typeof pedido.items === 'string' ? JSON.parse(pedido.items) : pedido.items
+    items = typeof pedido.items === 'string' ? JSON.parse(pedido.items) : (pedido.items || [])
   } catch(e) {}
+
+  const hora = new Date(pedido.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+  const driverLabel = (() => {
+    if (pedido.estado_cocina === 'pendiente') return null
+    const map: Record<string, string> = {
+      buscando_repartidor: '🔍 Buscando',
+      asignado:            '🛵 En camino',
+      en_camino:           '📦 Al cliente',
+      entregado:           '✓ Entregado',
+      cancelado:           '✕ Cancelado',
+    }
+    return map[pedido.estado] ?? null
+  })()
 
   return (
     <motion.div
       id={`pedido-${pedido.id}`}
-      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.96 }}
       layout
-      className={`bg-white rounded-2xl p-4 shadow-sm border transition-all duration-500 ${isHighlighted ? 'border-orange-500 shadow-orange-500/20 shadow-lg scale-[1.02]' : 'border-slate-100'}`}
+      className={`bg-white rounded-lg border shadow-sm overflow-hidden transition-all duration-200 ${
+        isHighlighted
+          ? 'border-orange-400 ring-2 ring-orange-300/40'
+          : 'border-slate-200'
+      }`}
     >
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <div className="flex flex-col items-start gap-1">
-            <span className="text-xs font-bold text-slate-400 tracking-wider">#{pedido?.wb_message_id || pedido?.id?.replace(/-/g, '').slice(-5).toUpperCase() || 'N/A'}</span>
-            {pedido.restaurantes?.nombre && (
-              <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full inline-block mb-1">
-                📍 {pedido.restaurantes.nombre}
-              </span>
-            )}
-          </div>
-          <h5 className="font-bold text-slate-800 mt-1">{pedido.cliente_nombre || 'Cliente Web'}</h5>
-        </div>
-        <span className="text-sm font-bold text-[#FF7A6A]">${pedido.total}</span>
+      {/* ── Header: folio + hora + total ── */}
+      <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1">
+        <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+          #{pedido?.wb_message_id || pedido?.id?.replace(/-/g,'').slice(-5).toUpperCase() || '—'}
+        </span>
+        <span className="text-[10px] text-slate-300 shrink-0">{hora}</span>
+        {pedido.restaurantes?.nombre && (
+          <span className="text-[9px] font-semibold text-indigo-500 truncate min-w-0">· {pedido.restaurantes.nombre}</span>
+        )}
+        <span className="ml-auto text-sm font-black text-emerald-600 shrink-0">${pedido.total}</span>
       </div>
 
-      {pedido.descripcion && (
-        <div className="mb-3 flex items-start gap-2 bg-amber-50 p-2 rounded-lg text-xs text-amber-800 border border-amber-100">
-          <AlertCircle size={14} className="mt-0.5 shrink-0" />
-          <p className="leading-tight">{pedido.descripcion}</p>
-        </div>
-      )}
-
-      {/* Control de estado del Repartidor (Flujo UberEats/Rappi) */}
-      {pedido.estado_cocina !== 'pendiente' && (
-        <div className="mb-3 flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Repartidor</span>
-          {pedido.estado === 'buscando_repartidor' && <span className="text-xs font-bold text-purple-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span> Buscando...</span>}
-          {pedido.estado === 'asignado' && <span className="text-xs font-bold text-blue-600">Asignado (En camino al local)</span>}
-          {pedido.estado === 'en_camino' && <span className="text-xs font-bold text-emerald-600">En camino al cliente</span>}
-          {pedido.estado === 'entregado' && <span className="text-xs font-bold text-emerald-600">Entregado</span>}
-          {pedido.estado === 'cancelado' && <span className="text-xs font-bold text-red-600">Cancelado</span>}
-          {['pendiente', null].includes(pedido.estado) && <span className="text-xs font-medium text-slate-400">En espera</span>}
-        </div>
-      )}
-
-      {/* Lista de productos detallada */}
-      <div className="space-y-3 mb-5">
-        {items?.map((item: any, idx: number) => (
-          <div key={idx} className="flex flex-col text-sm bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex justify-between items-start">
-              <span className="text-slate-900 font-black text-[15px] leading-tight">
-                <span className="text-white bg-[#FF7A6A] px-1.5 py-0.5 rounded-md text-[13px] mr-2 shadow-sm">{item.cantidad}x</span> 
-                {item.nombre}
-              </span>
-            </div>
-            
-            {/* Opciones seleccionadas estilo Tags/Badges */}
-            {item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {item.opcionesSeleccionadas.map((opc: any, oIdx: number) => (
-                  <div key={oIdx} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 shadow-[0_2px_4px_rgba(0,0,0,0.02)]">
-                    <span className="text-slate-400 uppercase tracking-wider text-[9px]">{opc.grupo}:</span>
-                    <span className="text-slate-800">{opc.opcion}</span>
-                    {opc.precio_extra > 0 && <span className="text-emerald-600 ml-0.5">(+${opc.precio_extra})</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-        {(!items || items.length === 0) && (
-          <div className="text-sm text-slate-400 italic text-center py-2 bg-slate-50 rounded-lg">Ver notas del pedido.</div>
+      {/* ── Nombre cliente + estado repartidor ── */}
+      <div className="flex items-center justify-between gap-1 px-2.5 pb-1.5 border-b border-slate-100">
+        <p className="text-[13px] font-bold text-slate-800 truncate">{pedido.cliente_nombre || 'Cliente Web'}</p>
+        {driverLabel && (
+          <span className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded shrink-0">
+            {driverLabel}
+          </span>
         )}
       </div>
 
-      <button 
-        onClick={onAction}
-        className={`w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all shadow-sm ${actionColor}`}
-      >
-        {actionLabel}
-      </button>
+      {/* ── Nota / descripción (texto de WhatsApp) ── */}
+      {pedido.descripcion && (
+        <div className="mx-2.5 mt-1.5 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+          <p className="text-[13px] font-black text-slate-900 leading-snug whitespace-pre-wrap break-words">
+            {pedido.descripcion}
+          </p>
+        </div>
+      )}
+
+      {/* ── PIN DE RECOLECCIÓN ── */}
+      {pedido.pickup_pin && (
+        <div className="mx-2.5 mt-2 bg-orange-100 border-2 border-orange-400 border-dashed rounded-md px-2 py-1 flex items-center justify-between shadow-sm">
+          <span className="text-[10px] font-black text-orange-600">PIN RECOLECCIÓN</span>
+          <span className="text-base font-black text-orange-700 tracking-[0.2em]">{pedido.pickup_pin}</span>
+        </div>
+      )}
+
+      {/* ── Items del pedido ── */}
+      {items.length > 0 && (
+        <div className="px-2.5 pt-1.5 space-y-1">
+          {items.map((item: any, idx: number) => (
+            <div key={idx} className="bg-slate-50 border border-slate-100 rounded-md px-2 py-1">
+              <p className="text-[13px] font-black text-slate-900 leading-snug">
+                <span className="text-orange-500 mr-1">{item.cantidad}×</span>{item.nombre}
+              </p>
+              {item.opcionesSeleccionadas?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-0.5 ml-4">
+                  {item.opcionesSeleccionadas.map((opc: any, i: number) => (
+                    <span key={i} className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
+                      {opc.opcion}{opc.precio_extra > 0 ? ` +$${opc.precio_extra}` : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Botón acción ── */}
+      <div className="px-2.5 pt-2 pb-2.5">
+        <ActionButton
+          onClick={onAction}
+          className={`w-full py-1.5 rounded-md font-bold text-xs text-white ${actionColor}`}
+          loadingText="Espere..."
+        >
+          {actionLabel}
+        </ActionButton>
+      </div>
     </motion.div>
   )
 }
 
-function EmptyState({ text }: { text: string }) {
+/* ─── Estado vacío ───────────────────────────────────────── */
+function EmptyCol() {
   return (
-    <div className="flex flex-col items-center justify-center h-32 text-center px-4">
-      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-2">
-        <Store size={20} className="text-slate-300" />
-      </div>
-      <p className="text-sm font-medium text-slate-400">{text}</p>
+    <div className="flex flex-col items-center justify-center py-8 opacity-40">
+      <Store size={20} className="text-slate-400 mb-1" />
+      <p className="text-[10px] font-medium text-slate-400">Vacío</p>
     </div>
   )
 }

@@ -61,7 +61,19 @@ export const useCartStore = create<CartStore>()(
 
       addToCart: (item) =>
         set((state) => {
-          const itemKey = item.cartItemId || item.id;
+          // Generamos un hash determinista si el item tiene opciones
+          let itemKey = item.cartItemId || item.id;
+          
+          if (!item.cartItemId) {
+             if (item.opcionesSeleccionadas && item.opcionesSeleccionadas.length > 0) {
+               itemKey = item.id + '_' + item.opcionesSeleccionadas.map(o => o.opcion).sort().join('_');
+             } else {
+               itemKey = item.id;
+             }
+             // Clone the item to avoid mutating the original reference
+             item = { ...item, cartItemId: itemKey };
+          }
+
           const existing = state.carrito.find((p) => (p.item.cartItemId || p.item.id) === itemKey);
           if (existing) {
             return {
