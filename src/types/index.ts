@@ -17,5 +17,5 @@ export type CartItem = {
   aplica_subsidio?: boolean;
 };
 
-export type CheckoutStep = 1 | 2 | 3 | 4;
+export type CheckoutStep = number;
 export type DeliveryType = 'domicilio' | 'tienda' | null;
