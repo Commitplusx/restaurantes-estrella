@@ -955,6 +955,10 @@ export function PublicMenuView() {
   }
 
   useEffect(() => {
+    // Si ya hay un tab seleccionado y es válido, no lo sobreescribimos (salvo que ya no exista)
+    if (activeTab && activeTab !== 'menu' && activeTab !== 'promos' && activeTab !== 'combos') {
+      if (categorias.some(c => c.id === activeTab)) return;
+    }
     const urlTab = new URLSearchParams(location.search).get('tab')
     if (urlTab && urlTab !== 'menu') {
       setActiveTab(urlTab)
@@ -964,7 +968,7 @@ export function PublicMenuView() {
       else if (validCategories.length > 0) setActiveTab(validCategories[0].id)
       else if (combos.length > 0) setActiveTab('combos')
     }
-  }, [location.search])
+  }, [location.search, categorias, items, promos, combos])
 
   // Fix Map interaction to be like Rappi/Uber (fixed center pin)
   const handleMapDragEnd = () => {
