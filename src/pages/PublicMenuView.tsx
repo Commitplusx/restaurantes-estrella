@@ -373,7 +373,9 @@ export function PublicMenuView() {
     if (!carrito.length || !items.length) return [];
     
     const inCartIds = carrito.map(p => p.item.id);
-    const cartNames = carrito.map(p => p.item.nombre.toLowerCase());
+
+    const cartNames = carrito.map(p => p.item?.nombre?.toLowerCase() || '');
+    
     
     const hasDrink = cartNames.some(n => n.includes('coca') || n.includes('agua') || n.includes('refresco') || n.includes('jugo') || n.includes('bebida') || n.includes('limonada') || n.includes('fresa') || n.includes('frappe') || n.includes('horchata'));
     const hasDessert = cartNames.some(n => n.includes('postre') || n.includes('pastel') || n.includes('helado') || n.includes('crepa') || n.includes('flan') || n.includes('churro'));
