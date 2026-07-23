@@ -2745,7 +2745,7 @@ export function PublicMenuView() {
               grupos.forEach((g: any) => {
                 g.opciones.forEach((o: any) => {
                   if (selectedOptionsState[g.titulo]?.[o.nombre]) {
-                    precioExtra += o.precio_extra;
+                    precioExtra += (o.precio_extra || 0);
                     opcionesSel.push({ 
                       grupo_id: g.id || '', 
                       grupo: g.titulo, 
@@ -2775,11 +2775,11 @@ export function PublicMenuView() {
           };
 
           // Precio total acumulado hasta el paso actual
-          const precioActual = selectedItemForOptions.precio + grupos.reduce((sum: number, g: any) => {
-            return sum + g.opciones.reduce((s2: number, o: any) => {
-              return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? o.precio_extra : 0);
-            }, 0);
-          }, 0);
+           const precioActual = (selectedItemForOptions?.precio || 0) + grupos.reduce((sum: number, g: any) => {
+          return sum + g.opciones.reduce((s2: number, o: any) => {
+         return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? (o.precio_extra || 0) : 0);
+         }, 0);
+         }, 0); 
 
           return (
             <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
