@@ -2760,8 +2760,8 @@ export function PublicMenuView() {
               const itemToAdd: CartItem = {
                 id: selectedItemForOptions.id,
                 cartItemId: hashId,
-                nombre: selectedItemForOptions.nombre || selectedItemForOptions.titulo || 'Promoción',
-                precio: (selectedItemForOptions.precio || selectedItemForOptions.precio_especial || 0) + precioExtra,
+                nombre: selectedItemForOptions.nombre || 'Promoción',
+                precio: (selectedItemForOptions.precio || 0) + precioExtra,
                 tipo: selectedItemForOptions.__tipo,
                 opcionesSeleccionadas: opcionesSel,
                 aplica_subsidio: selectedItemForOptions.aplica_subsidio
@@ -2770,7 +2770,7 @@ export function PublicMenuView() {
               setSelectedItemForOptions(null);
               showToast(
   'Agregado', // 1. Título de la notificación
-  `${selectedItemForOptions?.nombre || selectedItemForOptions?.titulo || 'Promoción'} añadido al carrito` // 2. Mensaje descriptivo
+  `${selectedItemForOptions?.nombre || 'Promoción'} añadido al carrito` // 2. Mensaje descriptivo
 );
             } else {
               setOptionsStep(s => s + 1);
@@ -2778,7 +2778,7 @@ export function PublicMenuView() {
           };
 
           // Precio total acumulado hasta el paso actual
-           const precioActual = (selectedItemForOptions?.precio || selectedItemForOptions.precio_especial || 0) + grupos.reduce((sum: number, g: any) => {
+           const precioActual = (selectedItemForOptions?.precio || 0) + grupos.reduce((sum: number, g: any) => {
           return sum + g.opciones.reduce((s2: number, o: any) => {
          return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? (o.precio_extra || 0) : 0);
          }, 0);
