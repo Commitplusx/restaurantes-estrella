@@ -495,7 +495,7 @@ export function PublicMenuView() {
   }, [carrito, metodoPago, tipoEntrega, descuento, clienteNombre, clienteTel, direccionEntrega, ubicacionGPS]);
 
   // Estado del modal de opciones de producto
-  type OptionableItem = (MenuItem | MenuCombo) & { __tipo: 'item' | 'combo' }
+  type OptionableItem = (MenuItem | MenuCombo | MenuPromocion) & { __tipo: 'item' | 'combo' | 'promo', nombre?: string, precio?: number }
   const [selectedItemForOptions, setSelectedItemForOptions] = useState<OptionableItem | null>(null)
   // Resetear el paso del wizard cuando cambia el item seleccionado
   useEffect(() => { setOptionsStep(0) }, [selectedItemForOptions])
@@ -1932,7 +1932,7 @@ export function PublicMenuView() {
                       <div
                         className="bg-white p-4 rounded-[16px] border border-slate-100 shadow-sm cursor-pointer hover:border-orange-200 transition-colors flex gap-4 items-stretch relative overflow-hidden group"
                         onClick={() => {
-                          setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' });
+                          setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
                         }}
                       >
                           <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-[12px] z-10 shadow-sm">
@@ -1958,7 +1958,7 @@ export function PublicMenuView() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedItemDetail({ ...promo, cartItemTipo: 'promo' });
+                                setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
                               }}
                               className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
                             >
