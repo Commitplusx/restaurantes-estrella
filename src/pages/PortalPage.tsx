@@ -107,22 +107,32 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
     if (!restaurante) return;
     
     const channel = supabase.channel(`global:pedidos:${restaurante.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` }, (payload) => {
         
-        // 1. Reproducir timbre con Web Audio API (instantáneo, sin descarga externa)
-        tocarTimbre()
-        
-        // 2. Notificación Push nativa
-        if ('Notification' in window && Notification.permission === 'granted') {
-           const notif = new Notification('¡Nuevo Pedido Recibido! 🚨', {
-             body: `Un cliente acaba de realizar un pedido. Revisa tu Monitor de Cocina.`,
-             icon: '/favicon.ico',
-           })
-           notif.onclick = () => {
-             window.focus();
-             setActiveTab('pedidos');
-             notif.close();
-           }
+        let shouldRing = false;
+
+        if (payload.eventType === 'INSERT' && payload.new.estado !== 'pendiente_pago') {
+          shouldRing = true;
+        } else if (payload.eventType === 'UPDATE' && payload.old.estado === 'pendiente_pago' && payload.new.estado === 'pendiente') {
+          shouldRing = true;
+        }
+
+        if (shouldRing) {
+          // 1. Reproducir timbre con Web Audio API (instantáneo, sin descarga externa)
+          tocarTimbre()
+          
+          // 2. Notificación Push nativa
+          if ('Notification' in window && Notification.permission === 'granted') {
+             const notif = new Notification('¡Nuevo Pedido Recibido! 🚨', {
+               body: `Un cliente acaba de realizar un pedido. Revisa tu Monitor de Cocina.`,
+               icon: '/favicon.ico',
+             })
+             notif.onclick = () => {
+               window.focus();
+               setActiveTab('pedidos');
+               notif.close();
+             }
+          }
         }
       })
       .subscribe()

@@ -103,11 +103,20 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
         { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=in.(${linkedIds.join(',')})` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            if (payload.new.estado === 'pendiente_pago') return;
             setPedidos((prev) => [payload.new, ...prev])
           } else if (payload.eventType === 'UPDATE') {
-            setPedidos((prev) =>
-              prev.map((p) => (p.id === payload.new.id ? payload.new : p))
-            )
+            setPedidos((prev) => {
+              if (payload.new.estado === 'pendiente_pago') {
+                return prev.filter(p => p.id !== payload.new.id);
+              }
+              const exists = prev.find(p => p.id === payload.new.id);
+              if (exists) {
+                return prev.map((p) => (p.id === payload.new.id ? payload.new : p));
+              } else {
+                return [payload.new, ...prev];
+              }
+            });
           } else if (payload.eventType === 'DELETE') {
             setPedidos((prev) => prev.filter((p) => p.id !== payload.old.id))
           }
@@ -154,6 +163,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
       .in('restaurante_id', ids)
       // Solo mostramos pedidos activos en base al estado de la cocina
       .in('estado_cocina', ['pendiente', 'en_cocina', 'listo_para_recoger'])
+      .neq('estado', 'pendiente_pago')
       .order('created_at', { ascending: false })
 
     if (data) setPedidos(data)
@@ -317,7 +327,15 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     try {
       // Actualización optimista del UI
       setPedidos((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, estado_cocina: nuevoEstado } : p))
+        prev.map((p) => (
+          p.id === id 
+            ? { 
+                ...p, 
+                estado_cocina: nuevoEstado, 
+                ...(nuevoEstado === 'en_cocina' ? { estado: 'buscando_repartidor' } : {}) 
+              } 
+            : p
+        ))
       )
       
       const updateData: any = { estado_cocina: nuevoEstado }
@@ -337,20 +355,9 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
         throw error
       }
       console.log(`[updateEstado] EXITO SUPABASE:`, data)
-      
-      if (nuevoEstado === 'en_cocina') {
-        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/asignar-repartidor';
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        console.log(`[updateEstado] Disparando Edge Function a: ${edgeUrl}`)
-        fetch(edgeUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ record: { id: id } })
-        }).catch(e => console.error('Error disparando asignar-repartidor:', e));
-      }
 
       // NOTA: Si cambia de estado en cocina, el Webhook de BD ahora detectará
-      // el UPDATE y disparará automáticamente 'notificar-whatsapp' al cliente.
+      // el UPDATE y disparará automáticamente 'notificar-whatsapp' y 'asignar-repartidor'.
       setPedidoToPrepare(null)
     } catch (e) {
       console.error('Error actualizando estado, revirtiendo:', e)

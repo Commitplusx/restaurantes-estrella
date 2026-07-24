@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
 import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal, Package, ChefHat, Truck } from 'lucide-react'
@@ -43,6 +43,18 @@ const EMOJI_MAP: Record<string, string> = {
   'Comida Corrida': '🍲'
 }
 
+function RestaurantCardSkeleton({ horizontal = false }: { horizontal?: boolean }) {
+  return (
+    <div className={`flex flex-col group relative bg-white sm:bg-transparent rounded-2xl sm:rounded-none shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none p-3 sm:p-0 gap-2 sm:gap-0 animate-pulse`}>
+      <div className={`relative mx-auto shrink-0 aspect-square rounded-full overflow-hidden bg-slate-200 sm:mb-3 shadow-sm border border-slate-100 ${horizontal ? 'w-[100px]' : 'w-[90px] sm:w-[160px] md:w-[180px]'}`}></div>
+      <div className={`flex flex-col items-center sm:items-center gap-2 sm:px-1 flex-1 w-full ${horizontal ? 'mt-1' : 'mt-2 sm:mt-0'}`}>
+        <div className="w-3/4 h-3 sm:h-4 bg-slate-200 rounded-full"></div>
+        <div className="w-1/2 h-2 sm:h-3 bg-slate-200 rounded-full"></div>
+      </div>
+    </div>
+  )
+}
+
 function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calculaDistancia, horizontal = false }: any) {
   const isAbierto = estaAbierto(res);
   let distanceStr = '';
@@ -74,12 +86,19 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
             <div className="w-full h-full flex items-center justify-center bg-orange-50"><Store size={24} className="text-orange-200 sm:w-10 sm:h-10" /></div>
           )}
           
-          <button 
-            onClick={(e) => toggleFav(e, res.id)}
-            className="absolute top-2 right-2 md:top-3 md:right-3 w-8 h-8 bg-white/90 backdrop-blur-md rounded-full shadow-md flex items-center justify-center z-30 transition-transform active:scale-90 hover:scale-110"
+          <motion.button 
+            onClick={(e: any) => toggleFav(e, res.id)}
+            whileTap={{ scale: 0.8 }}
+            className="absolute top-2 right-2 md:top-3 md:right-3 w-8 h-8 bg-white/90 backdrop-blur-md rounded-full shadow-md flex items-center justify-center z-30 transition-colors hover:bg-white"
           >
-            <Heart size={16} className={`${isFav ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-          </button>
+            <motion.div
+              initial={false}
+              animate={{ scale: isFav ? [1, 1.3, 1] : 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Heart size={16} className={`${isFav ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+            </motion.div>
+          </motion.button>
 
           {/* Badge de Tiempo */}
           {isAbierto && (
@@ -134,7 +153,10 @@ export function PublicLandingPage() {
   const [hasMore, setHasMore] = useState(true)
   const [activeTab, setActiveTab] = useState<'todos' | 'cerca'>('todos')
   const [isScrolled, setIsScrolled] = useState(false)
+  const [showHeader, setShowHeader] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
+  const observerTarget = useRef(null)
   
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(() => {
     const saved = sessionStorage.getItem('est_ubicacion')
@@ -206,10 +228,43 @@ export function PublicLandingPage() {
   const PAGE_SIZE = 8
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10)
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setIsScrolled(currentScrollY > 10);
+      
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // Scrolling down
+        setShowHeader(false);
+      } else if (currentScrollY < lastScrollY) {
+        // Scrolling up
+        setShowHeader(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [lastScrollY])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [observerTarget, hasMore, loading, loadingMore, page]);
 
   useEffect(() => {
     async function loadCats() {
@@ -551,7 +606,7 @@ export function PublicLandingPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-orange-100">
 
       {/* Header Pegajoso Premium (Estilo Delivery App) */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'bg-slate-50'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'bg-slate-50'} ${!showHeader ? '-translate-y-full' : 'translate-y-0'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2`}>
         <div className="max-w-[1400px] mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
            
            {/* Top Row (Address + Action) */}
@@ -840,13 +895,7 @@ export function PublicLandingPage() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 mt-4 md:mt-6">
             {[1,2,3,4,5,6,7,8,9,10].map(i => (
-              <div key={i} className="flex flex-col gap-3 sm:gap-0 animate-pulse bg-white sm:bg-transparent p-3 sm:p-0 rounded-2xl sm:rounded-none border border-slate-100 sm:border-none">
-                <div className="w-[90px] sm:w-[160px] md:w-[180px] shrink-0 aspect-square mx-auto bg-slate-200 rounded-full sm:mb-3" />
-                <div className="flex flex-col justify-center w-full items-center">
-                  <div className="w-3/4 h-4 bg-slate-200 rounded-full mb-2" />
-                  <div className="w-1/2 h-3 bg-slate-200 rounded-full" />
-                </div>
-              </div>
+              <RestaurantCardSkeleton key={i} />
             ))}
           </div>
         ) : displayRestaurants.length === 0 ? (
@@ -920,16 +969,15 @@ export function PublicLandingPage() {
           </div>
         )}
 
-        {/* Cargar más */}
+        {/* Cargar más e Infinite Scroll */}
         {hasMore && !loading && displayRestaurants.length > 0 && (
-          <div className="flex justify-center mt-4 pb-20">
-            <button 
-              onClick={handleLoadMore}
-              disabled={loadingMore}
-              className="px-8 py-3.5 bg-slate-100 text-slate-800 rounded-full font-bold hover:bg-slate-200 transition-all disabled:opacity-50 text-[15px]"
-            >
-              {loadingMore ? 'Cargando más...' : 'Ver más comercios'}
-            </button>
+          <div className="flex justify-center mt-8 pb-20" ref={observerTarget}>
+            {loadingMore ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 size={24} className="animate-spin text-orange-500" />
+                <span className="text-sm font-bold text-slate-500">Cargando más deliciosas opciones...</span>
+              </div>
+            ) : null}
           </div>
         )}
       </main>

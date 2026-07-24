@@ -169,9 +169,21 @@ export default function CartPage() {
     }
   };
 
-  // useEffect para est_carrito eliminado: ahora es manejado por Zustand
-
-  // useEffect para est_carrito eliminado: ahora es manejado por Zustand
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'pago_cancelado') {
+      setTimeout(() => showToast('Pago Cancelado', 'No pudimos completar tu pago. Por favor intenta de nuevo.', 'error'), 500);
+      searchParams.delete('error');
+      const newUrl = window.location.pathname + (searchParams.toString() ? '?' + searchParams.toString() : '');
+      window.history.replaceState({}, '', newUrl);
+    } else if (errorParam === 'pago_pendiente') {
+      setTimeout(() => showToast('Pago Pendiente', 'Tu pago está en revisión.', 'loading'), 500);
+      searchParams.delete('error');
+      const newUrl = window.location.pathname + (searchParams.toString() ? '?' + searchParams.toString() : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   useEffect(() => {
     if (ubicacionGPS) sessionStorage.setItem('est_ubicacion', JSON.stringify(ubicacionGPS));
@@ -776,7 +788,8 @@ export default function CartPage() {
             costo_envio: costoEnvioFinal,
             descuento: descuentoTotal,
             total: total,
-            originUrl: window.location.origin
+            originUrl: window.location.origin,
+            returnUrl: window.location.href
           })
         });
         
@@ -912,7 +925,7 @@ export default function CartPage() {
   const isStepValid = () => {
     if (checkoutStep === 1) return true;
     if (checkoutStep === 2) return clienteTel.replace(/\D/g, '').length === 10 && clienteNombre.trim().length > 0;
-    if (checkoutStep === 3) return tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && ubicacionGPS && !fueraDeCobertura);
+    if (checkoutStep === 3) return tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && ubicacionGPS && !fueraDeCobertura && !calculandoEnvio);
     if (checkoutStep === 4) return metodoPago !== null;
     if (checkoutStep === 5) return true;
     return false;
@@ -1211,7 +1224,7 @@ export default function CartPage() {
                             <div className="flex items-center gap-2">
                               <MapPin size={22} className="text-[#FA4A0C] shrink-0" />
                               <span className="font-black text-slate-800 text-[15px] whitespace-nowrap">Entregar en</span>
-                              {costoEnvio === 0 && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ml-1"><Star size={10} className="fill-green-700"/> ¡GRATIS!</span>}
+                              {!calculandoEnvio && costoEnvio === 0 && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ml-1"><Star size={10} className="fill-green-700"/> ¡GRATIS!</span>}
                             </div>
                             <button onClick={() => setIsMapModalOpen(true)} className="text-[#FA4A0C] text-[13px] font-bold hover:underline transition-colors shrink-0">Cambiar</button>
                           </div>
@@ -1219,7 +1232,9 @@ export default function CartPage() {
                           <p className="text-[14px] text-slate-600 mb-4 leading-relaxed pl-7">{direccionEntrega}</p>
                           
                           <div className="mt-2 pl-7 relative">
-                            {costoEnvio === 0 ? (
+                            {calculandoEnvio ? (
+                              <label className="text-[13px] font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Calculando envío...</label>
+                            ) : costoEnvio === 0 ? (
                               <label className="text-[13px] font-bold text-[#FA4A0C] mb-2 flex items-center gap-1.5"><Gift size={16} /> ¡Envío GRATIS! Ayúdanos con una referencia.</label>
                             ) : (
                               <label className="text-[13px] font-bold text-slate-500 mb-2 block">Referencia para encontrar tu casa (Opcional)</label>
