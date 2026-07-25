@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   Truck,
   LocateFixed,
-  Tag,
   ChevronDown,
   ShieldCheck,
   Sparkles,

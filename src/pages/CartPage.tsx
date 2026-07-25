@@ -5,7 +5,7 @@ import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, Plus, Minus, X, CheckCircle2, AlertCircle, 
-  Loader2, MapPin, LocateFixed, Store, Ticket, Star, ShieldCheck,
+  Loader2, MapPin, LocateFixed, Ticket, Star, ShieldCheck,
   ShoppingBag, ArrowRight, Info, Gift, Utensils
 } from 'lucide-react';
 import { useLoadScript, GoogleMap } from '@react-google-maps/api';
