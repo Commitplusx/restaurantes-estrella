@@ -322,7 +322,8 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   const updateEstado = async (id: string, nuevoEstado: string, tiempoMinutos?: number) => {
     console.log(`[updateEstado] INICIANDO - ID: ${id} | Nuevo: ${nuevoEstado} | Tiempo: ${tiempoMinutos}`)
     // Guardar estado previo para rollback
-    const estadoPrevio = pedidos.find(p => p.id === id)?.estado_cocina
+    const pedidoActual = pedidos.find(p => p.id === id);
+    const estadoPrevio = pedidoActual?.estado_cocina
     console.log(`[updateEstado] Estado previo guardado: ${estadoPrevio}`)
     try {
       // Actualización optimista del UI

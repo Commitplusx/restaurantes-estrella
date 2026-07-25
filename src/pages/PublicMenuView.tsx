@@ -1641,7 +1641,22 @@ export function PublicMenuView() {
           <div className="flex flex-wrap justify-center sm:justify-start gap-4 text-sm mt-1">
             <div className="flex items-center gap-1.5 text-slate-600">
               <Clock size={16} className="text-slate-400" /> 
-              <span>{restaurante.hora_apertura?.slice(0, 5)} - {restaurante.hora_cierre?.slice(0, 5)}</span>
+              <span>
+                {(() => {
+                  let abre = restaurante.hora_apertura?.slice(0, 5) || '';
+                  let cierra = restaurante.hora_cierre?.slice(0, 5) || '';
+                  if (restaurante.horarios) {
+                    const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+                    const diaString = dias[new Date().getDay()];
+                    const horarioHoy = (restaurante.horarios as any)[diaString];
+                    if (horarioHoy && horarioHoy.activo) {
+                      abre = horarioHoy.abre;
+                      cierra = horarioHoy.cierra;
+                    }
+                  }
+                  return `${abre} - ${cierra}`;
+                })()}
+              </span>
             </div>
             
             <a 
@@ -1802,41 +1817,53 @@ export function PublicMenuView() {
                                 <div className="mt-auto flex items-center justify-between">
                                   <span className="text-slate-900 font-bold text-[15px]">${item.precio.toFixed(2)}</span>
                                   
-                                  {item.agotado_hoy ? (
-                                    <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">Agotado</span>
-                                  ) : fueraDeHorario ? (
-                                    <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">{item.hora_inicio_disponible}</span>
-                                  ) : null}
+                                  <div className="flex items-center gap-2">
+                                    {item.agotado_hoy ? (
+                                      <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">Agotado</span>
+                                    ) : fueraDeHorario ? (
+                                      <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">{item.hora_inicio_disponible}</span>
+                                    ) : null}
+
+                                    {!item.foto_url && (!item.agotado_hoy && !fueraDeHorario) && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          if (item.opciones && item.opciones.length > 0) {
+                                            setSelectedItemForOptions({ ...item, __tipo: 'item' })
+                                            setSelectedOptionsState({})
+                                          } else {
+                                            addToCart({ ...cartItem, cartItemId: item.id })
+                                          }
+                                        }}
+                                        className="w-8 h-8 bg-orange-50 text-[#FA4A0C] rounded-full shadow-sm flex items-center justify-center hover:scale-105 transition-transform z-30"
+                                      >
+                                        <Plus size={16} strokeWidth={3} />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="w-[100px] h-[100px] rounded-[12px] overflow-hidden bg-slate-50 shrink-0 relative flex items-center justify-center border border-slate-100">
-                                {item.foto_url ? (
+                              {item.foto_url && (
+                                <div className="w-[100px] h-[100px] rounded-[12px] overflow-hidden bg-slate-50 shrink-0 relative flex items-center justify-center border border-slate-100">
                                   <LazyImage src={item.foto_url} alt={item.nombre} className="w-full h-full" />
-                                ) : (
-                                  <div className="w-full h-full flex flex-col items-center justify-center pb-4 pr-3 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-300">
-                                    <div className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center mb-1">
-                                      <span className="text-xs opacity-50">🍽️</span>
-                                    </div>
-                                    <span className="text-[9px] font-medium text-slate-400 text-center px-1 leading-tight">¡Pruébalo!</span>
-                                  </div>
-                                )}
-                                {(!item.agotado_hoy && !fueraDeHorario) && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (item.opciones && item.opciones.length > 0) {
-                                        setSelectedItemForOptions({ ...item, __tipo: 'item' })
-                                        setSelectedOptionsState({})
-                                      } else {
-                                        addToCart({ ...cartItem, cartItemId: item.id })
-                                      }
-                                    }}
-                                    className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
-                                  >
-                                    <Plus size={16} strokeWidth={3} />
-                                  </button>
-                                )}
-                              </div>
+                                  {(!item.agotado_hoy && !fueraDeHorario) && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (item.opciones && item.opciones.length > 0) {
+                                          setSelectedItemForOptions({ ...item, __tipo: 'item' })
+                                          setSelectedOptionsState({})
+                                        } else {
+                                          addToCart({ ...cartItem, cartItemId: item.id })
+                                        }
+                                      }}
+                                      className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
+                                    >
+                                      <Plus size={16} strokeWidth={3} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )
                         })}
@@ -1887,30 +1914,44 @@ export function PublicMenuView() {
                             </div>
                             <div className="mt-auto flex items-center justify-between">
                               <span className="text-slate-900 font-bold text-[15px]">${combo.precio.toFixed(2)}</span>
+                              {!combo.foto_url && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (combo.opciones && combo.opciones.length > 0) {
+                                      setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
+                                      setSelectedOptionsState({});
+                                    } else {
+                                      addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
+                                    }
+                                  }}
+                                  className="w-8 h-8 bg-orange-50 text-[#FA4A0C] rounded-full shadow-sm flex items-center justify-center hover:scale-105 transition-transform z-30"
+                                >
+                                  <Plus size={16} strokeWidth={3} />
+                                </button>
+                              )}
                             </div>
                           </div>
 
-                          <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-blue-50 flex items-center justify-center">
-                            {combo.foto_url ? (
+                          {combo.foto_url && (
+                            <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-blue-50 flex items-center justify-center">
                               <LazyImage blurBackground={true} src={combo.foto_url} alt={combo.nombre} className="w-full h-full" imgClassName="object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-                            ) : (
-                              <Tag size={32} className="text-blue-400" />
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (combo.opciones && combo.opciones.length > 0) {
-                                  setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
-                                  setSelectedOptionsState({});
-                                } else {
-                                  addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
-                                }
-                              }}
-                              className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
-                            >
-                              <Plus size={16} strokeWidth={3} />
-                            </button>
-                          </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (combo.opciones && combo.opciones.length > 0) {
+                                    setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
+                                    setSelectedOptionsState({});
+                                  } else {
+                                    addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
+                                  }
+                                }}
+                                className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
+                              >
+                                <Plus size={16} strokeWidth={3} />
+                              </button>
+                            </div>
+                          )}
                       </div>
                     </motion.div>
                   )
@@ -1946,25 +1987,34 @@ export function PublicMenuView() {
                             )}
                             <div className="mt-auto flex items-center justify-between">
                               <span className="text-[#FA4A0C] font-bold text-[15px]">${promo.precio_especial?.toFixed(2)}</span>
+                              {!promo.foto_url && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
+                                  }}
+                                  className="w-8 h-8 bg-orange-50 text-[#FA4A0C] rounded-full shadow-sm flex items-center justify-center hover:scale-105 transition-transform z-30"
+                                >
+                                  <Plus size={16} strokeWidth={3} />
+                                </button>
+                              )}
                             </div>
                           </div>
 
-                          <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-orange-50 flex items-center justify-center">
-                            {promo.foto_url ? (
+                          {promo.foto_url && (
+                            <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-orange-50 flex items-center justify-center">
                               <LazyImage blurBackground={true} src={promo.foto_url} alt={promo.titulo} className="w-full h-full" imgClassName="object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-                            ) : (
-                              <Ticket size={32} className="text-orange-400" />
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
-                              }}
-                              className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
-                            >
-                              <Plus size={16} strokeWidth={3} />
-                            </button>
-                          </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
+                                }}
+                                className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
+                              >
+                                <Plus size={16} strokeWidth={3} />
+                              </button>
+                            </div>
+                          )}
                       </div>
                     </motion.div>
                   )

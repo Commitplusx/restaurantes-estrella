@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, Plus, Minus, X, CheckCircle2, AlertCircle, 
   Loader2, MapPin, LocateFixed, Store, Ticket, Star, ShieldCheck,
-  ShoppingBag, ArrowRight, Info, Gift
+  ShoppingBag, ArrowRight, Info, Gift, Utensils
 } from 'lucide-react';
 import { useLoadScript, GoogleMap } from '@react-google-maps/api';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
@@ -54,7 +54,7 @@ const PREMIUM_MAP_STYLE = [
 
 const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string, className?: string }) => {
   const [loaded, setLoaded] = useState(false);
-  if (!src) return <div className={`bg-slate-100 flex items-center justify-center ${className || ''}`}><Store size={24} className="text-slate-300"/></div>;
+  if (!src) return <div className={`w-full h-full bg-slate-50/80 flex items-center justify-center ${className || ''}`}><Utensils size={28} className="text-slate-300"/></div>;
   return (
     <div className={`relative overflow-hidden bg-slate-100 ${className || ''}`}>
       {!loaded && <div className="absolute inset-0 bg-slate-200 animate-pulse z-10" />}
@@ -986,107 +986,110 @@ export default function CartPage() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 w-full relative">
-        <div className="max-w-lg mx-auto pb-32">
+        <div className="max-w-lg md:max-w-2xl mx-auto pb-32">
           <AnimatePresence mode="wait">
           
           {/* PASO 1: RESUMEN DEL PEDIDO */}
           {checkoutStep === 1 && (
             <motion.div key="step1" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
               
-              <div className="px-2 space-y-4 divide-y divide-slate-100">
-                <div className="flex justify-between items-center pb-2">
+              <div className="px-2">
+                <div className="flex justify-between items-center pb-4 mb-2 border-b border-slate-100">
                   <h3 className="font-black text-lg">Tu Pedido</h3>
                   <span className="bg-orange-50 text-[#FA4A0C] font-bold text-xs px-3 py-1 rounded-full">{carrito.length} items</span>
                 </div>
-                {carrito.map((p, i) => (
-                  <div key={i} className="flex gap-4 pt-4 first:pt-0">
-                    <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-slate-50">
-                      <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between py-1">
-                      <div>
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-bold text-sm text-slate-800 leading-tight pr-2">{p.item.nombre}</h4>
-                          <span className="font-black text-sm">${(p.item.precio * p.cantidad).toFixed(2)}</span>
-                        </div>
-                        {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {p.item.opcionesSeleccionadas.map((o, idx) => (
-                              <span key={idx} className="bg-slate-50 border border-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-md font-medium">
-                                {o.opcion}
-                              </span>
-                            ))}
+                <div className="flex flex-col md:grid md:grid-cols-2 gap-4">
+                  {carrito.map((p, i) => (
+                    <div key={i} className="flex gap-4 p-4 border border-slate-100 rounded-2xl bg-white shadow-sm relative">
+                      <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-slate-50">
+                        <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between py-1">
+                        <div>
+                          <div className="flex justify-between items-start">
+                            <h4 className="font-bold text-sm text-slate-800 leading-tight pr-2">{p.item.nombre}</h4>
+                            <span className="font-black text-sm">${(p.item.precio * p.cantidad).toFixed(2)}</span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-3 w-max bg-slate-50 border border-slate-100 rounded-full px-2 py-1">
-                        <button onClick={() => removeFromCart(p.item.cartItemId)} className="p-1 hover:text-[#FA4A0C] transition-colors"><Minus size={14} strokeWidth={3}/></button>
-                        <span className="font-bold text-sm w-4 text-center">{p.cantidad}</span>
-                        <button onClick={() => addToCart(p.item)} className="p-1 hover:text-[#FA4A0C] transition-colors"><Plus size={14} strokeWidth={3}/></button>
+                          {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {p.item.opcionesSeleccionadas.map((o, idx) => (
+                                <span key={idx} className="bg-slate-50 border border-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-md font-medium">
+                                  {o.opcion}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-3 w-max bg-slate-50 border border-slate-100 rounded-full px-2 py-1">
+                          <button onClick={() => removeFromCart(p.item.cartItemId)} className="p-1 hover:text-[#FA4A0C] transition-colors"><Minus size={14} strokeWidth={3}/></button>
+                          <span className="font-bold text-sm w-4 text-center">{p.cantidad}</span>
+                          <button onClick={() => addToCart(p.item)} className="p-1 hover:text-[#FA4A0C] transition-colors"><Plus size={14} strokeWidth={3}/></button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              {/* BANNER ESTRELLA EATS */}
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mx-2 mt-4 bg-gradient-to-r from-orange-50 to-orange-100/50 border border-orange-100/80 rounded-2xl p-3.5 flex items-center gap-3.5 shadow-sm"
-              >
-                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 shadow-sm border border-orange-50">
-                  <span className="text-xl">🛵</span>
-                </div>
-                <div>
-                  <h4 className="font-black text-[#FA4A0C] text-[13px] leading-tight tracking-tight">Estrella Eats te lo lleva</h4>
-                  <p className="text-[11px] text-orange-900/60 font-medium leading-tight mt-0.5">Rápido y calientito hasta tu puerta</p>
-                </div>
-              </motion.div>
-
-
-              {/* WIDGET DE LEALTAD EN PASO 1 - si ya verificó tel en esta sesión */}
-              {didInitLoyalty && datosCliente && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
+              <div className="flex flex-col md:grid md:grid-cols-2 gap-4 mt-4 px-2">
+                {/* BANNER ESTRELLA EATS */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-3xl p-4 border flex items-center gap-3 ${
-                    datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6
-                      ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200'
-                      : 'bg-blue-50 border-blue-100'
-                  }`}
+                  className="bg-gradient-to-r from-orange-50 to-orange-100/50 border border-orange-100/80 rounded-2xl p-3.5 flex items-center gap-3.5 shadow-sm h-full"
                 >
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
-                    datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? 'bg-orange-100' : 'bg-blue-100'
-                  }`}>
-                    {datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? '🎁' : '⭐'}
+                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 shadow-sm border border-orange-50">
+                    <span className="text-xl">🛵</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    {datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? (
-                      <>
-                        <p className="text-xs font-black text-orange-900">Cliente Estrella {datosCliente.nombre ? `· ${datosCliente.nombre}` : ''}</p>
-                        <p className="text-[11px] text-orange-700 font-medium">Sigue al paso 3 para desbloquear tu envío gratis 🚀</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-xs font-black text-blue-900">Tu lealtad te premia</p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          {[...Array(6)].map((_, i) => (
-                            <div key={i} className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                              i < datosCliente.puntos
-                                ? 'bg-blue-500 border-blue-500'
-                                : 'bg-white border-blue-200'
-                            }`}>
-                              {i < datosCliente.puntos && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                            </div>
-                          ))}
-                          <span className="text-[10px] font-bold text-blue-600 ml-1">{datosCliente.puntos}/6</span>
-                        </div>
-                      </>
-                    )}
+                  <div>
+                    <h4 className="font-black text-[#FA4A0C] text-[13px] leading-tight tracking-tight">Estrella Eats te lo lleva</h4>
+                    <p className="text-[11px] text-orange-900/60 font-medium leading-tight mt-0.5">Rápido y calientito hasta tu puerta</p>
                   </div>
                 </motion.div>
-              )}
+
+                {/* WIDGET DE LEALTAD EN PASO 1 - si ya verificó tel en esta sesión */}
+                {didInitLoyalty && datosCliente && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`rounded-3xl p-4 border flex items-center gap-3 h-full ${
+                      datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6
+                        ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200'
+                        : 'bg-blue-50 border-blue-100'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
+                      datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? 'bg-orange-100' : 'bg-blue-100'
+                    }`}>
+                      {datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? '🎁' : '⭐'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? (
+                        <>
+                          <p className="text-xs font-black text-orange-900">Cliente Estrella {datosCliente.nombre && !/^\d+$/.test(datosCliente.nombre.replace(/\s+/g, '')) ? `· ${datosCliente.nombre}` : ''}</p>
+                          <p className="text-[11px] text-orange-700 font-medium">Sigue al paso 3 para desbloquear tu envío gratis 🚀</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs font-black text-blue-900">Tu lealtad te premia</p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {[...Array(6)].map((_, i) => (
+                              <div key={i} className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                i < datosCliente.puntos
+                                  ? 'bg-blue-500 border-blue-500'
+                                  : 'bg-white border-blue-200'
+                              }`}>
+                                {i < datosCliente.puntos && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                              </div>
+                            ))}
+                            <span className="text-[10px] font-bold text-blue-600 ml-1">{datosCliente.puntos}/6</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
 
               <div className="px-2 mt-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-bl-full pointer-events-none"></div>
@@ -1120,7 +1123,7 @@ export default function CartPage() {
                    </div>
                 </div>
                 
-                <div className="space-y-5">
+                <div className="space-y-5 md:grid md:grid-cols-2 md:gap-6 md:space-y-0 md:items-start">
                   <div>
                     <label className="block text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-2 pl-1">Tu Nombre Completo</label>
                     <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-slate-100/80 border-0 rounded-2xl px-5 py-4 text-[15px] outline-none focus:bg-orange-50 focus:ring-2 focus:ring-[#FA4A0C]/20 transition-all font-bold text-slate-800 shadow-inner" />
@@ -1204,7 +1207,7 @@ export default function CartPage() {
               <div className="px-2 mt-6">
                 {(!ubicacionGPS || tipoEntrega !== 'domicilio') && (
                   <>
-                    <h3 className="font-black text-xl mb-4">¿Cómo quieres recibirlo?</h3>
+                    <h3 className="font-black text-xl mb-4 md:text-center">¿Cómo quieres recibirlo?</h3>
                     <div className="flex gap-3">
                       <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-5 rounded-3xl border-0 font-bold flex flex-col items-center gap-2 transition-all shadow-inner ${tipoEntrega === 'domicilio' ? 'bg-[#FA4A0C]/10 text-[#FA4A0C] ring-2 ring-[#FA4A0C]/30' : 'bg-slate-100/80 text-slate-500 hover:bg-slate-100'}`}>
                         <span className="text-3xl mb-1">🛵</span> <span className="text-[15px]">A Domicilio</span>
@@ -1298,8 +1301,8 @@ export default function CartPage() {
           {checkoutStep === 4 && (
             <motion.div key="step4" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-5">
                <div className="px-2 mt-6">
-                <h3 className="font-black text-lg mb-4">¿Cómo vas a pagar?</h3>
-                 <div className="space-y-3">
+                <h3 className="font-black text-lg mb-4 md:text-center">¿Cómo vas a pagar?</h3>
+                 <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
                    <button onClick={() => setMetodoPago('efectivo')} className={`w-full py-5 px-5 rounded-2xl border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'efectivo' ? 'border-green-500 bg-green-50 shadow-sm' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
                      <span className="text-3xl bg-white rounded-full p-1 shadow-sm">💵</span>
                      <span className="flex-1 text-left text-[15px]">Efectivo al recibir</span>
@@ -1406,7 +1409,7 @@ export default function CartPage() {
         
         {/* BOTÓN DE NAVEGACIÓN FIJO (Ocupa poco espacio) */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 z-40 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-          <div className="max-w-lg mx-auto">
+          <div className="max-w-lg md:max-w-2xl mx-auto">
           {checkoutStep < 5 ? (
             <button 
               onClick={() => {
