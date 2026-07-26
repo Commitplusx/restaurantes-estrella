@@ -1,12 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import basicSsl from '@vitejs/plugin-basic-ssl'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    basicSsl(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -38,6 +36,29 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
+          }
+        ],
+        shortcuts: [
+          {
+            name: "Pedir Comida",
+            short_name: "Pedir",
+            description: "Pide de tus restaurantes favoritos",
+            url: "/",
+            icons: [{ src: "estrella-circle.png", sizes: "192x192" }]
+          }
+        ],
+        screenshots: [
+          {
+            src: "og-image.jpg",
+            sizes: "1280x640",
+            type: "image/jpeg",
+            form_factor: "wide"
+          },
+          {
+            src: "og-image.jpg",
+            sizes: "1280x640",
+            type: "image/jpeg",
+            form_factor: "narrow"
           }
         ]
       },

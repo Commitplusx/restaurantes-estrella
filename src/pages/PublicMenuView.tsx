@@ -834,8 +834,9 @@ export function PublicMenuView() {
         if (fetchedId) actualRestId = fetchedId
       }
 
-      // Creamos el canal de realtime
-      const realtimeChannel = supabase.channel(`public:menu_updates:${actualRestId}`)
+      // Creamos el canal de realtime (con un sufijo único para evitar errores de StrictMode o re-renders rápidos)
+      const channelId = `public:menu_updates:${actualRestId}_${Math.random().toString(36).substring(7)}`;
+      const realtimeChannel = supabase.channel(channelId)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `restaurante_id=eq.${actualRestId}` }, () => {
           fetchMenuData(true) // Silencioso
         })

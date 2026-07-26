@@ -9,6 +9,9 @@ export function InstallPWA() {
   const [lastScrollY, setLastScrollY] = useState(0);
 
   useEffect(() => {
+    // Si ya lo cerró antes, no lo volvemos a mostrar
+    if (localStorage.getItem('pwa_prompt_dismissed') === 'true') return;
+
     // Detectar si es iOS
     const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     // Detectar si ya está instalada (en modo standalone)
@@ -61,6 +64,7 @@ export function InstallPWA() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
+    localStorage.setItem('pwa_prompt_dismissed', 'true');
   };
 
   if (!showPrompt) return null;

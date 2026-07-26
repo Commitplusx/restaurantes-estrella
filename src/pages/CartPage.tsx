@@ -5,8 +5,8 @@ import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, Plus, Minus, X, CheckCircle2, AlertCircle, 
-  Loader2, MapPin, LocateFixed, Ticket, Star, ShieldCheck,
-  ShoppingBag, ArrowRight, Info, Gift, Utensils
+  Loader2, MapPin, LocateFixed, Star, ShieldCheck,
+  ShoppingBag, ArrowRight, Gift, Utensils
 } from 'lucide-react';
 import { useLoadScript, GoogleMap } from '@react-google-maps/api';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
@@ -68,6 +68,24 @@ const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string,
     </div>
   )
 }
+
+// Helper para scroll suave garantizado en todos los móviles (iOS Safari a veces ignora behavior: 'smooth')
+const smoothScroll = (element: HTMLElement | null, target: number, duration: number) => {
+  if (!element) return;
+  const start = element.scrollTop;
+  const change = target - start;
+  const startTime = performance.now();
+  
+  const easeInOutQuad = (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+  
+  const animateScroll = (currentTime: number) => {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    element.scrollTop = start + change * easeInOutQuad(progress);
+    if (elapsed < duration) requestAnimationFrame(animateScroll);
+  };
+  requestAnimationFrame(animateScroll);
+};
 
 export default function CartPage() {
   const { id } = useParams<{ id: string }>();
@@ -153,10 +171,9 @@ export default function CartPage() {
   const [usarSaldoVip, setUsarSaldoVip] = useState(false);
   const [montoSaldoVip, setMontoSaldoVip] = useState('');
   const [pinVip, setPinVip] = useState('');
+  const [pinSeguridad, setPinSeguridad] = useState('');
   const [verificandoPin, setVerificandoPin] = useState(false);
   const [pinAutorizado, setPinAutorizado] = useState(false);
-  const [pinSeguridad, setPinSeguridad] = useState<string | null>(null);
-  // Bug fix: Re-check loyalty if tel already loaded from sessionStorage on mount
   const [didInitLoyalty, setDidInitLoyalty] = useState(false);
 
   // Hooks de cálculo
@@ -183,7 +200,12 @@ export default function CartPage() {
       const newUrl = window.location.pathname + (searchParams.toString() ? '?' + searchParams.toString() : '');
       window.history.replaceState({}, '', newUrl);
     }
-  }, []);
+    
+    // Si el usuario tenía un paso guardado mayor a 3 (por la versión anterior), lo regresamos al 3
+    if (checkoutStep > 3) {
+      setCheckoutStep(3);
+    }
+  }, [checkoutStep, setCheckoutStep]);
 
   useEffect(() => {
     if (ubicacionGPS) sessionStorage.setItem('est_ubicacion', JSON.stringify(ubicacionGPS));
@@ -435,7 +457,27 @@ export default function CartPage() {
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
           if (status === 'OK' && results && results.length > 0 && results[0]) {
-            setDraftDireccion(results[0].formatted_address);
+            let route = '';
+            let streetNumber = '';
+            let neighborhood = '';
+
+            // Buscar en todos los componentes para priorizar calle, número y colonia
+            results[0].address_components.forEach((comp: any) => {
+              if (comp.types.includes('route')) route = comp.short_name;
+              if (comp.types.includes('street_number')) streetNumber = comp.long_name;
+              if (comp.types.includes('sublocality') || comp.types.includes('neighborhood')) neighborhood = comp.long_name;
+            });
+
+            let customAddress = route ? `${route} ${streetNumber}`.trim() : '';
+            if (neighborhood) customAddress = customAddress ? `${customAddress}, ${neighborhood}` : neighborhood;
+            
+            // Si por alguna razón Google no trae calle/colonia, usamos un trozo del formateado
+            if (!customAddress) {
+               const parts = results[0].formatted_address.split(',');
+               customAddress = parts.length > 1 ? `${parts[0].trim()}, ${parts[1].trim()}` : results[0].formatted_address;
+            }
+
+            setDraftDireccion(customAddress);
           } else {
             setDraftDireccion(`Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
           }
@@ -614,6 +656,25 @@ export default function CartPage() {
   const descuentoAplicable = (subtotal + costoEnvioFinal) > 0 ? Math.min(descuentoTotal + descuentoVip, subtotal + costoEnvioFinal) : 0;
   const rawTotal = Math.max(0, subtotal + costoEnvioFinal - descuentoAplicable);
   const total = Math.round(rawTotal * 100) / 100;
+
+  const getSmartDenominations = (totalAmount: number) => {
+    const exact = Math.ceil(totalAmount);
+    let options = [exact];
+    const next50 = Math.ceil(totalAmount / 50) * 50;
+    if (next50 > exact) options.push(next50);
+    const next100 = Math.ceil(totalAmount / 100) * 100;
+    if (next100 > exact && !options.includes(next100)) options.push(next100);
+    for (let bill of [200, 500, 1000]) {
+      if (bill > totalAmount && !options.includes(bill) && options.length < 3) {
+        options.push(bill);
+      }
+    }
+    while (options.length < 3) {
+       options.push(options[options.length - 1] + 100);
+    }
+    return options.slice(0, 3);
+  };
+  const smartDenominations = getSmartDenominations(total);
 
   // Ahorro total (para mostrar en la UI premium)
   const ahorroTotal = descuentoAplicable + (isFreeDelivery || (cuponValido && costoEnvioFijoOverride !== null) ? Math.max(0, costoEnvioBase - costoEnvioFinal) : 0);
@@ -916,534 +977,503 @@ export default function CartPage() {
   // Textos inteligentes por paso
   const getBotonText = () => {
     if (checkoutStep === 1) return 'Confirmar Resumen';
-    if (checkoutStep === 2) return 'Continuar a Entrega';
-    if (checkoutStep === 3) return 'Ir a Método de Pago';
-    if (procesando) return 'Procesando...';
+    if (checkoutStep === 2) {
+      if (checkingLoyalty) return 'Verificando...';
+      if (!clienteNombre.trim() || clienteTel.replace(/\D/g, '').length !== 10) return 'Faltan tus datos';
+      if (!tipoEntrega) return 'Elige cómo recibirlo';
+      if (tipoEntrega === 'domicilio' && (!ubicacionGPS || fueraDeCobertura)) return 'Confirma tu ubicación';
+      return 'Continuar a Entrega y Pago';
+    }
+    if (checkoutStep === 3) {
+      if (!metodoPago) return 'Selecciona cómo pagar';
+      if (metodoPago === 'efectivo' && (!montoEfectivo || parseFloat(montoEfectivo) < total)) return 'Indica con cuánto pagas';
+      return procesando ? 'Procesando...' : '¡Confirmar y Pedir!';
+    }
     return 'Confirmar Pedido';
   };
 
   const isStepValid = () => {
     if (checkoutStep === 1) return true;
-    if (checkoutStep === 2) return clienteTel.replace(/\D/g, '').length === 10 && clienteNombre.trim().length > 0;
-    if (checkoutStep === 3) return tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && ubicacionGPS && !fueraDeCobertura && !calculandoEnvio);
-    if (checkoutStep === 4) return metodoPago !== null;
-    if (checkoutStep === 5) return true;
+    if (checkoutStep === 2) {
+      const datosValidos = clienteTel.replace(/\D/g, '').length === 10 && clienteNombre.trim().length > 0;
+      const entregaValida = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && ubicacionGPS && !fueraDeCobertura && !calculandoEnvio);
+      return datosValidos && entregaValida;
+    }
+    if (checkoutStep === 3) {
+      const pagoValido = metodoPago !== null && (metodoPago !== 'efectivo' || parseFloat(montoEfectivo || '0') >= total);
+      return pagoValido;
+    }
     return false;
   };
 
   return (
     <div className="fixed inset-0 bg-white flex flex-col font-sans text-slate-900 overflow-hidden">
-      {/* HEADER FIJO CON STEPPER */}
-      <header className="bg-white/80 backdrop-blur-md px-4 py-3 border-b border-slate-100 shadow-sm sticky top-0 z-50 flex items-center gap-2">
+      {/* HEADER NATIVO */}
+      <header className="bg-white px-5 py-4 sticky top-0 z-50 flex items-center gap-4">
         <button 
           onClick={() => {
             if (checkoutStep > 1) {
               setCheckoutStep(checkoutStep - 1);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              smoothScroll(document.getElementById('cart-scroll-container'), 0, 400);
             } else {
               navigate(`/menu/${id}`);
             }
           }} 
-          className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors shrink-0"
+          className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0"
         >
-          <ChevronLeft size={20} className="text-slate-700" />
+          <ChevronLeft size={20} className="text-slate-800" strokeWidth={3} />
         </button>
         
-        <div className="flex-1 max-w-[200px] mx-auto">
-          {checkoutStep === 5 ? (
-            <div className="text-center font-black text-[17px] text-slate-800 tracking-tight">Confirma tu pedido</div>
-          ) : (
-            <div className="flex items-center justify-between relative">
-              {/* Progress bar background */}
-              <div className="absolute left-0 right-0 h-1 bg-slate-100 rounded-full top-1/2 -translate-y-1/2 z-0" />
-              
-              {/* Active progress bar */}
-              <div 
-                 className="absolute left-0 h-1 bg-gradient-to-r from-[#FA4A0C] to-[#ff6a36] rounded-full top-1/2 -translate-y-1/2 z-0 transition-all duration-500 ease-out" 
-                 style={{ width: `${((checkoutStep - 1) / 4) * 100}%` }}
-              />
-
-              {[1, 2, 3, 4, 5].map(step => (
-                <div key={step} className="relative z-10 flex flex-col items-center gap-1">
-                  <div 
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${
-                      checkoutStep > step 
-                        ? 'bg-green-500 text-white shadow-md shadow-green-500/30' 
-                        : checkoutStep === step 
-                          ? 'bg-[#FA4A0C] text-white shadow-md shadow-orange-500/30 scale-110' 
-                          : 'bg-white text-slate-300 border-2 border-slate-100'
-                    }`}
-                  >
-                    {checkoutStep > step ? <CheckCircle2 size={14} strokeWidth={3} /> : step}
-                  </div>
-                </div>
-              ))}
-            </div>
+        <div className="flex-1">
+          {checkoutStep === 1 && (
+            <>
+              <h1 className="font-black text-xl text-slate-800 leading-tight">Tu Carrito</h1>
+              <p className="text-[12px] text-slate-400 font-medium">Revisa tus artículos</p>
+            </>
+          )}
+          {checkoutStep === 2 && (
+            <>
+              <h1 className="font-black text-xl text-slate-800 leading-tight">Entrega</h1>
+              <p className="text-[12px] text-slate-400 font-medium">¿Dónde te lo llevamos?</p>
+            </>
+          )}
+          {checkoutStep === 3 && (
+            <>
+              <h1 className="font-black text-xl text-slate-800 leading-tight">Pago</h1>
+              <p className="text-[12px] text-slate-400 font-medium">Casi listo para comer</p>
+            </>
           )}
         </div>
         
-        <div className="w-9 shrink-0"></div>
+        <div className="w-10 shrink-0"></div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 w-full relative">
+      <main id="cart-scroll-container" className="flex-1 overflow-y-auto p-4 w-full relative scroll-smooth">
         <div className="max-w-lg md:max-w-2xl mx-auto pb-32">
           <AnimatePresence mode="wait">
           
-          {/* PASO 1: RESUMEN DEL PEDIDO */}
+          {/* ══════════════════════════════════════
+              PASO 1 — Tu Carrito
+          ══════════════════════════════════════ */}
           {checkoutStep === 1 && (
-            <motion.div key="step1" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
-              
-              <div className="px-2">
-                <div className="flex justify-between items-center pb-4 mb-2 border-b border-slate-100">
-                  <h3 className="font-black text-lg">Tu Pedido</h3>
-                  <span className="bg-orange-50 text-[#FA4A0C] font-bold text-xs px-3 py-1 rounded-full">{carrito.length} items</span>
-                </div>
-                <div className="flex flex-col md:grid md:grid-cols-2 gap-4">
-                  {carrito.map((p, i) => (
-                    <div key={i} className="flex gap-4 p-4 border border-slate-100 rounded-2xl bg-white shadow-sm relative">
-                      <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-slate-50">
-                        <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
-                      </div>
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                        <div>
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-bold text-sm text-slate-800 leading-tight pr-2">{p.item.nombre}</h4>
-                            <span className="font-black text-sm">${(p.item.precio * p.cantidad).toFixed(2)}</span>
-                          </div>
-                          {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {p.item.opcionesSeleccionadas.map((o, idx) => (
-                                <span key={idx} className="bg-slate-50 border border-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-md font-medium">
-                                  {o.opcion}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 mt-3 w-max bg-slate-50 border border-slate-100 rounded-full px-2 py-1">
-                          <button onClick={() => removeFromCart(p.item.cartItemId)} className="p-1 hover:text-[#FA4A0C] transition-colors"><Minus size={14} strokeWidth={3}/></button>
-                          <span className="font-bold text-sm w-4 text-center">{p.cantidad}</span>
-                          <button onClick={() => addToCart(p.item)} className="p-1 hover:text-[#FA4A0C] transition-colors"><Plus size={14} strokeWidth={3}/></button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <motion.div key="step1" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4">
 
-              <div className="flex flex-col md:grid md:grid-cols-2 gap-4 mt-4 px-2">
-                {/* BANNER ESTRELLA EATS */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-gradient-to-r from-orange-50 to-orange-100/50 border border-orange-100/80 rounded-2xl p-3.5 flex items-center gap-3.5 shadow-sm h-full"
-                >
-                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 shadow-sm border border-orange-50">
-                    <span className="text-xl">🛵</span>
-                  </div>
-                  <div>
-                    <h4 className="font-black text-[#FA4A0C] text-[13px] leading-tight tracking-tight">Estrella Eats te lo lleva</h4>
-                    <p className="text-[11px] text-orange-900/60 font-medium leading-tight mt-0.5">Rápido y calientito hasta tu puerta</p>
-                  </div>
-                </motion.div>
-
-                {/* WIDGET DE LEALTAD EN PASO 1 - si ya verificó tel en esta sesión */}
-                {didInitLoyalty && datosCliente && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-3xl p-4 border flex items-center gap-3 h-full ${
-                      datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6
-                        ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200'
-                        : 'bg-blue-50 border-blue-100'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
-                      datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? 'bg-orange-100' : 'bg-blue-100'
-                    }`}>
-                      {datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? '🎁' : '⭐'}
+              {/* Lista de artículos */}
+              <div className="px-1">
+                {carrito.map((p, i) => (
+                  <div key={i} className="flex gap-4 py-4 border-b border-slate-100 last:border-0">
+                    <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden shrink-0 bg-slate-100">
+                      <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      {datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6 ? (
-                        <>
-                          <p className="text-xs font-black text-orange-900">Cliente Estrella {datosCliente.nombre && !/^\d+$/.test(datosCliente.nombre.replace(/\s+/g, '')) ? `· ${datosCliente.nombre}` : ''}</p>
-                          <p className="text-[11px] text-orange-700 font-medium">Sigue al paso 3 para desbloquear tu envío gratis 🚀</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-xs font-black text-blue-900">Tu lealtad te premia</p>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            {[...Array(6)].map((_, i) => (
-                              <div key={i} className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                                i < datosCliente.puntos
-                                  ? 'bg-blue-500 border-blue-500'
-                                  : 'bg-white border-blue-200'
-                              }`}>
-                                {i < datosCliente.puntos && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                              </div>
-                            ))}
-                            <span className="text-[10px] font-bold text-blue-600 ml-1">{datosCliente.puntos}/6</span>
-                          </div>
-                        </>
+                    <div className="flex-1 flex flex-col justify-between py-0.5">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="font-bold text-[15px] text-slate-800 leading-tight">{p.item.nombre}</h4>
+                        <span className="font-black text-[15px] text-slate-900 shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
+                      </div>
+                      {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
+                        <p className="text-[11px] text-slate-400 font-medium mt-1 leading-snug">
+                          {p.item.opcionesSeleccionadas.map(o => o.opcion).join(' · ')}
+                        </p>
                       )}
+                      <div className="flex items-center gap-2 mt-2 w-max bg-slate-100 rounded-full px-1.5 py-1">
+                        <button onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition-colors"><Minus size={12} strokeWidth={3}/></button>
+                        <span className="font-black text-sm w-5 text-center tabular-nums">{p.cantidad}</span>
+                        <button onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition-colors"><Plus size={12} strokeWidth={3}/></button>
+                      </div>
                     </div>
-                  </motion.div>
-                )}
+                  </div>
+                ))}
               </div>
 
-              <div className="px-2 mt-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-bl-full pointer-events-none"></div>
-                <h4 className="font-bold text-sm mb-3 flex items-center gap-2 relative z-10"><Ticket size={16} className="text-[#FA4A0C]"/> ¿Tienes un cupón promocional?</h4>
-                <div className="flex gap-2 relative z-10">
-                  <input type="text" placeholder="CÓDIGO" value={cuponCliente} onChange={e => {setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0)}} className="flex-1 bg-white border border-slate-200 shadow-inner rounded-xl px-4 py-3 text-sm font-bold uppercase outline-none focus:border-[#FA4A0C] focus:ring-2 focus:ring-orange-500/10 transition-all" disabled={validandoCupon} />
-                  <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-slate-900 text-white px-5 py-3 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors disabled:opacity-50 shadow-md">
+              {/* Subtotal rápido */}
+              <div className="flex justify-between items-center px-1 pt-4 pb-2">
+                <span className="text-[13px] text-slate-400 font-medium">{carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</span>
+                <span className="font-black text-[17px] text-slate-900">${subtotal.toFixed(2)}</span>
+              </div>
+
+              {/* Cupón */}
+              <div className="mt-4 px-1">
+                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-2">¿Tienes un cupón?</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="CÓDIGO"
+                    value={cuponCliente}
+                    onChange={e => { setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0); }}
+                    disabled={validandoCupon}
+                    className="flex-1 bg-slate-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold uppercase outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-600/20 transition-all placeholder:text-slate-300"
+                  />
+                  <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-black text-white px-5 py-3.5 rounded-2xl text-[14px] font-bold hover:bg-slate-800 transition-colors disabled:opacity-40">
                     {validandoCupon ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Aplicar'}
                   </button>
                 </div>
                 <AnimatePresence>
                   {cuponValido && (
-                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="text-green-600 text-xs font-bold mt-3 flex items-center gap-1 bg-green-50 p-2 rounded-lg border border-green-100">
-                      <CheckCircle2 size={14}/> Cupón aplicado con éxito. Ahorras ${descuento.toFixed(2)}
-                    </motion.p>
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-2 flex items-center gap-2 text-[13px] font-bold text-green-700 bg-green-50 px-3 py-2 rounded-xl">
+                      <CheckCircle2 size={14} className="text-green-600 shrink-0"/> Cupón aplicado · Ahorras ${descuento.toFixed(2)}
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+
             </motion.div>
           )}
 
-          {/* PASO 2: DATOS DEL CLIENTE */}
+          {/* ══════════════════════════════════════
+              PASO 2 — Entrega
+          ══════════════════════════════════════ */}
           {checkoutStep === 2 && (
-            <motion.div key="step2" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-5">
-              <div className="mb-6 px-2">
-                <div className="flex items-center gap-3 mb-6">
-                   <div className="w-12 h-12 bg-blue-50/80 rounded-full flex items-center justify-center"><Info size={22} className="text-blue-500" /></div>
-                   <div>
-                     <h3 className="font-black text-xl leading-tight">Tus Datos</h3>
-                     <p className="text-[13px] text-slate-500 font-medium">Para contactarte sobre tu pedido</p>
-                   </div>
-                </div>
-                
-                <div className="space-y-5 md:grid md:grid-cols-2 md:gap-6 md:space-y-0 md:items-start">
-                  <div>
-                    <label className="block text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-2 pl-1">Tu Nombre Completo</label>
-                    <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-slate-100/80 border-0 rounded-2xl px-5 py-4 text-[15px] outline-none focus:bg-orange-50 focus:ring-2 focus:ring-[#FA4A0C]/20 transition-all font-bold text-slate-800 shadow-inner" />
+            <motion.div key="step2" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4 space-y-6">
+
+              {/* Tus datos */}
+              <div id="seccion-datos">
+                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Tus datos</p>
+                <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100/80">
+                  
+                  {/* Nombre Input */}
+                  <div className="px-4 py-2.5 border-b border-slate-100/80 focus-within:bg-blue-50/30 transition-colors">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Nombre completo</label>
+                    <input
+                      type="text"
+                      value={clienteNombre}
+                      onChange={e => setClienteNombre(e.target.value)}
+                      placeholder="Ej. Juan Pérez"
+                      className="w-full bg-transparent outline-none text-[15px] font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-2 pl-1">
-                      Teléfono (WhatsApp)
+
+                  {/* Teléfono Input */}
+                  <div className={`px-4 py-2.5 transition-colors ${telError ? 'bg-red-50/50' : 'focus-within:bg-blue-50/30'}`}>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 mb-0.5 ${telError ? 'text-red-400' : 'text-slate-400'}`}>
+                      Teléfono {telError && <span className="lowercase font-medium normal-case ml-1 flex items-center gap-0.5"><AlertCircle size={10}/> 10 dígitos</span>}
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[15px]">+52</span>
-                      <input type="tel" value={clienteTel} onChange={(e) => {setClienteTel(e.target.value); setTelError(false);}} placeholder="123 456 7890" maxLength={10} className={`w-full pl-14 bg-slate-100/80 border-0 ${telError ? 'focus:bg-red-50 focus:ring-red-400/20' : 'focus:bg-orange-50 focus:ring-[#FA4A0C]/20'} focus:ring-2 rounded-2xl px-5 py-4 outline-none transition-all font-bold tracking-wide text-[16px] text-slate-800 shadow-inner`} />
+                    <div className="flex items-center">
+                      <span className="text-slate-400 font-bold text-[15px] mr-2">+52</span>
+                      <input
+                        type="tel"
+                        value={clienteTel}
+                        onChange={e => { setClienteTel(e.target.value); setTelError(false); }}
+                        placeholder="10 dígitos"
+                        maxLength={10}
+                        className="w-full bg-transparent outline-none text-[15px] font-bold tracking-wide text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                      />
                     </div>
-                    {telError && <p className="text-red-500 text-xs mt-1.5 pl-1 flex items-center gap-1"><AlertCircle size={12}/> Ingresa 10 dígitos válidos</p>}
-
-                    
-                    {/* Estado: verificando */}
-                    <AnimatePresence mode="wait">
-                      {!telError && clienteTel.replace(/\D/g, '').length === 10 && checkingLoyalty && (
-                        <motion.div
-                          key="checking"
-                          initial={{ opacity: 0, y: -6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
-                          className="mt-3 p-4 rounded-xl border border-orange-200 bg-orange-50 flex items-center gap-3"
-                        >
-                          <div className="w-9 h-9 rounded-full bg-white border border-orange-200 flex items-center justify-center shrink-0 shadow-sm">
-                            <Loader2 size={20} className="animate-spin text-[#FA4A0C]" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-black text-orange-900">Verificando tu lealtad...</p>
-                            <p className="text-[11px] text-orange-600 font-medium mt-0.5">Buscando tus beneficios de Cliente Estrella</p>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* Estado: resultado */}
-                      {!telError && clienteTel.replace(/\D/g, '').length === 10 && !checkingLoyalty && didInitLoyalty && (
-                        <motion.div
-                          key="result"
-                          initial={{ opacity: 0, scale: 0.97, y: -6 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
-                          transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                          className={`mt-3 p-4 rounded-xl border flex items-start gap-3 ${
-                            (datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6
-                              ? 'bg-orange-50 border-orange-200'
-                              : 'bg-blue-50 border-blue-200'
-                          }`}
-                        >
-                          {(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? (
-                            <>
-                              <div className="w-9 h-9 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center shrink-0 text-xl shadow-sm">🎁</div>
-                              <div>
-                                <p className="text-sm font-black text-orange-900">¡Tienes una sorpresa!</p>
-                                <p className="text-[12px] text-orange-700 font-medium mt-0.5 leading-snug">Por ser Cliente Estrella, sigue al siguiente paso para ver tu beneficio especial.</p>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="w-9 h-9 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center shrink-0 text-xl shadow-sm">🛵</div>
-                              <div>
-                                <p className="text-sm font-black text-blue-900">¡Tu 6to envío es GRATIS!</p>
-                                <p className="text-[12px] text-blue-700 font-medium mt-0.5">
-                                  Llevas <span className="font-black bg-blue-100 px-1.5 py-0.5 rounded text-blue-900">{datosCliente?.puntos || 0} de 6</span> pedidos. ¡Sigue ordenando!
-                                </p>
-                              </div>
-                            </>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
+
+                  {/* Estado lealtad integrado como footer de la tarjeta */}
+                  <AnimatePresence mode="wait">
+                    {clienteTel.replace(/\D/g, '').length === 10 && checkingLoyalty && (
+                      <motion.div key="checking" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-slate-100/80 bg-slate-50">
+                        <div className="px-4 py-3 flex items-center gap-3">
+                          <Loader2 size={16} className="animate-spin text-slate-400 shrink-0"/>
+                          <p className="text-[12px] font-bold text-slate-500">Verificando tu historial...</p>
+                        </div>
+                      </motion.div>
+                    )}
+                    {clienteTel.replace(/\D/g, '').length === 10 && !checkingLoyalty && didInitLoyalty && (
+                      <motion.div key="result" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={`border-t border-slate-100/80 ${(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                        <div className="px-4 py-3 flex items-center gap-3">
+                          <span className="text-lg shrink-0">{(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? '🎁' : '⭐'}</span>
+                          <div>
+                            {(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? (
+                              <>
+                                <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">¡Tienes un beneficio!</p>
+                                <p className="text-[11px] text-slate-500 font-medium leading-tight">Continúa para desbloquear tu envío gratis</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">Llevas {datosCliente?.puntos || 0} de 6 pedidos</p>
+                                <p className="text-[11px] text-slate-500 font-medium leading-tight">¡Al 6to pedido el envío es gratis!</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
-            </motion.div>
-          )}
 
-          {/* PASO 3: ENTREGA Y MAPA */}
-          {checkoutStep === 3 && (
-            <motion.div key="step3" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-5">
-              <div className="px-2 mt-6">
-                {(!ubicacionGPS || tipoEntrega !== 'domicilio') && (
-                  <>
-                    <h3 className="font-black text-xl mb-4 md:text-center">¿Cómo quieres recibirlo?</h3>
-                    <div className="flex gap-3">
-                      <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-5 rounded-3xl border-0 font-bold flex flex-col items-center gap-2 transition-all shadow-inner ${tipoEntrega === 'domicilio' ? 'bg-[#FA4A0C]/10 text-[#FA4A0C] ring-2 ring-[#FA4A0C]/30' : 'bg-slate-100/80 text-slate-500 hover:bg-slate-100'}`}>
-                        <span className="text-3xl mb-1">🛵</span> <span className="text-[15px]">A Domicilio</span>
-                      </button>
-                      <button onClick={() => setTipoEntrega('tienda')} className={`flex-1 py-5 rounded-3xl border-0 font-bold flex flex-col items-center gap-2 transition-all shadow-inner ${tipoEntrega === 'tienda' ? 'bg-[#FA4A0C]/10 text-[#FA4A0C] ring-2 ring-[#FA4A0C]/30' : 'bg-slate-100/80 text-slate-500 hover:bg-slate-100'}`}>
-                        <span className="text-3xl mb-1">🏪</span> <span className="text-[15px]">En Tienda</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-                  <AnimatePresence>
+              {/* Tipo de entrega */}
+              <div id="seccion-entrega">
+                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">¿Cómo lo recibes?</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                    <span className="text-xl">🛵</span>
+                    <span className="text-[13.5px]">A Domicilio</span>
+                  </button>
+                  <button onClick={() => setTipoEntrega('tienda')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                    <span className="text-xl">🏪</span>
+                    <span className="text-[13.5px]">En Tienda</span>
+                  </button>
+                </div>
+
+                <AnimatePresence>
                   {tipoEntrega === 'domicilio' && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className={ubicacionGPS ? "mt-0" : "mt-6"}>
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                       {ubicacionGPS ? (
-                        <div className="mb-6 mt-2">
-                          <div className="flex justify-between items-center mb-3">
-                            <div className="flex items-center gap-2">
-                              <MapPin size={22} className="text-[#FA4A0C] shrink-0" />
-                              <span className="font-black text-slate-800 text-[15px] whitespace-nowrap">Entregar en</span>
-                              {!calculandoEnvio && costoEnvio === 0 && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ml-1"><Star size={10} className="fill-green-700"/> ¡GRATIS!</span>}
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3 bg-slate-50 rounded-2xl px-4 py-3">
+                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                              <MapPin size={16} className="text-black shrink-0 mt-0.5"/>
+                              <p className="text-[13px] font-bold text-slate-800 leading-snug">{direccionEntrega}</p>
                             </div>
-                            <button onClick={() => setIsMapModalOpen(true)} className="text-[#FA4A0C] text-[13px] font-bold hover:underline transition-colors shrink-0">Cambiar</button>
+                            <button onClick={() => setIsMapModalOpen(true)} className="text-blue-600 text-[12px] font-bold shrink-0 hover:underline">Cambiar</button>
                           </div>
-                          
-                          <p className="text-[14px] text-slate-600 mb-4 leading-relaxed pl-7">{direccionEntrega}</p>
-                          
-                          <div className="mt-2 pl-7 relative">
-                            {calculandoEnvio ? (
-                              <label className="text-[13px] font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Calculando envío...</label>
-                            ) : costoEnvio === 0 ? (
-                              <label className="text-[13px] font-bold text-[#FA4A0C] mb-2 flex items-center gap-1.5"><Gift size={16} /> ¡Envío GRATIS! Ayúdanos con una referencia.</label>
-                            ) : (
-                              <label className="text-[13px] font-bold text-slate-500 mb-2 block">Referencia para encontrar tu casa (Opcional)</label>
-                            )}
-                            <textarea rows={2} value={direccionReferencias} onChange={(e) => setDireccionReferencias(e.target.value)} placeholder="Ej. Casa verde, portón negro..." className="w-full bg-slate-100/80 border-0 rounded-2xl px-5 py-4 text-[15px] outline-none focus:bg-orange-50 focus:ring-2 focus:ring-[#FA4A0C]/20 transition-all resize-none text-slate-800 placeholder:text-slate-400 shadow-inner" />
-                          </div>
-
+                          {!calculandoEnvio && costoEnvio >= 0 && (
+                            <div className="flex justify-between items-center px-1">
+                              <span className="text-[13px] text-slate-400 font-medium">Costo de envío</span>
+                              <span className="text-[13px] font-bold text-slate-800">{costoEnvioFinal === 0 ? <span className="text-green-600">GRATIS 🎉</span> : `$${costoEnvioFinal.toFixed(2)}`}</span>
+                            </div>
+                          )}
+                          <textarea
+                            rows={2}
+                            value={direccionReferencias}
+                            onChange={e => setDireccionReferencias(e.target.value)}
+                            placeholder="Referencias (opcional) — casa verde, portón negro..."
+                            className="w-full bg-slate-100 rounded-2xl px-4 py-3 text-[14px] outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-600/20 transition-all resize-none text-slate-800 placeholder:text-slate-300"
+                          />
                         </div>
                       ) : (
-                        <button onClick={() => setIsMapModalOpen(true)} className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-bold text-[16px] flex items-center justify-center gap-2.5 hover:bg-slate-800 transition-colors shadow-xl mb-4 mt-6">
-                          <MapPin size={20}/> Indicar en el mapa dónde entregar
+                        <button onClick={() => setIsMapModalOpen(true)} className="mt-4 w-full bg-black text-white py-4 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors">
+                          <MapPin size={18}/> Indicar ubicación en el mapa
                         </button>
                       )}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {/* VIP LEALTAD WIDGET EN PASO 3 (Siempre visible aquí) */}
-                {datosCliente && !calculandoEnvio && (tipoEntrega === 'tienda' || ubicacionGPS) && (
-                  <div className="mt-6 mb-2 bg-gradient-to-br from-amber-50 to-orange-50 rounded-[24px] p-4 shadow-sm overflow-hidden relative">
-                    <div className="absolute -right-4 -top-4 text-amber-200/40 transform rotate-12 pointer-events-none"><Star size={80} fill="currentColor" /></div>
-                    {datosCliente.es_vip ? (
-                      <div className="relative z-10 flex items-center justify-between">
+                {/* Widget lealtad envío gratis */}
+                {datosCliente && !calculandoEnvio && (tipoEntrega === 'tienda' || ubicacionGPS) && !datosCliente.es_vip && costoEnvioCalculado > 0 && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6) && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4">
+                    <button 
+                      onClick={() => setUsarBeneficioNormal(!usarBeneficioNormal)}
+                      className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl transition-all text-left border-2 ${usarBeneficioNormal ? 'bg-green-50/50 border-green-500' : 'bg-white border-slate-100 hover:border-slate-200'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 flex items-center justify-center rounded-xl shrink-0 ${usarBeneficioNormal ? 'bg-green-100' : 'bg-amber-100'}`}>
+                          {usarBeneficioNormal ? <CheckCircle2 size={20} className="text-green-600" /> : <Gift size={20} className="text-amber-600" />}
+                        </div>
                         <div>
-                          <h4 className="font-black text-amber-900 flex items-center gap-1 text-sm"><Star size={14} className="text-amber-500 fill-amber-500"/> Cliente VIP</h4>
-                          <p className="text-[10px] text-amber-800 mt-0.5 font-medium">Saldo: <b className="text-amber-900">${datosCliente.saldo.toFixed(2)}</b></p>
+                          <p className={`text-[13px] font-black leading-tight mb-0.5 ${usarBeneficioNormal ? 'text-green-700' : 'text-slate-800'}`}>Envío Gratis disponible</p>
+                          <p className={`text-[11px] font-medium leading-tight ${usarBeneficioNormal ? 'text-green-600/80' : 'text-slate-500'}`}>Recompensa cliente estrella</p>
                         </div>
-                        {!usarSaldoVip ? (
-                          <button onClick={() => setUsarSaldoVip(true)} className="bg-amber-500 hover:bg-amber-600 transition-colors text-white px-3 py-1.5 rounded-lg font-bold text-[11px] shadow-md">Usar Saldo</button>
-                        ) : (
-                          <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} className="flex gap-2">
-                             <input type="number" value={montoSaldoVip} onChange={e => setMontoSaldoVip(e.target.value)} placeholder="$0.00" className="w-16 bg-white border border-amber-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 rounded-lg px-2 py-1 text-[11px] font-bold outline-none transition-all" />
-                             <input type="password" value={pinVip} onChange={e => { setPinVip(e.target.value.replace(/\D/g, '')); setPinError(false); }} maxLength={4} placeholder="PIN" className={`w-12 bg-white border ${pinError ? 'border-red-400 focus:ring-red-400/20' : 'border-amber-200 focus:border-amber-400 focus:ring-amber-500/20'} focus:ring-2 rounded-lg px-2 py-1 text-[11px] text-center font-black tracking-widest outline-none transition-all`} />
-                             <button onClick={handlePinVerify} disabled={verificandoPin || pinVip.length < 4} className="bg-amber-900 text-white rounded-lg px-2 text-[11px] font-bold shadow-md hover:bg-amber-950 transition-colors disabled:opacity-50 flex justify-center items-center">
-                               {verificandoPin ? <Loader2 size={12} className="animate-spin" /> : 'OK'}
-                             </button>
-                          </motion.div>
-                        )}
                       </div>
+                      <div className={`px-3 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider shrink-0 ${usarBeneficioNormal ? 'bg-green-600 text-white shadow-sm shadow-green-600/30' : 'bg-slate-100 text-slate-500'}`}>
+                        {usarBeneficioNormal ? 'Aplicado' : 'Aplicar'}
+                      </div>
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* Widget VIP */}
+                {datosCliente?.es_vip && (tipoEntrega === 'tienda' || ubicacionGPS) && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3">
+                    <div>
+                      <p className="text-[13px] font-black text-slate-800 flex items-center gap-1"><Star size={13} className="fill-slate-800"/> Cliente VIP · Saldo ${datosCliente.saldo.toFixed(2)}</p>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Usa tu saldo para pagar</p>
+                    </div>
+                    {!usarSaldoVip ? (
+                      <button onClick={() => setUsarSaldoVip(true)} className="bg-black text-white px-3 py-1.5 rounded-xl font-bold text-[11px]">Usar</button>
                     ) : (
-                      costoEnvioCalculado > 0 && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6) && (
-                        <div className="flex justify-between items-center relative z-10">
-                           <div>
-                             <h4 className="font-black text-amber-900 flex items-center gap-1.5 text-[13px] leading-none">🎁 Envío Gratis</h4>
-                             <p className="text-[10px] text-amber-800 mt-1 font-medium leading-none">Tu recompensa estrella</p>
-                           </div>
-                           <label className="relative inline-flex items-center cursor-pointer scale-90 origin-right">
-                            <input type="checkbox" className="sr-only peer" checked={usarBeneficioNormal} onChange={e => setUsarBeneficioNormal(e.target.checked)}/>
-                            <div className="w-11 h-6 bg-amber-200/50 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-amber-200 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                           </label>
+                      <div className="flex gap-1.5">
+                        <input type="number" value={montoSaldoVip} onChange={e => setMontoSaldoVip(e.target.value)} placeholder="$0" className="w-14 bg-white border border-slate-200 rounded-xl px-2 py-1 text-[11px] font-bold outline-none text-center"/>
+                        <input type="password" value={pinVip} onChange={e => { setPinVip(e.target.value.replace(/\D/g, '')); setPinError(false); }} maxLength={4} placeholder="PIN" className={`w-12 bg-white border ${pinError ? 'border-red-400' : 'border-slate-200'} rounded-xl px-2 py-1 text-[11px] text-center font-black tracking-widest outline-none`}/>
+                        <button onClick={handlePinVerify} disabled={verificandoPin || pinVip.length < 4} className="bg-black text-white rounded-xl px-2 text-[11px] font-bold disabled:opacity-50 flex items-center">
+                          {verificandoPin ? <Loader2 size={10} className="animate-spin"/> : 'OK'}
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </div>
+
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════
+              PASO 3 — Pago
+          ══════════════════════════════════════ */}
+          {checkoutStep === 3 && (
+            <motion.div key="step3" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4 space-y-6">
+
+              {/* Método de pago */}
+              <div>
+                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Método de pago</p>
+                <div className="space-y-2">
+                  <button onClick={() => setMetodoPago('efectivo')} className={`w-full py-4 px-5 rounded-2xl font-bold flex items-center gap-4 transition-all ${metodoPago === 'efectivo' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                    <span className="text-2xl">💵</span>
+                    <span className="flex-1 text-left text-[15px]">Efectivo al recibir</span>
+                    {metodoPago === 'efectivo' && <CheckCircle2 size={18} className="text-white shrink-0"/>}
+                  </button>
+
+                  <AnimatePresence>
+                    {metodoPago === 'efectivo' && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden px-1">
+                        <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-2">¿Con cuánto pagas?</p>
+                        <div className="flex gap-2">
+                          {smartDenominations.map((denom, idx) => (
+                            <button key={idx} onClick={() => setMontoEfectivo(denom.toString())} className={`flex-1 py-3 rounded-2xl font-black text-[14px] transition-all ${montoEfectivo === denom.toString() ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                              ${denom.toFixed(0)}
+                              {idx === 0 && <span className="block text-[9px] font-bold opacity-60 uppercase mt-0.5">Exacto</span>}
+                            </button>
+                          ))}
                         </div>
-                      )
+                      </motion.div>
                     )}
-                  </div>
-                )}
+                  </AnimatePresence>
+
+                  {restaurante?.acepta_pago_online && (
+                    <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-4 px-5 rounded-2xl font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                      <span className="text-2xl">💳</span>
+                      <div className="flex-1 text-left">
+                        <span className="block text-[15px]">Pago en Línea</span>
+                        <span className={`block text-[11px] font-medium ${metodoPago === 'en_linea' ? 'text-white/60' : 'text-slate-400'}`}>Tarjeta o Mercado Pago</span>
+                      </div>
+                      {metodoPago === 'en_linea' && <CheckCircle2 size={18} className="text-white shrink-0"/>}
+                    </button>
+                  )}
+                </div>
               </div>
-            </motion.div>
-          )}
 
-          {/* PASO 4: MÉTODO DE PAGO */}
-          {checkoutStep === 4 && (
-            <motion.div key="step4" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-5">
-               <div className="px-2 mt-6">
-                <h3 className="font-black text-lg mb-4 md:text-center">¿Cómo vas a pagar?</h3>
-                 <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
-                   <button onClick={() => setMetodoPago('efectivo')} className={`w-full py-5 px-5 rounded-2xl border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'efectivo' ? 'border-green-500 bg-green-50 shadow-sm' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
-                     <span className="text-3xl bg-white rounded-full p-1 shadow-sm">💵</span>
-                     <span className="flex-1 text-left text-[15px]">Efectivo al recibir</span>
-                     {metodoPago === 'efectivo' && <CheckCircle2 size={20} className="text-green-500" />}
-                   </button>
-                   
-                   <AnimatePresence>
-                     {metodoPago === 'efectivo' && (
-                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="px-2 pb-2">
-                         <div className="bg-green-50/50 p-4 rounded-xl border border-green-100">
-                           <label className="text-xs font-bold text-green-800 mb-2 block uppercase tracking-wide">¿Con qué billete pagas?</label>
-                           <input type="number" placeholder={`Ej. ${Math.ceil(total / 100) * 100}`} value={montoEfectivo} onChange={e => setMontoEfectivo(e.target.value)} className="w-full bg-white border border-green-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 font-black text-lg shadow-sm transition-all" />
-                           <p className="text-[10px] text-green-600 mt-2">Para llevarte el cambio exacto.</p>
-                         </div>
-                       </motion.div>
-                     )}
-                   </AnimatePresence>
+              {/* ─── CARD RESUMEN TIPO RECIBO ─── */}
+              <div className="bg-slate-50 rounded-3xl overflow-hidden">
 
-                   {restaurante?.acepta_pago_online && (
-                     <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-5 px-5 rounded-2xl border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 shadow-sm' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
-                       <span className="text-3xl bg-white rounded-full p-1 shadow-sm">💳</span>
-                       <div className="flex-1 text-left">
-                         <span className="block text-[15px]">Pago en Línea</span>
-                         <span className="block text-[11px] text-slate-500 font-medium">Tarjeta o Mercado Pago</span>
-                       </div>
-                       {metodoPago === 'en_linea' && <CheckCircle2 size={20} className="text-[#FA4A0C]" />}
-                     </button>
-                   )}
-                 </div>
-               </div>
-            </motion.div>
-          )}
-          {/* PASO 5: REVISIÓN FINAL */}
-          {checkoutStep === 5 && (
-            <motion.div key="step5" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
-              <div className="px-2">
-                <div className="flex items-center gap-3 mb-4">
-                   <div className="w-10 h-10 bg-green-50/80 rounded-full flex items-center justify-center"><CheckCircle2 size={20} className="text-green-500" /></div>
-                   <div>
-                     <h3 className="font-black text-lg leading-tight">Revisión Final</h3>
-                   </div>
+                {/* Primer artículo del pedido */}
+                <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-slate-100/80">
+                  <div className="w-12 h-12 rounded-xl bg-slate-200 overflow-hidden shrink-0">
+                    <LazyImage src={carrito[0]?.item?.foto_url} alt={carrito[0]?.item?.nombre}/>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[14px] text-slate-800 truncate">{carrito.length === 1 ? carrito[0].item.nombre : `${carrito[0].item.nombre} y ${carrito.length - 1} más`}</p>
+                    <p className="text-[11px] text-slate-400 font-medium">{restaurante?.nombre} · {carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</p>
+                  </div>
                 </div>
 
-                <div className="bg-slate-50/80 border border-slate-100 rounded-[24px] p-5 space-y-4">
-                  {/* Tu Pedido */}
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tu Pedido</p>
-                    <p className="text-sm font-bold text-slate-800">{carrito.length} artículos</p>
+                {/* Detalles financieros */}
+                <div className="px-4 py-3 space-y-2.5 border-b border-slate-100/80">
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-slate-400 font-medium">Subtotal</span>
+                    <span className="font-semibold text-slate-700">${subtotal.toFixed(2)}</span>
                   </div>
-                  
-                  {/* Entrega */}
-                  <div className="border-t border-slate-200/60 pt-4 flex justify-between items-center gap-4">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">{tipoEntrega === 'domicilio' ? 'Domicilio' : 'Tienda'}</p>
-                    <p className="text-[13px] font-bold text-slate-800 line-clamp-1 text-right">{tipoEntrega === 'domicilio' ? direccionEntrega : 'Recoger en local'}</p>
-                  </div>
-                  
-                  {/* Pago */}
-                  <div className="border-t border-slate-200/60 pt-4 flex justify-between items-center">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">Pago</p>
-                    <p className="text-[13px] font-bold text-slate-800 text-right">
-                      {metodoPago === 'efectivo' ? `Efectivo ${montoEfectivo ? '($' + montoEfectivo + ')' : ''}` : 'En Línea'}
-                    </p>
-                  </div>
+                  {descuentoTotal > 0 && (
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-slate-400 font-medium">Descuento</span>
+                      <span className="font-semibold text-green-600">−${descuentoTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {tipoEntrega === 'domicilio' && (
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-slate-400 font-medium">Envío</span>
+                      <span className="font-semibold text-slate-700">
+                        {calculandoEnvio
+                          ? <Loader2 size={12} className="animate-spin inline"/>
+                          : costoEnvioFinal === 0
+                            ? <span className="text-green-600 font-bold">GRATIS</span>
+                            : `$${costoEnvioFinal.toFixed(2)}`
+                        }
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-                  {/* Totals */}
-                  <div className="border-t-2 border-dashed border-slate-200 pt-4 space-y-2">
-                    <div className="flex justify-between text-[13px] text-slate-500 font-medium">
-                      <span>Subtotal</span><span className="font-bold text-slate-700">${subtotal.toFixed(2)}</span>
-                    </div>
-                    {descuentoTotal > 0 && (
-                      <div className="flex justify-between text-[13px] text-green-500 font-medium">
-                        <span>Descuento</span><span className="font-bold">-${descuentoTotal.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {tipoEntrega === 'domicilio' && (
-                      <div className="flex justify-between text-[13px] text-slate-500 font-medium items-center">
-                        <span>Envío</span>
-                        <span className="font-bold text-slate-800">{calculandoEnvio ? <Loader2 size={10} className="animate-spin inline" /> : costoEnvioFinal === 0 ? <span className="text-green-500">GRATIS</span> : `+$${costoEnvioFinal.toFixed(2)}`}</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex justify-between items-end pt-3 mt-1 border-t border-slate-200/60">
-                      <span className="font-black text-slate-800 text-[16px]">Total</span>
-                      <motion.span
-                        key={Math.round(displayTotal)}
-                        className="font-black text-[28px] text-[#FA4A0C] leading-none tabular-nums"
-                      >
-                        ${displayTotal.toFixed(2)}
-                      </motion.span>
-                    </div>
+                {/* Total */}
+                <div className="flex justify-between items-center px-4 py-3.5 border-b border-slate-100/80">
+                  <span className="font-black text-[15px] text-slate-800">Total</span>
+                  <motion.span
+                    key={Math.round(displayTotal)}
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="font-black text-[22px] text-green-600 leading-none tabular-nums"
+                  >
+                    ${displayTotal.toFixed(2)}
+                  </motion.span>
+                </div>
+
+                {/* Entregar a */}
+                <div className="px-4 py-3 space-y-2.5">
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-slate-400 font-medium">Nombre</span>
+                    <span className="font-semibold text-slate-800 text-right">{clienteNombre}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-slate-400 font-medium">Teléfono</span>
+                    <span className="font-semibold text-slate-800">{clienteTel}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px] gap-4">
+                    <span className="text-slate-400 font-medium shrink-0">Dirección</span>
+                    <span className="font-semibold text-slate-800 text-right leading-snug">{tipoEntrega === 'domicilio' ? direccionEntrega : 'Recoger en sucursal'}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-slate-400 font-medium">Pago</span>
+                    <span className="font-semibold text-slate-800">{metodoPago === 'efectivo' ? `Efectivo${montoEfectivo ? ' ($' + montoEfectivo + ')' : ''}` : 'En Línea'}</span>
                   </div>
                 </div>
-                
-                {ahorroTotal > 0 && (
-                  <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] font-bold text-green-600 bg-green-50 py-1.5 rounded-full mx-auto w-max px-3 border border-green-100">
-                    <Star size={12} className="fill-green-600" /> ¡Ahorraste ${ahorroTotal.toFixed(2)}!
-                  </div>
-                )}
               </div>
+
+              {/* Banner de ahorro */}
+              {ahorroTotal > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl px-5 py-3.5 shadow-lg shadow-green-500/20"
+                >
+                  <span className="text-2xl">🎉</span>
+                  <div>
+                    <p className="font-black text-white text-[14px] leading-tight">¡Ahorraste ${ahorroTotal.toFixed(2)}!</p>
+                    <p className="text-white/75 text-[11px] font-medium leading-tight">En este pedido</p>
+                  </div>
+                </motion.div>
+              )}
+
             </motion.div>
           )}
+
 
         </AnimatePresence>
         
         {/* BOTÓN DE NAVEGACIÓN FIJO (Ocupa poco espacio) */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 z-40 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
           <div className="max-w-lg md:max-w-2xl mx-auto">
-          {checkoutStep < 5 ? (
+          {checkoutStep < 3 ? (
             <button 
               onClick={() => {
-                if (checkoutStep === 2 && (clienteTel.replace(/\D/g, '').length !== 10 || !clienteNombre.trim())) {
-                  setTelError(clienteTel.replace(/\D/g, '').length !== 10);
-                  showToast('Error', 'Completa tus datos correctamente', 'error');
-                  return;
-                }
-                if (checkoutStep === 3 && (!tipoEntrega || (tipoEntrega === 'domicilio' && (!direccionEntrega || fueraDeCobertura)))) {
-                  showToast('Error', 'Completa los datos de entrega', 'error');
-                  return;
-                }
-                if (checkoutStep === 4 && metodoPago === 'efectivo') {
-                  const montoInt = parseFloat(montoEfectivo || '0');
-                  if (montoInt < total) {
-                    showToast('Error', `El monto debe ser mayor o igual al total ($${total.toFixed(2)})`, 'error');
+                if (checkoutStep === 2) {
+                  if (clienteTel.replace(/\D/g, '').length !== 10 || !clienteNombre.trim()) {
+                    setTelError(clienteTel.replace(/\D/g, '').length !== 10);
+                    showToast('Error', 'Completa tus datos personales', 'error');
+                    const el = document.getElementById('seccion-datos');
+                    if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
+                    return;
+                  }
+                  if (!tipoEntrega || (tipoEntrega === 'domicilio' && (!direccionEntrega || fueraDeCobertura))) {
+                    showToast('Error', 'Revisa los datos de entrega', 'error');
+                    const el = document.getElementById('seccion-entrega');
+                    if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
                     return;
                   }
                 }
                 setCheckoutStep(checkoutStep + 1);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                smoothScroll(document.getElementById('cart-scroll-container'), 0, 400);
               }}
-              disabled={!isStepValid() || checkingLoyalty}
-              className="w-full bg-gradient-to-r from-slate-900 to-slate-800 text-white py-4 rounded-[20px] font-black text-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-slate-900/20"
+              disabled={checkingLoyalty}
+              className={`w-full text-white py-4 rounded-[20px] font-black text-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-xl ${!isStepValid() ? 'bg-slate-800 shadow-slate-900/10' : 'bg-gradient-to-r from-slate-900 to-slate-800 shadow-slate-900/20'}`}
             >
-              {checkingLoyalty && checkoutStep === 2 ? 'Verificando...' : getBotonText()}
+              {getBotonText()}
             </button>
           ) : (
             <button 
-              onClick={handlePedir}
-              disabled={procesando || !metodoPago}
-              className="w-full bg-gradient-to-r from-[#FA4A0C] to-[#ff6a36] text-white py-4 rounded-[20px] font-black text-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-orange-500/30 flex items-center justify-center gap-2"
+              onClick={() => {
+                if (!metodoPago || (metodoPago === 'efectivo' && (!montoEfectivo || parseFloat(montoEfectivo) < total))) {
+                  showToast('Error', 'Completa tu método de pago', 'error');
+                  return;
+                }
+                handlePedir();
+              }}
+              disabled={procesando || !isStepValid()}
+              className={`w-full py-4 rounded-[20px] font-black text-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-xl flex items-center justify-center gap-2 ${!isStepValid() ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-black text-white shadow-black/20'}`}
             >
-              {procesando ? <Loader2 size={24} className="animate-spin" /> : '¡Confirmar y Pedir!'}
+              {procesando ? <Loader2 size={24} className="animate-spin text-white" /> : getBotonText()}
             </button>
           )}
           </div>
@@ -1463,8 +1493,16 @@ export default function CartPage() {
             </div>
             <div className="flex-1 relative bg-slate-50">
               <div className="absolute top-4 right-4 z-20">
-                <button onClick={obtenerUbicacionGPS} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-700 hover:text-[#FA4A0C] transition-colors">
+                <button onClick={obtenerUbicacionGPS} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-700 hover:text-black transition-colors relative">
                   {buscandoGPS ? <Loader2 className="animate-spin" /> : <LocateFixed size={20} />}
+                  
+                  {/* Tooltip Guía */}
+                  {!ubicacionGPS && (
+                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8, type: 'spring' }} className="absolute right-[calc(100%+12px)] top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[11px] font-bold px-3 py-2 rounded-xl whitespace-nowrap pointer-events-none shadow-xl flex items-center">
+                      Toca aquí para ubicarte 📍
+                      <div className="absolute top-1/2 right-[-5px] -translate-y-1/2 border-y-4 border-y-transparent border-l-[6px] border-l-slate-900 w-0 h-0"></div>
+                    </motion.div>
+                  )}
                 </button>
               </div>
               <div className="absolute top-4 left-4 right-20 z-20 pointer-events-none">
@@ -1478,7 +1516,7 @@ export default function CartPage() {
                   <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={draftUbicacion || ubicacionGPS || { lat: 16.2516, lng: -92.1332 }} zoom={17} onLoad={map => setMapInstance(map)} onDragEnd={handleMapDragEnd} options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: PREMIUM_MAP_STYLE }}>
                   </GoogleMap>
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none drop-shadow-xl">
-                    <MapPin className="text-[#FA4A0C] w-12 h-12 fill-[#FA4A0C]" />
+                    <MapPin className="text-black w-12 h-12 fill-black" />
                     <div className="w-4 h-1 bg-black/20 rounded-full mx-auto mt-1 blur-[1px]"></div>
                   </div>
                 </div>
@@ -1487,7 +1525,7 @@ export default function CartPage() {
               )}
             </div>
             <div className="p-5 bg-white z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-t-[32px] relative -mt-4">
-              <button onClick={handleConfirmarUbicacion} disabled={!draftUbicacion && !ubicacionGPS} className="w-full bg-gradient-to-r from-[#FA4A0C] to-[#ff6a36] text-white py-4 rounded-2xl font-black text-lg disabled:opacity-50 shadow-xl shadow-orange-500/30 active:scale-[0.98] transition-all">
+              <button onClick={handleConfirmarUbicacion} disabled={!draftUbicacion && !ubicacionGPS} className="w-full bg-black text-white py-4 rounded-2xl font-black text-lg disabled:opacity-50 shadow-xl shadow-black/20 active:scale-[0.98] transition-all">
                 Confirmar esta ubicación
               </button>
             </div>
@@ -1502,13 +1540,13 @@ export default function CartPage() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowOtpModal(false)} />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative bg-white rounded-[32px] p-8 max-w-sm w-full z-10 text-center shadow-2xl">
               <button onClick={() => setShowOtpModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"><X size={16} strokeWidth={3} /></button>
-              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                <ShieldCheck size={40} className="text-[#FA4A0C]" />
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                <ShieldCheck size={40} className="text-black" />
               </div>
               <h3 className="font-black text-xl mb-2 text-slate-800">Verifica tu pedido</h3>
               <p className="text-sm text-slate-500 mb-6 font-medium">Ingresa el PIN de 4 dígitos enviado a tu WhatsApp al número <b className="text-slate-700">{clienteTel}</b></p>
-              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} maxLength={4} autoFocus className="w-full bg-slate-50 text-center text-3xl font-black tracking-[0.5em] py-4 rounded-2xl outline-none border border-slate-200 focus:border-[#FA4A0C] focus:ring-4 ring-orange-500/10 mb-6 transition-all text-slate-800" />
-              <button onClick={handleVerifyOtp} disabled={otpCode.length < 4 || verificandoOtp} className="w-full bg-gradient-to-r from-[#FA4A0C] to-[#ff6a36] text-white font-black py-4 rounded-2xl disabled:opacity-50 shadow-xl shadow-orange-500/30 flex items-center justify-center gap-2">
+              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} maxLength={4} autoFocus className="w-full bg-slate-50 text-center text-3xl font-black tracking-[0.5em] py-4 rounded-2xl outline-none border border-slate-200 focus:border-black focus:ring-4 ring-black/10 mb-6 transition-all text-slate-800" />
+              <button onClick={handleVerifyOtp} disabled={otpCode.length < 4 || verificandoOtp} className="w-full bg-black text-white font-black py-4 rounded-2xl disabled:opacity-50 shadow-xl shadow-black/20 flex items-center justify-center gap-2">
                 {verificandoOtp ? <Loader2 className="animate-spin" /> : 'Confirmar y Enviar'}
               </button>
             </motion.div>
