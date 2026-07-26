@@ -905,7 +905,7 @@ export default function CartPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100">
       <Loader2 size={48} className="animate-spin text-[#FA4A0C]" />
     </div>
   );
@@ -913,9 +913,9 @@ export default function CartPage() {
   // === ESTADO VACÍO PREMIUM ===
   if (carrito.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex flex-col font-sans text-slate-900">
-        <header className="bg-white px-4 py-4 border-b border-slate-100 flex items-center shadow-sm sticky top-0 z-50">
-          <button onClick={() => navigate(`/menu/${id}`)} className="p-2 bg-slate-50 rounded-full mr-3 hover:bg-slate-100 transition-colors">
+      <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900">
+        <header className="bg-slate-100 px-4 pt-4 pb-3 flex items-center sticky top-0 z-50">
+          <button onClick={() => navigate(`/menu/${id}`)} className="p-2 bg-white rounded-full mr-3 shadow-sm hover:bg-slate-50 transition-colors">
             <ChevronLeft size={20} className="text-slate-700" />
           </button>
           <h1 className="text-lg font-black text-slate-800">Carrito de Compras</h1>
@@ -964,7 +964,7 @@ export default function CartPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate(`/menu/${id}`)}
-            className="w-full bg-gradient-to-r from-[#FA4A0C] to-[#ff6a36] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 group"
+            className="w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-700/25 flex items-center justify-center gap-2 group"
           >
             Ver el Menú 
             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -1007,9 +1007,9 @@ export default function CartPage() {
   };
 
   return (
-    <div className="fixed inset-0 bg-white flex flex-col font-sans text-slate-900 overflow-hidden">
+    <div className="fixed inset-0 bg-slate-100 flex flex-col font-sans text-slate-900 overflow-hidden">
       {/* HEADER NATIVO */}
-      <header className="bg-white px-5 py-4 sticky top-0 z-50 flex items-center gap-4">
+      <header className="bg-slate-100 px-5 pt-4 pb-3 sticky top-0 z-50 flex items-center gap-4">
         <button 
           onClick={() => {
             if (checkoutStep > 1) {
@@ -1019,7 +1019,7 @@ export default function CartPage() {
               navigate(`/menu/${id}`);
             }
           }} 
-          className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0"
+          className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center hover:bg-slate-50 shadow-sm transition-colors shrink-0"
         >
           <ChevronLeft size={20} className="text-slate-800" strokeWidth={3} />
         </button>
@@ -1028,25 +1028,35 @@ export default function CartPage() {
           {checkoutStep === 1 && (
             <>
               <h1 className="font-black text-xl text-slate-800 leading-tight">Tu Carrito</h1>
-              <p className="text-[12px] text-slate-400 font-medium">Revisa tus artículos</p>
+              <p className="text-[12px] text-slate-500 font-medium">{carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</p>
             </>
           )}
           {checkoutStep === 2 && (
             <>
               <h1 className="font-black text-xl text-slate-800 leading-tight">Entrega</h1>
-              <p className="text-[12px] text-slate-400 font-medium">¿Dónde te lo llevamos?</p>
+              <p className="text-[12px] text-slate-500 font-medium">¿Dónde te lo llevamos?</p>
             </>
           )}
           {checkoutStep === 3 && (
             <>
               <h1 className="font-black text-xl text-slate-800 leading-tight">Pago</h1>
-              <p className="text-[12px] text-slate-400 font-medium">Casi listo para comer</p>
+              <p className="text-[12px] text-slate-500 font-medium">Casi listo para comer</p>
             </>
           )}
         </div>
         
         <div className="w-10 shrink-0"></div>
       </header>
+
+      {/* BARRA DE PROGRESO */}
+      <div className="w-full h-[3px] bg-slate-200 sticky top-[68px] z-50">
+        <motion.div
+          className="h-full bg-[#1D4ED8] rounded-full"
+          initial={false}
+          animate={{ width: checkoutStep === 1 ? '33%' : checkoutStep === 2 ? '66%' : '100%' }}
+          transition={{ type: 'spring', stiffness: 200, damping: 30 }}
+        />
+      </div>
 
       <main id="cart-scroll-container" className="flex-1 overflow-y-auto p-4 w-full relative scroll-smooth">
         <div className="max-w-lg md:max-w-2xl mx-auto pb-32">
@@ -1056,13 +1066,13 @@ export default function CartPage() {
               PASO 1 — Tu Carrito
           ══════════════════════════════════════ */}
           {checkoutStep === 1 && (
-            <motion.div key="step1" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4">
+            <motion.div key="step1" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4 space-y-3">
 
-              {/* Lista de artículos */}
-              <div className="px-1">
+              {/* Tarjeta: Lista de artículos */}
+              <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_-4px_rgba(0,0,0,0.07)]">
                 {carrito.map((p, i) => (
-                  <div key={i} className="flex gap-4 py-4 border-b border-slate-100 last:border-0">
-                    <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden shrink-0 bg-slate-100">
+                  <div key={i} className="flex gap-4 px-4 py-4 border-b border-slate-100 last:border-0">
+                    <div className="w-[68px] h-[68px] rounded-2xl overflow-hidden shrink-0 bg-slate-100">
                       <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
                     </div>
                     <div className="flex-1 flex flex-col justify-between py-0.5">
@@ -1071,29 +1081,29 @@ export default function CartPage() {
                         <span className="font-black text-[15px] text-slate-900 shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
                       </div>
                       {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                        <p className="text-[11px] text-slate-400 font-medium mt-1 leading-snug">
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-snug">
                           {p.item.opcionesSeleccionadas.map(o => o.opcion).join(' · ')}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-2 w-max bg-slate-100 rounded-full px-1.5 py-1">
-                        <button onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition-colors"><Minus size={12} strokeWidth={3}/></button>
+                      <div className="flex items-center gap-3 mt-2 w-max bg-slate-100 rounded-full px-2 py-1.5">
+                        <button onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Minus size={12} strokeWidth={3}/></button>
                         <span className="font-black text-sm w-5 text-center tabular-nums">{p.cantidad}</span>
-                        <button onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition-colors"><Plus size={12} strokeWidth={3}/></button>
+                        <button onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Plus size={12} strokeWidth={3}/></button>
                       </div>
                     </div>
                   </div>
                 ))}
+
+                {/* Subtotal dentro de la tarjeta */}
+                <div className="flex justify-between items-center px-4 py-3.5 bg-slate-50">
+                  <span className="text-[13px] text-slate-500 font-medium">Subtotal</span>
+                  <span className="font-black text-[17px] text-slate-900">${subtotal.toFixed(2)}</span>
+                </div>
               </div>
 
-              {/* Subtotal rápido */}
-              <div className="flex justify-between items-center px-1 pt-4 pb-2">
-                <span className="text-[13px] text-slate-400 font-medium">{carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</span>
-                <span className="font-black text-[17px] text-slate-900">${subtotal.toFixed(2)}</span>
-              </div>
-
-              {/* Cupón */}
-              <div className="mt-4 px-1">
-                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-2">¿Tienes un cupón?</p>
+              {/* Tarjeta: Cupón */}
+              <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_-4px_rgba(0,0,0,0.07)] px-4 py-4">
+                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Tienes un cupón?</span>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -1101,9 +1111,9 @@ export default function CartPage() {
                     value={cuponCliente}
                     onChange={e => { setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0); }}
                     disabled={validandoCupon}
-                    className="flex-1 bg-slate-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold uppercase outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-600/20 transition-all placeholder:text-slate-300"
+                    className="flex-1 bg-slate-100 rounded-2xl px-4 py-3 text-[15px] font-bold uppercase outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-600/20 transition-all placeholder:text-slate-300"
                   />
-                  <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-black text-white px-5 py-3.5 rounded-2xl text-[14px] font-bold hover:bg-slate-800 transition-colors disabled:opacity-40">
+                  <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-[#1D4ED8] text-white px-5 py-3 rounded-2xl text-[14px] font-bold hover:bg-blue-700 transition-colors disabled:opacity-40 shadow-sm shadow-blue-700/20">
                     {validandoCupon ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Aplicar'}
                   </button>
                 </div>
@@ -1127,7 +1137,7 @@ export default function CartPage() {
 
               {/* Tus datos */}
               <div id="seccion-datos">
-                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Tus datos</p>
+                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">Tus datos</span>
                 <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100/80">
                   
                   {/* Nombre Input */}
@@ -1196,7 +1206,7 @@ export default function CartPage() {
 
               {/* Tipo de entrega */}
               <div id="seccion-entrega">
-                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">¿Cómo lo recibes?</p>
+                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Cómo lo recibes?</span>
                 <div className="flex gap-2">
                   <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                     <span className="text-xl">🛵</span>
@@ -1235,7 +1245,7 @@ export default function CartPage() {
                           />
                         </div>
                       ) : (
-                        <button onClick={() => setIsMapModalOpen(true)} className="mt-4 w-full bg-black text-white py-4 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors">
+                        <button onClick={() => setIsMapModalOpen(true)} className="mt-4 w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-700/20">
                           <MapPin size={18}/> Indicar ubicación en el mapa
                         </button>
                       )}
@@ -1299,38 +1309,46 @@ export default function CartPage() {
 
               {/* Método de pago */}
               <div>
-                <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Método de pago</p>
-                <div className="space-y-2">
-                  <button onClick={() => setMetodoPago('efectivo')} className={`w-full py-4 px-5 rounded-2xl font-bold flex items-center gap-4 transition-all ${metodoPago === 'efectivo' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                    <span className="text-2xl">💵</span>
-                    <span className="flex-1 text-left text-[15px]">Efectivo al recibir</span>
-                    {metodoPago === 'efectivo' && <CheckCircle2 size={18} className="text-white shrink-0"/>}
+                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">Método de pago</span>
+                <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_-4px_rgba(0,0,0,0.07)] space-y-0 divide-y divide-slate-100">
+
+                  {/* Efectivo */}
+                  <button onClick={() => setMetodoPago('efectivo')} className={`w-full py-4 px-5 font-bold flex items-center gap-4 transition-all first:rounded-t-3xl ${metodoPago === 'efectivo' ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}>
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${metodoPago === 'efectivo' ? 'bg-blue-100' : 'bg-slate-100'}`}>💵</div>
+                    <span className={`flex-1 text-left text-[15px] ${metodoPago === 'efectivo' ? 'text-[#1D4ED8]' : 'text-slate-700'}`}>Efectivo al recibir</span>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${metodoPago === 'efectivo' ? 'border-[#1D4ED8] bg-[#1D4ED8]' : 'border-slate-300'}`}>
+                      {metodoPago === 'efectivo' && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
                   </button>
 
                   <AnimatePresence>
                     {metodoPago === 'efectivo' && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden px-1">
-                        <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-2">¿Con cuánto pagas?</p>
-                        <div className="flex gap-2">
-                          {smartDenominations.map((denom, idx) => (
-                            <button key={idx} onClick={() => setMontoEfectivo(denom.toString())} className={`flex-1 py-3 rounded-2xl font-black text-[14px] transition-all ${montoEfectivo === denom.toString() ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                              ${denom.toFixed(0)}
-                              {idx === 0 && <span className="block text-[9px] font-bold opacity-60 uppercase mt-0.5">Exacto</span>}
-                            </button>
-                          ))}
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden bg-blue-50">
+                        <div className="px-5 pb-4 pt-1">
+                          <p className="text-[11px] font-bold text-blue-400 uppercase tracking-widest mb-2">¿Con cuánto pagas?</p>
+                          <div className="flex gap-2">
+                            {smartDenominations.map((denom, idx) => (
+                              <button key={idx} onClick={() => setMontoEfectivo(denom.toString())} className={`flex-1 py-3 rounded-2xl font-black text-[14px] transition-all border-2 ${montoEfectivo === denom.toString() ? 'bg-[#1D4ED8] border-[#1D4ED8] text-white shadow-md shadow-blue-700/20' : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'}`}>
+                                ${denom.toFixed(0)}
+                                {idx === 0 && <span className="block text-[9px] font-bold opacity-60 uppercase mt-0.5">Exacto</span>}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
                   {restaurante?.acepta_pago_online && (
-                    <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-4 px-5 rounded-2xl font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                      <span className="text-2xl">💳</span>
+                    <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-4 px-5 font-bold flex items-center gap-4 transition-all last:rounded-b-3xl ${metodoPago === 'en_linea' ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}>
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${metodoPago === 'en_linea' ? 'bg-blue-100' : 'bg-slate-100'}`}>💳</div>
                       <div className="flex-1 text-left">
-                        <span className="block text-[15px]">Pago en Línea</span>
-                        <span className={`block text-[11px] font-medium ${metodoPago === 'en_linea' ? 'text-white/60' : 'text-slate-400'}`}>Tarjeta o Mercado Pago</span>
+                        <span className={`block text-[15px] ${metodoPago === 'en_linea' ? 'text-[#1D4ED8]' : 'text-slate-700'}`}>Pago en Línea</span>
+                        <span className={`block text-[11px] font-medium ${metodoPago === 'en_linea' ? 'text-blue-400' : 'text-slate-400'}`}>Tarjeta o Mercado Pago</span>
                       </div>
-                      {metodoPago === 'en_linea' && <CheckCircle2 size={18} className="text-white shrink-0"/>}
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${metodoPago === 'en_linea' ? 'border-[#1D4ED8] bg-[#1D4ED8]' : 'border-slate-300'}`}>
+                        {metodoPago === 'en_linea' && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
                     </button>
                   )}
                 </div>
@@ -1432,8 +1450,8 @@ export default function CartPage() {
 
         </AnimatePresence>
         
-        {/* BOTÓN DE NAVEGACIÓN FIJO (Ocupa poco espacio) */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 z-40 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+        {/* BOTÓN DE NAVEGACIÓN FIJO */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-slate-100/95 backdrop-blur-md z-40">
           <div className="max-w-lg md:max-w-2xl mx-auto">
           {checkoutStep < 3 ? (
             <button 
@@ -1457,7 +1475,11 @@ export default function CartPage() {
                 smoothScroll(document.getElementById('cart-scroll-container'), 0, 400);
               }}
               disabled={checkingLoyalty}
-              className={`w-full text-white py-4 rounded-[20px] font-black text-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-xl ${!isStepValid() ? 'bg-slate-800 shadow-slate-900/10' : 'bg-gradient-to-r from-slate-900 to-slate-800 shadow-slate-900/20'}`}
+              className={`w-full text-white py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg ${
+                !isStepValid()
+                  ? 'bg-slate-400 shadow-none'
+                  : 'bg-[#1D4ED8] shadow-blue-700/25 hover:bg-blue-700'
+              }`}
             >
               {getBotonText()}
             </button>
@@ -1471,9 +1493,13 @@ export default function CartPage() {
                 handlePedir();
               }}
               disabled={procesando || !isStepValid()}
-              className={`w-full py-4 rounded-[20px] font-black text-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-xl flex items-center justify-center gap-2 ${!isStepValid() ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-black text-white shadow-black/20'}`}
+              className={`w-full py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 ${
+                !isStepValid()
+                  ? 'bg-slate-300 text-slate-400 shadow-none'
+                  : 'bg-[#1D4ED8] text-white shadow-blue-700/25 hover:bg-blue-700'
+              } disabled:opacity-60`}
             >
-              {procesando ? <Loader2 size={24} className="animate-spin text-white" /> : getBotonText()}
+              {procesando ? <Loader2 size={22} className="animate-spin text-white" /> : getBotonText()}
             </button>
           )}
           </div>
@@ -1525,7 +1551,7 @@ export default function CartPage() {
               )}
             </div>
             <div className="p-5 bg-white z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-t-[32px] relative -mt-4">
-              <button onClick={handleConfirmarUbicacion} disabled={!draftUbicacion && !ubicacionGPS} className="w-full bg-black text-white py-4 rounded-2xl font-black text-lg disabled:opacity-50 shadow-xl shadow-black/20 active:scale-[0.98] transition-all">
+              <button onClick={handleConfirmarUbicacion} disabled={!draftUbicacion && !ubicacionGPS} className="w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-black text-lg disabled:opacity-50 shadow-lg shadow-blue-700/25 hover:bg-blue-700 active:scale-[0.98] transition-all">
                 Confirmar esta ubicación
               </button>
             </div>
@@ -1545,8 +1571,8 @@ export default function CartPage() {
               </div>
               <h3 className="font-black text-xl mb-2 text-slate-800">Verifica tu pedido</h3>
               <p className="text-sm text-slate-500 mb-6 font-medium">Ingresa el PIN de 4 dígitos enviado a tu WhatsApp al número <b className="text-slate-700">{clienteTel}</b></p>
-              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} maxLength={4} autoFocus className="w-full bg-slate-50 text-center text-3xl font-black tracking-[0.5em] py-4 rounded-2xl outline-none border border-slate-200 focus:border-black focus:ring-4 ring-black/10 mb-6 transition-all text-slate-800" />
-              <button onClick={handleVerifyOtp} disabled={otpCode.length < 4 || verificandoOtp} className="w-full bg-black text-white font-black py-4 rounded-2xl disabled:opacity-50 shadow-xl shadow-black/20 flex items-center justify-center gap-2">
+              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} maxLength={4} autoFocus className="w-full bg-slate-50 text-center text-3xl font-black tracking-[0.5em] py-4 rounded-2xl outline-none border border-slate-200 focus:border-[#1D4ED8] focus:ring-4 ring-blue-600/10 mb-6 transition-all text-slate-800" />
+              <button onClick={handleVerifyOtp} disabled={otpCode.length < 4 || verificandoOtp} className="w-full bg-[#1D4ED8] text-white font-black py-4 rounded-2xl disabled:opacity-50 shadow-lg shadow-blue-700/25 hover:bg-blue-700 flex items-center justify-center gap-2">
                 {verificandoOtp ? <Loader2 className="animate-spin" /> : 'Confirmar y Enviar'}
               </button>
             </motion.div>
