@@ -133,26 +133,26 @@ export function PushNotificationSetup() {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed top-4 left-4 right-4 md:left-1/2 md:w-auto md:-translate-x-1/2 z-[110] bg-white rounded-2xl shadow-xl p-4 border border-slate-100 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-      <div className="w-10 h-10 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center shrink-0">
-        <Bell size={20} />
+    <div className="fixed bottom-6 left-4 right-4 md:left-1/2 md:w-[400px] md:-translate-x-1/2 z-[110] bg-zinc-900 text-white rounded-[20px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] p-5 border border-zinc-800 flex items-start gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out">
+      <div className="w-12 h-12 bg-orange-500/20 text-orange-400 rounded-full flex items-center justify-center shrink-0 border border-orange-500/20">
+        <Bell size={22} />
       </div>
-      <div className="flex-1 pt-1">
-        <h4 className="font-bold text-slate-800 text-sm">Activa las notificaciones</h4>
-        <p className="text-xs text-slate-500 mt-1">
+      <div className="flex-1 pt-0.5">
+        <h4 className="font-bold text-white text-[15px] tracking-tight">Activa las notificaciones</h4>
+        <p className="text-[13px] text-zinc-400 mt-1.5 leading-snug pr-2">
           Entérate al instante de promociones exclusivas, cupones y el estado de tu pedido.
         </p>
-        <div className="flex items-center gap-3 mt-3">
+        <div className="flex items-center gap-4 mt-4">
           <button
             onClick={() => subscribeUser(false)}
             disabled={isSubscribing}
-            className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-600 transition-colors disabled:opacity-50"
+            className="bg-orange-500 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-orange-600 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-orange-500/20"
           >
             {isSubscribing ? 'Activando...' : 'Activar ahora'}
           </button>
           <button
             onClick={handleDismiss}
-            className="text-slate-400 hover:text-slate-600 text-xs font-medium"
+            className="text-zinc-400 hover:text-white text-xs font-semibold transition-colors"
           >
             Quizás luego
           </button>
@@ -160,9 +160,9 @@ export function PushNotificationSetup() {
       </div>
       <button 
         onClick={handleDismiss}
-        className="text-slate-300 hover:text-slate-500 p-1"
+        className="absolute top-4 right-4 text-zinc-500 hover:text-zinc-300 transition-colors p-1"
       >
-        <X size={16} />
+        <X size={18} />
       </button>
     </div>
   );
