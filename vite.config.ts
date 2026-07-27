@@ -63,6 +63,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        importScripts: ['/push-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,woff,woff2}'],
         globIgnores: ['**/login-cover.png', '**/login-cover.jpg'],
         runtimeCaching: [
