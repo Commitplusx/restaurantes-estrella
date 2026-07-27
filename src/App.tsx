@@ -6,16 +6,37 @@ import { OfflineBanner } from './components/OfflineBanner'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
-// Lazy loading de las vistas para hacer Code Splitting
-const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })))
-const PortalPage = lazy(() => import('./pages/PortalPage').then(module => ({ default: module.PortalPage })))
-const PublicLandingPage = lazy(() => import('./pages/PublicLandingPage').then(module => ({ default: module.PublicLandingPage })))
-const PublicMenuView = lazy(() => import('./pages/PublicMenuView').then(module => ({ default: module.PublicMenuView })))
-const CartPage = lazy(() => import('./pages/CartPage').then(module => ({ default: module.default })))
-const SuccessPage = lazy(() => import('./pages/SuccessPage').then(module => ({ default: module.SuccessPage })))
-const BeneficiosPage = lazy(() => import('./pages/BeneficiosPage').then(module => ({ default: module.BeneficiosPage })))
-const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })))
-const TermsPage = lazy(() => import('./pages/TermsPage').then(module => ({ default: module.TermsPage })))
+// Wrapper para evitar pantalla blanca cuando un chunk (JS viejo) falla al cargar (común en SPAs tras un deploy)
+const lazyWithRetry = (componentImport: () => Promise<any>) =>
+  lazy(async () => {
+    const pageHasAlreadyBeenForceRefreshed = JSON.parse(
+      window.sessionStorage.getItem('page-has-been-force-refreshed') || 'false'
+    );
+
+    try {
+      const component = await componentImport();
+      window.sessionStorage.setItem('page-has-been-force-refreshed', 'false');
+      return component;
+    } catch (error) {
+      if (!pageHasAlreadyBeenForceRefreshed) {
+        window.sessionStorage.setItem('page-has-been-force-refreshed', 'true');
+        window.location.reload();
+        return new Promise(() => {}); // Pausar ejecución mientras recarga
+      }
+      throw error;
+    }
+  });
+
+// Lazy loading de las vistas para hacer Code Splitting con auto-recarga
+const LoginPage = lazyWithRetry(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })))
+const PortalPage = lazyWithRetry(() => import('./pages/PortalPage').then(module => ({ default: module.PortalPage })))
+const PublicLandingPage = lazyWithRetry(() => import('./pages/PublicLandingPage').then(module => ({ default: module.PublicLandingPage })))
+const PublicMenuView = lazyWithRetry(() => import('./pages/PublicMenuView').then(module => ({ default: module.PublicMenuView })))
+const CartPage = lazyWithRetry(() => import('./pages/CartPage').then(module => ({ default: module.default })))
+const SuccessPage = lazyWithRetry(() => import('./pages/SuccessPage').then(module => ({ default: module.SuccessPage })))
+const BeneficiosPage = lazyWithRetry(() => import('./pages/BeneficiosPage').then(module => ({ default: module.BeneficiosPage })))
+const PrivacyPage = lazyWithRetry(() => import('./pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })))
+const TermsPage = lazyWithRetry(() => import('./pages/TermsPage').then(module => ({ default: module.TermsPage })))
 
 import { CookieBanner } from './components/CookieBanner'
 import { PushNotificationSetup } from './components/PushNotificationSetup'
