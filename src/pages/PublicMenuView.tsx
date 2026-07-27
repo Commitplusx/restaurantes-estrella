@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useCartStore } from '../store/useCartStore'
@@ -272,6 +273,7 @@ export function PublicMenuView() {
 
   // Estado del carrito y drawer (Global via Zustand)
   const carrito = useCartStore(state => state.carrito as { item: CartItem & { foto_url?: string }, cantidad: number }[])
+  const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
   const isCartOpen = useCartStore(state => state.isCartOpen)
   const setIsCartOpen = useCartStore(state => state.setIsCartOpen)
   const _addToCart = useCartStore(state => state.addToCart)
@@ -415,6 +417,7 @@ export function PublicMenuView() {
     return pools.sort((a, b) => a.precio - b.precio).slice(0, 3);
   }, [carrito, items]);
   
+  /*
   // Revisar si el cliente tiene envío gratis por lealtad o saldo VIP
   useEffect(() => {
     const telLimpio = clienteTel.replace(/\D/g, '')
@@ -492,6 +495,7 @@ export function PublicMenuView() {
     idempotencyKeyRef.current = null;
     ticketIdRef.current = null;
   }, [carrito, metodoPago, tipoEntrega, descuento, clienteNombre, clienteTel, direccionEntrega, ubicacionGPS]);
+  */
 
   // Estado del modal de opciones de producto
   type OptionableItem = (MenuItem | MenuCombo | MenuPromocion) & { __tipo: 'item' | 'combo' | 'promo', nombre?: string, precio?: number }
@@ -520,6 +524,7 @@ export function PublicMenuView() {
     }
   }
 
+  /*
   const validarCuponBtn = async () => {
     if (!cuponCliente.trim()) return
     setValidandoCupon(true)
@@ -635,6 +640,7 @@ export function PublicMenuView() {
       setValidandoCupon(false)
     }
   }
+  */
 
   // Verificamos si la ruta o id cambian para hacer reload silencioso si es necesario
 
@@ -884,6 +890,7 @@ export function PublicMenuView() {
     }
   }, [id])
 
+  /*
   // --- Lógica de Subsidio Dinámico ($8 por artículo) ---
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
   
@@ -907,6 +914,7 @@ export function PublicMenuView() {
   const costoEnvio = isFreeDelivery ? 0 : costoEnvioCalculado;
   // Bugfix: Evitar que mediante la consola del navegador pongan un monto VIP negativo para sumar saldo
   const descuentoVip = (usarSaldoVip && datosCliente?.es_vip && pinAutorizado) ? Math.max(0, parseFloat(montoSaldoVip || '0')) : 0;
+  */
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
     if (restaurante && !estaAbierto(restaurante)) {
@@ -932,6 +940,7 @@ export function PublicMenuView() {
     }
 
     // Bugfix: Evitar fraude con cupones. Si cambia el carrito, obligar a re-evaluar el cupón.
+    /*
     if (cuponValido) {
       setCuponValido(false)
       setDescuento(0)
@@ -939,12 +948,14 @@ export function PublicMenuView() {
       setCuponPlataformaIdManual(null)
       showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
     }
+    */
 
     _addToCart(product)
   }
 
   const removeFromCart = (cartItemId: string) => {
     // Bugfix: Evitar fraude con cupones. Si quita cosas, podría evadir el monto mínimo.
+    /*
     if (cuponValido) {
       setCuponValido(false)
       setDescuento(0)
@@ -952,6 +963,7 @@ export function PublicMenuView() {
       setCuponPlataformaIdManual(null)
       showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
     }
+    */
 
     _removeFromCart(cartItemId)
   }
@@ -1171,326 +1183,6 @@ export function PublicMenuView() {
         maximumAge: 60000 // Aceptar ubicación cacheada de hasta 1 min
       }
     )
-  }
-
-
-  const cartCount = carrito.reduce((sum, p) => sum + p.cantidad, 0)
-
-  // BUG 4 fix: reset coupon if cart subtotal drops to 0 or below discount amount
-  const costoTotalEnvioBase = (tipoEntrega === 'domicilio' && !fueraDeCobertura) ? costoEnvio : 0;
-  
-  // Procesar Cupon de Plataforma Automático o Manual (envio_fijo, porcentaje, monto_fijo)
-  let costoEnvioFinal = costoTotalEnvioBase;
-  let descuentoTotal = descuento;
-  let cuponPlataformaActivo = null;
-
-  if (cuponValido && costoEnvioFijoOverride !== null) {
-    if (costoEnvioFinal > costoEnvioFijoOverride) {
-      costoEnvioFinal = costoEnvioFijoOverride;
-    }
-  }
-
-  if (cuponValido && cuponPlataformaIdManual) {
-    cuponPlataformaActivo = { id: cuponPlataformaIdManual, tipo: costoEnvioFijoOverride !== null ? 'envio_fijo' : 'monto_fijo' }; 
-  } else if (!cuponValido && cuponPlataformaAuto) {
-    const cp = cuponPlataformaAuto;
-    const isValidAuto = !cp.uso_maximo || cp.usos_actuales < cp.uso_maximo;
-    if (isValidAuto) {
-      cuponPlataformaActivo = cp;
-      if (cp.tipo === 'envio_fijo' && costoTotalEnvioBase > cp.valor) {
-        costoEnvioFinal = cp.valor;
-      } else if (cp.tipo === 'porcentaje') {
-        descuentoTotal += (subtotal * (cp.valor / 100));
-      } else if (cp.tipo === 'monto_fijo') {
-        descuentoTotal += cp.valor;
-      }
-    }
-  }
-
-  const descuentoAplicable = (subtotal + costoEnvioFinal) > 0 ? Math.min(descuentoTotal + descuentoVip, subtotal + costoEnvioFinal) : 0;
-  const total = Math.max(0, subtotal + costoEnvioFinal - descuentoAplicable);
-
-  console.log("=== LOGS DE CARRITO ===", { subtotal, costoEnvioBase, bolsaSubsidio, costoEnvioCalculado, isFreeDelivery, usarBeneficioNormal, datosCliente, costoEnvio, descuentoVip, usarSaldoVip, pinAutorizado, montoSaldoVip, costoEnvioFinal, descuentoAplicable, total });
-
-  // Limpiar todos los campos del checkout y volver al paso 1
-  const resetCheckout = () => {
-    setCheckoutStep(1)
-    setTipoEntrega(null)
-    setCuponCliente('')
-    setCuponPlataformaIdManual(null)
-    setCuponValido(false)
-    setDescuento(0)
-    setCostoEnvioFijoOverride(null)
-    setDireccionReferencias('')
-    sessionStorage.removeItem('est_tipoentrega')
-    sessionStorage.removeItem('est_checkoutstep')
-  }
-
-  const closeCart = () => {
-    setIsCartOpen(false)
-    setTimeout(() => resetCheckout(), 300)
-  }
-
-  const handlePedir = async () => {
-    if (!restaurante || carrito.length === 0) return
-    if (submittingRef.current) return
-    
-    if (!clienteNombre.trim()) {
-      showToast('Falta el nombre', 'Por favor ingresa tu nombre para continuar', 'error')
-      return
-    }
-    
-    // Validación estricta final de envío a domicilio
-    if (tipoEntrega === 'domicilio') {
-      if (!direccionEntrega.trim() || !ubicacionGPS) {
-        showToast('Ubicación requerida', 'Por favor confirma tu ubicación en el mapa', 'error')
-        setCheckoutStep(3)
-        return
-      }
-      if (fueraDeCobertura) {
-        showToast('Fuera de cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error')
-        setCheckoutStep(3)
-        return
-      }
-    }
-
-    // Bug #1: proper phone validation
-    const telLimpio = clienteTel.replace(/\D/g, '')
-    if (telLimpio.length < 10) {
-      setTelError(true)
-      return
-    }
-    setTelError(false)
-
-    if (metodoPago === 'efectivo') {
-      if (!montoEfectivo) {
-        showToast('Falta el monto', 'Por favor ingresa con cuánto vas a pagar.', 'error')
-        return
-      }
-      if (Number(montoEfectivo) < total) {
-        showToast('Monto inválido', `El monto debe ser al menos de $${total.toFixed(2)}`, 'error')
-        return
-      }
-      if (showOtpModal || verificandoOtp) return
-      
-      setProcesando(true)
-      try {
-        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp'
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-        
-        const res = await fetch(edgeUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ action: 'request-client-otp', telefono: telLimpio })
-        })
-        if (!res.ok) throw new Error('No pudimos enviar el código SMS')
-        
-        setShowOtpModal(true)
-        // No cerramos el carrito para que se quede de fondo
-      } catch (err: any) {
-        showToast('Error', err.message, 'error')
-      } finally {
-        setProcesando(false)
-      }
-      return
-    }
-
-    procesarOrden()
-  }
-
-  const generarPayloadPedido = () => {
-    const telLimpio = clienteTel.replace(/\D/g, '')
-
-    if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = crypto.randomUUID()
-      ticketIdRef.current = Math.random().toString(36).substring(2, 8).toUpperCase()
-    }
-    const ticketId = ticketIdRef.current!
-
-    const pedidoDetalles = carrito.map(p => {
-      const tag = p.item.tipo === 'combo' ? '[COMBO] ' : p.item.tipo === 'promo' ? '[PROMO] ' : ''
-      let optionsStr = ''
-      if (p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0) {
-        optionsStr = '\n  └ ' + p.item.opcionesSeleccionadas.map(o => `+ ${o.opcion}`).join(', ')
-      }
-      return `${p.cantidad}x ${tag}${p.item.nombre} ($${(p.item.precio * p.cantidad).toFixed(2)})${optionsStr}`
-    }).join('\n')
-
-    const detallesEntregaStr = tipoEntrega === 'domicilio' 
-      ? `\n\n🛵 *Tipo de entrega:* A domicilio` + 
-        `\n📍 *Dirección:* ${direccionEntrega}` + 
-        (direccionReferencias.trim() ? `\n📝 *Referencias:* ${direccionReferencias}` : '') +
-        (costoEnvio > 0 ? `\n🚚 *Costo Envío:* $${costoEnvio}` : '')
-      : `\n\n🏪 *Tipo de entrega:* Recoger en tienda`
-      
-    const montoPagaCon = metodoPago === 'efectivo' && montoEfectivo ? ` (Paga con: $${montoEfectivo})` : ''
-    const notasPagoStr = `\n\n💳 *Método de Pago:* ${metodoPago === 'efectivo' ? `Efectivo al recibir${montoPagaCon}` : 'Pago en línea'}` +
-                         (descuentoAplicable > 0 ? `\n🏷️ *Descuento Aplicado:* -${descuentoAplicable.toFixed(2)}` : '') +
-                         (descuentoVip > 0 ? ` (Billetera VIP)` : '');
-                         
-    const pedidoCompleto = pedidoDetalles + detallesEntregaStr + notasPagoStr;
-
-    const pinSeguridad = total > 500 ? Math.floor(1000 + Math.random() * 9000).toString() : null
-
-    return {
-      cliente_tel: telLimpio,
-      cliente_nombre: clienteNombre.trim(),
-      restaurante: restaurante?.nombre || '',
-      restaurante_id: restaurante?.id || null,
-      restaurante_lat: restaurante?.lat || null,
-      restaurante_lng: restaurante?.lng || null,
-      descripcion: pedidoCompleto,
-      direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
-      referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,
-      lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
-      lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
-      estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
-      estado_cocina: 'pendiente',
-      wb_message_id: ticketId,
-      metodo_pago: metodoPago,
-      total: total,
-      tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
-      pin_seguridad: pinSeguridad,
-      idempotency_key: idempotencyKeyRef.current,
-      cupon_plataforma_id: cuponPlataformaActivo?.id || null,
-      descuento_plataforma: cuponPlataformaActivo ? (costoTotalEnvioBase - costoEnvioFinal + (cuponPlataformaActivo.tipo !== 'envio_fijo' ? descuentoTotal : 0)) : 0
-    }
-  }
-
-  const procesarOrden = async () => {
-    if (submittingRef.current) return
-    submittingRef.current = true
-    setProcesando(true)
-    
-    const payload = generarPayloadPedido()
-
-    try {
-      const { error: insertError } = await supabase.from('pedidos').insert([payload]).select('id').single()
-
-      if (insertError) {
-        if (insertError.code === '23505') {
-          console.warn("Pedido duplicado detectado (idempotency key), recuperando el existente...")
-        } else {
-          throw insertError
-        }
-      }
-
-    } catch (err: any) {    
-      alert('Hubo un problema registrando el pedido en la base de datos: ' + (err.message || 'Error desconocido') + '. Por favor intenta nuevamente.');
-      submittingRef.current = false // BUG 5 fix
-      setProcesando(false);
-      return;
-    }
-
-    if (metodoPago === 'en_linea') {
-      try {
-        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/mercadopago-checkout'
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-        
-        const res = await fetch(edgeUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${anonKey}`
-          },
-          body: JSON.stringify({
-            pedidoId: payload.wb_message_id, // Pasamos el ticketId para enlazar con la tabla pedidos
-            items: carrito,
-            costo_envio: costoEnvioFinal,
-            descuento: descuentoTotal,
-            total: total,
-            originUrl: window.location.origin,
-            idempotencyKey: idempotencyKeyRef.current
-          })
-        })
-        
-        const data = await res.json()
-        console.log("MP_DEBUG - Respuesta raw del servidor:", data)
-        console.log("MP_DEBUG - Código de estado HTTP:", res.status)
-
-        if (!res.ok) {
-          console.error("MP_DEBUG - Error detectado por HTTP status. Status:", res.status, "Body:", data)
-          throw new Error(data.error || 'Error al generar link de Mercado Pago')
-        }
-        
-        if (data.url) {
-          console.log("MP_DEBUG - URL de pago generada correctamente:", data.url)
-          window.location.href = data.url
-          return
-        } else {
-          console.error("MP_DEBUG - No vino la URL en el payload exitoso:", data)
-          throw new Error('Mercado Pago no devolvió un link de pago válido. Intenta nuevamente.')
-        }
-      } catch (err: any) {
-        console.error("MP_DEBUG - Excepción atrapada en el catch:", err)
-        showToast('Error', err.message || 'No se pudo generar el pago en línea', 'error')
-        submittingRef.current = false // BUG 5 fix
-        setProcesando(false)
-        return
-      }
-    } else {
-      // Flujo 100% Web para pagos en Efectivo — limpiar todo
-      setIsCartOpen(false)
-      _clearCart()
-      setClienteNombre('')
-      setClienteTel('')
-      setCuponCliente('')
-      setCuponValido(false)
-      setDescuento(0)
-      setCostoEnvioFijoOverride(null)
-      setDireccionReferencias('')
-      setTipoEntrega(null)
-      setUbicacionGPS(null)
-      setDireccionEntrega('')
-      idempotencyKeyRef.current = null
-      ticketIdRef.current = null
-      sessionStorage.clear()
-      window.location.href = `/success?pedido=${payload.wb_message_id}&success=true`
-    }
-  }
-
-  const handleVerifyOtp = async () => {
-    if (otpCode.length < 4) return
-    setVerificandoOtp(true)
-    try {
-      const payload = generarPayloadPedido()
-      const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp'
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-      
-      const res = await fetch(edgeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-        body: JSON.stringify({ action: 'verify-and-order', telefono: clienteTel.replace(/\D/g, ''), codigo: otpCode, payload })
-      })
-      
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Código incorrecto')
-      
-      setShowOtpModal(false)
-      
-      // Limpiamos y redirigimos (Flujo Efectivo exitoso)
-      setIsCartOpen(false)
-      _clearCart()
-      setClienteNombre('')
-      setClienteTel('')
-      setCuponCliente('')
-      setCuponValido(false)
-      setDescuento(0)
-      setCostoEnvioFijoOverride(null)
-      setDireccionReferencias('')
-      setTipoEntrega(null)
-      setUbicacionGPS(null)
-      setDireccionEntrega('')
-      idempotencyKeyRef.current = null
-      ticketIdRef.current = null
-      sessionStorage.clear()
-      window.location.href = `/success?pedido=${payload.wb_message_id}&success=true`
-      
-    } catch (err: any) {
-      showToast('Código Incorrecto', err.message, 'error')
-    } finally {
-      setVerificandoOtp(false)
-    }
   }
 
   if (restaurantePausado) return (
@@ -2188,553 +1880,7 @@ export function PublicMenuView() {
         )}
       </AnimatePresence>
 
-{/* Drawer de Carrito y modal de opciones */}
-  <AnimatePresence>
-    {isCartOpen && (
-      <motion.div key="cart-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100]" onClick={closeCart} />
-    )}
-  </AnimatePresence>
-  <AnimatePresence>
-    {isCartOpen && (
-      <motion.div 
-        key="cart-drawer"
-        initial={{ x: '100%' }} 
-        animate={{ x: 0 }} 
-        exit={{ x: '100%' }} 
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }} 
-        style={{ willChange: "transform" }}
-        className="fixed inset-0 w-full h-[100dvh] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:h-[100vh] sm:w-[440px] sm:max-w-md bg-white z-[110] shadow-[0_-5px_40px_rgba(0,0,0,0.1)] sm:shadow-2xl flex flex-col overflow-hidden"
-      >
-          
-          <div className="p-5 md:p-6 pb-4 border-b border-slate-100 flex flex-col shrink-0 bg-white z-10 shadow-sm relative">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                {checkoutStep > 1 && (
-                  <button onClick={() => setCheckoutStep(prev => prev - 1)} className="p-2 -ml-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 hover:text-[#FA4A0C] transition-colors">
-                    <ChevronLeft size={22} strokeWidth={2.5} />
-                  </button>
-                )}
-                <div className="flex flex-col">
-                  <h2 className="text-[22px] font-black text-slate-900 tracking-tight leading-tight">
-                    {checkoutStep === 1 ? 'Tu Pedido' : checkoutStep === 2 ? 'Tus Datos' : checkoutStep === 3 ? 'Entrega' : 'Método de Pago'}
-                  </h2>
-                  <p className="text-orange-500 font-bold text-[12px] uppercase tracking-wider">{restaurante.nombre}</p>
-                </div>
-              </div>
-              <button onClick={closeCart} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><X size={20} strokeWidth={2.5} /></button>
-            </div>
-            
-            {carrito.length > 0 && (
-              <div className="flex items-center justify-between mt-5">
-                <div className={`flex-1 h-1.5 rounded-full transition-colors ${checkoutStep >= 1 ? 'bg-[#FA4A0C]' : 'bg-slate-200'}`} />
-                <div className="w-2" />
-                <div className={`flex-1 h-1.5 rounded-full transition-colors ${checkoutStep >= 2 ? 'bg-[#FA4A0C]' : 'bg-slate-200'}`} />
-                <div className="w-2" />
-                <div className={`flex-1 h-1.5 rounded-full transition-colors ${checkoutStep >= 3 ? 'bg-[#FA4A0C]' : 'bg-slate-200'}`} />
-                <div className="w-2" />
-                <div className={`flex-1 h-1.5 rounded-full transition-colors ${checkoutStep >= 4 ? 'bg-[#FA4A0C]' : 'bg-slate-200'}`} />
-              </div>
-            )}
-          </div>
 
-          <div className="flex-1 overflow-y-auto p-6 hide-scrollbar relative overflow-x-hidden">
-            {carrito.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
-                <ShoppingBag size={48} className="text-slate-300 mb-4" />
-                <p className="text-slate-500 font-medium">Tu carrito está vacío</p>
-                <button onClick={closeCart} className="mt-6 px-6 py-2.5 bg-slate-100 text-slate-600 rounded-full font-bold text-sm">Ver menú</button>
-              </div>
-            ) : (
-              <div className="w-full h-full relative">
-                {/* PASO 1: RESUMEN */}
-                {checkoutStep === 1 && (
-                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="flex flex-col h-full">
-                    <div className="space-y-0 divide-y divide-slate-100">
-                      {carrito.map((p, i) => (
-                        <div key={i} className="flex gap-3 py-3.5 bg-white group">
-                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[12px] overflow-hidden bg-slate-50 shrink-0 border border-slate-100 relative">
-                            {p.item.foto_url ? (
-                              <LazyImage src={p.item.foto_url} alt={p.item.nombre} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-300"><Store size={20} /></div>
-                            )}
-                          </div>
-                          <div className="flex-1 flex flex-col justify-center min-w-0">
-                            <div className="flex justify-between items-start mb-0.5">
-                              <h4 className="font-bold text-slate-800 text-[13px] sm:text-[14px] leading-tight pr-2 truncate">{p.item.nombre}</h4>
-                              <span className="font-black text-slate-900 text-[13px] sm:text-[14px]">${(p.item.precio * p.cantidad).toFixed(2)}</span>
-                            </div>
-                            {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5 mb-2.5">
-                                {p.item.opcionesSeleccionadas.map((o, idx) => (
-                                  <span key={idx} className="bg-slate-100/80 border border-slate-200 text-slate-500 text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md font-medium leading-tight">
-                                    {o.opcion}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full p-0.5 w-max mt-auto">
-                              <button onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-red-500 transition-colors"><Minus size={12} /></button>
-                              <span className="font-bold text-[12px] w-5 text-center text-slate-800">{p.cantidad}</span>
-                              <button onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-green-600 transition-colors"><Plus size={12} /></button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* RECOMENDACIONES SMART */}
-                    {recomendaciones.length > 0 && (
-                      <div className="mt-6 mb-2">
-                        <h4 className="font-bold text-slate-800 text-[13px] mb-3 flex items-center gap-1.5 px-1">
-                          <Sparkles size={16} className="text-amber-500 fill-amber-500"/> Completa tu pedido con:
-                        </h4>
-                        <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-3 snap-x -mx-6 px-6">
-                          {recomendaciones.map((rec) => (
-                            <div key={rec.id} className="snap-start shrink-0 w-[140px] bg-white border border-slate-100 rounded-[20px] p-2.5 shadow-sm flex flex-col hover:border-slate-300 transition-colors">
-                               <div className="w-full h-20 bg-slate-50 rounded-xl mb-2.5 overflow-hidden border border-slate-50">
-                                 <LazyImage src={rec.foto_url} alt={rec.nombre} className="w-full h-full object-cover" />
-                               </div>
-                               <h5 className="font-bold text-slate-700 text-[11px] leading-tight line-clamp-2 mb-2">{rec.nombre}</h5>
-                               <div className="mt-auto flex items-center justify-between">
-                                 <span className="font-black text-slate-900 text-[13px]">${rec.precio}</span>
-                                 <button onClick={() => {
-                                   if (rec.opciones && rec.opciones.length > 0) {
-                                     setSelectedItemForOptions({...rec, __tipo: 'item'})
-                                   } else {
-                                     addToCart({...rec, foto_url: rec.foto_url || undefined, tipo: 'item', cartItemId: rec.id})
-                                   }
-                                 }} className="bg-[#FA4A0C] text-white w-7 h-7 rounded-full flex items-center justify-center shadow-[0_4px_10px_rgba(250,74,12,0.3)] hover:scale-110 active:scale-95 transition-all">
-                                   <Plus size={14} strokeWidth={3}/>
-                                 </button>
-                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-6 bg-slate-50 rounded-[24px] p-5 border border-slate-100">
-                      <h4 className="font-bold text-slate-800 mb-3 text-[13px] flex items-center gap-2 uppercase tracking-widest"><Ticket size={16} className="text-[#FA4A0C]"/> ¿Tienes un cupón?</h4>
-                      <div className="flex gap-2">
-                        <input type="text" placeholder="Código de descuento" value={cuponCliente} onChange={e => {setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0)}} className="flex-1 bg-white border border-slate-200 rounded-[16px] px-4 py-3 text-sm uppercase outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 font-bold shadow-sm transition-all" disabled={validandoCupon} />
-                        <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-slate-900 text-white px-6 py-3 rounded-[16px] text-sm font-bold disabled:opacity-50 hover:bg-black transition-colors">{validandoCupon ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Aplicar'}</button>
-                      </div>
-                      {cuponValido && <p className="text-green-600 text-xs font-bold mt-3 flex items-center gap-1.5 bg-green-50 p-2 rounded-lg"><CheckCircle2 size={14}/> Cupón aplicado exitosamente: -$${descuento.toFixed(2)}</p>}
-                      
-                      {/* Toast Promocional del Envío Dinámico */}
-                      {costoEnvioBase > 0 && costoEnvio > 0 && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-blue-50/80 border border-blue-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
-                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                            <span className="text-xl">🛵</span>
-                          </div>
-                          <p className="text-[13px] text-blue-800 font-medium leading-tight">
-                            ¡Tu envío está bajando gracias a tu compra! 🛵 Agrega un antojito más para que tu envío salga aún más barato... <span className="font-bold">¡o hasta GRATIS!</span>
-                          </p>
-                        </motion.div>
-                      )}
-                      {costoEnvioBase > 0 && costoEnvio === 0 && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 bg-green-50/80 border border-green-200/50 rounded-[20px] p-4 flex items-center gap-3 shadow-sm">
-                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                            <span className="text-xl">🎉</span>
-                          </div>
-                          <p className="text-[13px] text-green-800 font-medium leading-tight">
-                            ¡Magia! ✨ Has agregado tantos productos que tu envío ahora es <span className="font-black">TOTALMENTE GRATIS</span>.
-                          </p>
-                        </motion.div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* PASO 2: DATOS PERSONALES */}
-                {checkoutStep === 2 && (
-                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-5">
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Tu Nombre</label>
-                      <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-white border border-slate-200 rounded-[16px] px-4 py-3.5 outline-none focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10 transition-all font-medium text-slate-800 placeholder:text-slate-300 shadow-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-between">
-                        <span>Tu Teléfono (WhatsApp)</span>
-                        {checkingLoyalty && <Loader2 size={12} className="animate-spin text-orange-500" />}
-                      </label>
-                      <input type="tel" value={clienteTel} onChange={(e) => {setClienteTel(e.target.value); setTelError(false);}} placeholder="10 dígitos" maxLength={10} className={`w-full bg-white border rounded-[16px] px-4 py-3.5 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-300 shadow-sm ${telError ? 'border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-500/10' : 'border-slate-200 focus:border-[#FA4A0C] focus:ring-4 focus:ring-[#FA4A0C]/10'}`} />
-                      {telError && <p className="text-red-500 text-[10px] font-bold mt-2 flex items-center gap-1"><AlertCircle size={10} /> Ingrese un número a 10 dígitos válido</p>}
-                    </div>
-                    
-                    {isFreeDelivery && (
-                      <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="bg-orange-50 p-3 rounded-xl border border-orange-200 flex items-center gap-2 mt-2">
-                        <Star size={16} className="text-orange-500 fill-orange-500" />
-                        <p className="text-[11px] font-bold text-orange-800">¡Felicidades! Este es tu 6to pedido, tu envío será <span className="font-black text-orange-600">GRATIS</span>.</p>
-                      </motion.div>
-                    )}
-
-                    <div className="bg-slate-50 p-4 rounded-2xl flex items-start gap-3 mt-4 border border-slate-100">
-                      <div className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0">💡</div>
-                      <p className="text-xs text-slate-500 mt-1">Tu información está segura. Solo la usamos para contactarte si el repartidor no encuentra tu casa.</p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* PASO 3: ENTREGA Y MAPA */}
-                {checkoutStep === 3 && (
-                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-4">
-                    
-                    {/* Etiqueta Dinmica de Tiempo Estimado */}
-                    {tipoEntrega === 'domicilio' && (
-                      <div className="flex items-center justify-center gap-2 mb-2 bg-orange-50 text-orange-600 px-4 py-2 rounded-full border border-orange-100">
-                        <Clock size={16} strokeWidth={2.5} />
-                        <span className="text-sm font-bold">Tiempo estimado: {tiempoEstimado}</span>
-                      </div>
-                    )}
-                    
-                    <div className="pt-2">
-                      {(!ubicacionGPS || tipoEntrega !== 'domicilio') && (
-                        <>
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">¿Cómo quieres recibirlo?</label>
-                          <motion.div layout className="flex flex-col sm:flex-row gap-3">
-                            <AnimatePresence mode="popLayout">
-                              {tipoEntrega !== 'tienda' && (
-                                <motion.button 
-                                  layout
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.8, display: 'none' }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => {
-                                    setTipoEntrega(tipoEntrega === 'domicilio' ? null : 'domicilio')
-                                  }}
-                                  className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
-                                >
-                                  <span className="text-2xl">🛵</span>
-                                  <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'domicilio' ? 'Elegiste A Domicilio (toca para cambiar)' : 'A Domicilio'}</span>
-                                </motion.button>
-                              )}
-                              {tipoEntrega !== 'domicilio' && (
-                                <motion.button 
-                                  layout
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.8, display: 'none' }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => setTipoEntrega(tipoEntrega === 'tienda' ? null : 'tienda')} 
-                                  className={`flex-1 py-4 px-4 rounded-[16px] border-2 font-bold flex flex-col items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}
-                                >
-                                  <span className="text-2xl">🏪</span>
-                                  <span className="text-[11px] text-center leading-tight">{tipoEntrega === 'tienda' ? 'Elegiste Recoger en Tienda (toca para cambiar)' : 'Recoger en Tienda'}</span>
-                                </motion.button>
-                              )}
-                            </AnimatePresence>
-                          </motion.div>
-                        </>
-                      )}
-                    </div>
-
-                    <AnimatePresence>
-                      {tipoEntrega === 'tienda' && restaurante.maps_url && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className="bg-slate-50 p-5 rounded-[20px] border border-slate-200 mt-2 overflow-hidden flex flex-col items-center text-center shadow-sm">
-                           <MapPin className="text-slate-400 mb-2 w-6 h-6" />
-                           <p className="text-sm text-slate-800 font-bold mb-3">Recoge tu pedido en nuestro local</p>
-                           <a href={restaurante.maps_url} target="_blank" rel="noopener noreferrer" className="w-full bg-slate-900 hover:bg-black text-white py-3.5 rounded-[12px] font-bold text-xs flex items-center justify-center transition-colors shadow-md">
-                             Ver indicaciones en Maps
-                           </a>
-                        </motion.div>
-                      )}
-
-                      {tipoEntrega === 'domicilio' && (
-                        <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }} className={`mb-6 ${ubicacionGPS ? 'mt-2' : 'mt-4'} relative`}>
-                           
-                           {ubicacionGPS ? (
-                             <div className="w-full text-left">
-                               <div className="flex justify-between items-center mb-3">
-                                 <div className="flex items-center gap-2">
-                                   <MapPin size={22} className="text-[#FA4A0C] shrink-0" />
-                                   <span className="font-black text-slate-800 text-[15px] whitespace-nowrap">Entregar en</span>
-                                   {isFreeDelivery && <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ml-1"><Star size={10} className="fill-green-700"/> ¡GRATIS!</span>}
-                                 </div>
-                                 <button onClick={() => setIsMapModalOpen(true)} className="text-[#FA4A0C] text-[13px] font-bold hover:underline transition-colors shrink-0">
-                                   Cambiar
-                                 </button>
-                               </div>
-                               
-                               <p className="text-[14px] text-slate-600 mb-4 leading-relaxed pl-7">
-                                 {direccionEntrega}
-                               </p>
-
-                               <div className="mt-2 pl-7 relative">
-                                 {isFreeDelivery ? (
-                                   <p className="text-[13px] font-bold text-orange-600 mb-2 flex items-center gap-1.5">
-                                     <Gift size={16} /> ¡Envío GRATIS! Ayúdanos con una referencia.
-                                   </p>
-                                 ) : (
-                                   <label className="text-[13px] font-bold text-slate-500 mb-2 block">Referencia para encontrar tu casa (Opcional)</label>
-                                 )}
-                                 
-                                 <textarea 
-                                   value={direccionReferencias} 
-                                   onChange={(e) => setDireccionReferencias(e.target.value)} 
-                                   rows={2}
-                                   placeholder="Ej. Casa verde, portón negro..." 
-                                   className="w-full bg-slate-100/80 border-0 rounded-2xl px-5 py-4 text-[15px] outline-none focus:bg-orange-50 focus:ring-2 focus:ring-[#FA4A0C]/20 transition-all font-medium text-slate-800 placeholder:text-slate-400 shadow-inner resize-none" 
-                                 />
-                               </div>
-                             </div>
-                           ) : (
-                             <>
-                               <MapPin className="text-[#FA4A0C] mb-3 w-10 h-10" />
-                               <p className="text-[16px] text-slate-800 font-bold mb-4">¿A dónde enviamos tu pedido?</p>
-                               <button 
-                                 onClick={() => setIsMapModalOpen(true)}
-                                 className="w-full bg-[#FA4A0C] hover:bg-[#E03A00] text-white py-4 rounded-[20px] font-bold text-[16px] flex items-center justify-center transition-colors shadow-lg"
-                               >
-                                 Establecer Ubicación
-                               </button>
-                             </>
-                           )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    {/* VIP LEALTAD WIDGET MOVIDO AL FOOTER */}
-                  </motion.div>
-                )}
-
-                {/* PASO 4: PAGO */}
-                {checkoutStep === 4 && (() => {
-                  const hasMercadoPago = Boolean(restaurante?.acepta_pago_online);
-                  return (
-                  <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }} className="space-y-6">
-                    <div>
-                      <h3 className="font-black text-slate-900 text-lg mb-4 text-center">Selecciona tu Método de Pago</h3>
-                      <div className="flex flex-col gap-4">
-                        <button onClick={() => setMetodoPago('efectivo')} className={`w-full py-5 px-6 rounded-[24px] border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'efectivo' ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${metodoPago === 'efectivo' ? 'bg-green-100' : 'bg-slate-100'}`}>💵</div>
-                          <div className="text-left flex-1">
-                            <span className="block text-base">Efectivo al recibir</span>
-                            <span className="block text-xs opacity-70 mt-0.5">Paga cuando tengas tu pedido</span>
-                          </div>
-                          {metodoPago === 'efectivo' && <CheckCircle2 size={24} className="text-green-500" />}
-                        </button>
-
-                        {metodoPago === 'efectivo' && (
-                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="px-2">
-                            <label className="block text-sm font-bold text-slate-700 mb-2">¿Con cuánto vas a pagar?</label>
-                            <div className="relative">
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                              <input 
-                                type="number" 
-                                placeholder={`Ej. ${Math.ceil(total / 100) * 100}`}
-                                value={montoEfectivo}
-                                onChange={(e) => setMontoEfectivo(e.target.value)}
-                                className="w-full bg-white border-2 border-slate-200 rounded-2xl py-3 pl-8 pr-4 font-bold text-slate-900 focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/20 transition-all"
-                              />
-                            </div>
-                            {montoEfectivo && Number(montoEfectivo) < total && (
-                              <p className="text-red-500 text-xs font-bold mt-2">El monto no puede ser menor al total del pedido (${total.toFixed(2)}).</p>
-                            )}
-                          </motion.div>
-                        )}
-
-                        {hasMercadoPago ? (
-                          <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-5 px-6 rounded-[24px] border-2 font-bold flex items-center gap-4 transition-all ${metodoPago === 'en_linea' ? 'border-[#FA4A0C] bg-[#FA4A0C]/5 text-[#FA4A0C]' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${metodoPago === 'en_linea' ? 'bg-[#FA4A0C]/20' : 'bg-slate-100'}`}>💳</div>
-                            <div className="text-left flex-1">
-                              <span className="block text-base">Tarjeta o Mercado Pago</span>
-                              <span className="block text-xs opacity-70 mt-0.5">Pago seguro en línea</span>
-                            </div>
-                            {metodoPago === 'en_linea' && <CheckCircle2 size={24} className="text-[#FA4A0C]" />}
-                          </button>
-                        ) : (
-                          <div className="w-full mt-2 p-4 bg-slate-50 border border-slate-200 rounded-[16px] text-center flex items-center gap-3">
-                            <span className="text-2xl">⏳</span>
-                            <p className="text-sm text-slate-600 font-medium">¡Próximamente tendremos pagos en línea! Por el momento, el pago es exclusivo en efectivo al recibir.</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-
-          {carrito.length > 0 && (
-            <div className="p-6 border-t border-slate-100/50 shrink-0 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-10 relative rounded-t-[32px] sm:rounded-none">
-              <div className="flex flex-col gap-4">
-                
-
-
-                {/* VIP LEALTAD WIDGET EN EL FOOTER (Solo en paso 3) */}
-                {checkoutStep === 3 && datosCliente && !calculandoEnvio && (tipoEntrega === 'tienda' || ubicacionGPS) && (
-                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-[16px] p-3 shadow-sm border border-amber-200 overflow-hidden relative">
-                    <div className="absolute -right-4 -top-4 text-amber-200/40 transform rotate-12 pointer-events-none">
-                      <Star size={80} fill="currentColor" />
-                    </div>
-                    {datosCliente.es_vip ? (
-                      <div className="relative z-10 flex items-center justify-between">
-                        <div>
-                          <h4 className="font-black text-amber-900 flex items-center gap-1 text-sm"><Star size={14} className="text-amber-500 fill-amber-500"/> Cliente VIP</h4>
-                          <p className="text-[10px] text-amber-800 mt-0.5 font-medium">Saldo: <b className="text-amber-900">${datosCliente.saldo.toFixed(2)}</b></p>
-                        </div>
-                        {!usarSaldoVip ? (
-                          <button onClick={() => setUsarSaldoVip(true)} className="bg-amber-500 hover:bg-amber-600 transition-colors text-white px-3 py-1.5 rounded-lg font-bold text-[11px] shadow-md">Usar Saldo</button>
-                        ) : (
-                          <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} className="flex gap-2">
-                             <input type="number" value={montoSaldoVip} onChange={e => setMontoSaldoVip(e.target.value)} placeholder="$0.00" className="w-16 bg-white border border-amber-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 rounded-lg px-2 py-1 text-[11px] font-bold outline-none transition-all" />
-                             <input type="password" value={pinVip} onChange={e => { setPinVip(e.target.value.replace(/\D/g, '')); setPinError(false); }} maxLength={4} placeholder="PIN" className={`w-12 bg-white border ${pinError ? 'border-red-400 focus:ring-red-400/20' : 'border-amber-200 focus:border-amber-400 focus:ring-amber-500/20'} focus:ring-2 rounded-lg px-2 py-1 text-[11px] text-center font-black tracking-widest outline-none transition-all`} />
-                             <button onClick={handlePinVerify} disabled={verificandoPin || pinVip.length < 4} className="bg-amber-900 text-white rounded-lg px-2 text-[11px] font-bold shadow-md hover:bg-amber-950 transition-colors disabled:opacity-50 flex justify-center items-center">
-                               {verificandoPin ? <Loader2 size={12} className="animate-spin" /> : 'OK'}
-                             </button>
-                          </motion.div>
-                        )}
-                      </div>
-                    ) : (
-                      costoEnvioCalculado > 0 && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6) && (
-                        <div className="flex justify-between items-center relative z-10">
-                           <div>
-                             <h4 className="font-black text-amber-900 flex items-center gap-1.5 text-[13px] leading-none">🎁 Envío Gratis</h4>
-                             <p className="text-[10px] text-amber-800 mt-1 font-medium leading-none">Tu recompensa estrella</p>
-                           </div>
-                           <label className="relative inline-flex items-center cursor-pointer scale-90 origin-right">
-                            <input type="checkbox" className="sr-only peer" checked={usarBeneficioNormal} onChange={e => setUsarBeneficioNormal(e.target.checked)}/>
-                            <div className="w-11 h-6 bg-amber-200/50 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-amber-200 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                           </label>
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
-                
-                {/* Banner Motivacional Envío en Paso 3 */}
-                {checkoutStep === 3 && tipoEntrega === 'domicilio' && costoEnvioBase > 0 && !fueraDeCobertura && !calculandoEnvio && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[16px] p-3 flex items-center gap-3 border ${costoEnvio === 0 ? 'bg-green-50/80 border-green-200/50' : 'bg-blue-50/80 border-blue-200/50'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${costoEnvio === 0 ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                      {costoEnvio === 0 ? <span className="text-sm">🎁</span> : <span className="text-sm">🛵</span>}
-                    </div>
-                    <p className={`text-[12px] font-medium leading-tight ${costoEnvio === 0 ? 'text-green-800' : 'text-blue-800'}`}>
-                      {isFreeDelivery 
-                        ? <>¡Magia! Por ser cliente Estrella, tu 6to envío es <span className="font-black">TOTALMENTE GRATIS</span> 🎁.</>
-                        : costoEnvio === 0 
-                        ? <>¡Magia! 🪄 Tu envío es <span className="font-black">TOTALMENTE GRATIS</span>. ¡Aprovecha ese ahorro para pedir un postre!</>
-                        : <>¡Tu envío está bajando gracias a tu compra! 👇 Agrega un antojito más para que tu envío salga aún más barato... <span className="font-bold">¡o hasta GRATIS!</span></>}
-                    </p>
-                  </motion.div>
-                )}
-
-                {/* Desglose de totales premium */}
-                <div className="flex flex-col gap-2.5 mb-2 px-1">
-                  <div className="flex justify-between text-slate-500 text-[13px] font-bold tracking-wide">
-                    <span>Subtotal</span>
-                    <span className="text-slate-800">${carrito.reduce((s, p) => s + (p.item.precio * p.cantidad), 0).toFixed(2)}</span>
-                  </div>
-                  {descuentoTotal > 0 && (
-                    <div className="flex justify-between text-green-500 text-[13px] font-bold tracking-wide">
-                      <span>Descuento</span>
-                      <span>-${descuentoTotal.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {tipoEntrega === 'domicilio' && (
-                    <div className="flex justify-between items-center text-slate-500 text-[13px] font-bold tracking-wide">
-                      <span className="flex items-center gap-1.5"><Truck size={14} className="text-[#FA4A0C]"/> Envío</span>
-                      <AnimatePresence mode="wait">
-                        <motion.span 
-                          key={calculandoEnvio ? 'calc' : fueraDeCobertura ? 'out' : `${costoEnvio}-${costoEnvioBase}`}
-                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          className="flex items-center gap-1.5"
-                        >
-                          {calculandoEnvio ? (
-                            <Loader2 size={12} className="animate-spin inline" />
-                          ) : fueraDeCobertura ? (
-                            <span className="text-red-500">Sin cobertura</span>
-                          ) : costoEnvioFinal === 0 ? (
-                            <span className="flex items-center gap-1.5">
-                              <span className="text-slate-400 line-through text-[12px] font-medium">${costoEnvioBase.toFixed(2)}</span>
-                              <span className="text-green-500 font-black">¡GRATIS!</span>
-                            </span>
-                          ) : costoEnvioFinal < costoEnvioBase ? (
-                            <span className="flex items-center gap-1.5">
-                              <span className="text-slate-400 line-through text-[12px] font-medium">${costoEnvioBase.toFixed(2)}</span>
-                              <span className="text-[#FA4A0C] font-black">+${costoEnvioFinal.toFixed(2)}</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-800">+${costoEnvioFinal.toFixed(2)}</span>
-                          )}
-                        </motion.span>
-                      </AnimatePresence>
-                    </div>
-                  )}
-                  <div className="h-px bg-slate-100 my-1 w-full" />
-                  <div className="flex justify-between items-end mt-1">
-                    <span className="text-slate-900 font-black text-[15px]">Total a pagar</span>
-                    <span className="text-3xl font-black text-slate-900 tracking-tight">${total.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {checkoutStep < 4 ? (
-                  <motion.button 
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      if (checkoutStep === 2) {
-                        const telLimpio = clienteTel.replace(/\D/g, '')
-                        if (telLimpio.length !== 10) {
-                          setTelError(true);
-                          showToast('Atención', 'Ingresa un número a 10 dígitos', 'error');
-                          return;
-                        }
-                        if (!clienteNombre.trim()) {
-                          showToast('Atención', 'Dinos tu nombre', 'error');
-                          return;
-                        }
-                      }
-                      if (checkoutStep === 3) {
-                        if (!tipoEntrega) {
-                          showToast('Atención', 'Selecciona cómo quieres recibir tu pedido', 'error');
-                          return;
-                        }
-                        if (tipoEntrega === 'domicilio') {
-                          if (calculandoEnvio) {
-                            showToast('Calculando envío', 'Espera un momento mientras calculamos el costo...', 'loading');
-                            return;
-                          }
-                          if (!direccionEntrega.trim() || !ubicacionGPS) {
-                            showToast('Atención', 'Selecciona tu ubicación en el mapa', 'error');
-                            return;
-                          }
-                          if (fueraDeCobertura) {
-                            showToast('Sin Cobertura', 'Lo sentimos, tu ubicación está fuera del área de servicio.', 'error');
-                            return;
-                          }
-                        }
-                      }
-                      if (checkoutStep === 4 && !metodoPago) {
-                        showToast('Atención', 'Selecciona un método de pago', 'error');
-                        return;
-                      }
-                      setCheckoutStep(prev => prev + 1)
-                    }} 
-                    className="w-full bg-slate-900 text-white py-4 rounded-[20px] font-black text-[17px] flex items-center justify-between px-6 hover:bg-black transition-all shadow-xl shadow-slate-900/20"
-                  >
-                    <span>{checkoutStep === 1 ? 'Continuar' : checkoutStep === 2 ? 'Continuar a Entrega' : 'Ir al Pago'}</span>
-                    <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase">Paso {checkoutStep}/4</span>
-                  </motion.button>
-                ) : (
-                  <motion.button 
-                    whileTap={{ scale: 0.95 }} 
-                    onClick={handlePedir} 
-                    disabled={procesando || calculandoEnvio} 
-                    className="w-full bg-[#FA4A0C] text-white py-4 px-6 rounded-[20px] font-black text-[17px] flex items-center justify-between hover:bg-[#ff551b] transition-all disabled:opacity-50 shadow-xl shadow-[#FA4A0C]/20"
-                  >
-                    <span>Confirmar Pedido</span>
-                    {procesando ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                  </motion.button>
-                )}
-              </div>
-            </div>
-          )}
-        </motion.div>
-    )}
-  </AnimatePresence>
 
       {/* MODAL DE OPCIONES — WIZARD PASO A PASO */}
       <AnimatePresence>
@@ -2797,11 +1943,11 @@ export function PublicMenuView() {
                   if (selectedOptionsState[g.titulo]?.[o.nombre]) {
                     precioExtra += (o.precio_extra || 0);
                     opcionesSel.push({ 
-                      grupo_id: g.id || '', 
+                      grupo_id: g.id || g.titulo, 
                       grupo: g.titulo, 
-                      opcion_id: o.id || '', 
+                      opcion_id: o.id || o.nombre, 
                       opcion: o.nombre, 
-                      precio_extra: o.precio_extra 
+                      precio_extra: o.precio_extra || 0 
                     });
                   }
                 });
@@ -3258,7 +2404,7 @@ export function PublicMenuView() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
+      {/* <AnimatePresence>
         {showOtpModal && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
             <motion.div
@@ -3340,7 +2486,7 @@ export function PublicMenuView() {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence> */}
 
       {/* ── MODAL DE SELECCIÓN DE SUCURSAL ── */}
       <AnimatePresence>

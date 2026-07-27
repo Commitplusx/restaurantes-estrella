@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, Plus, Minus, X, CheckCircle2, AlertCircle, 
   Loader2, MapPin, LocateFixed, Star, ShieldCheck,
-  ShoppingBag, ArrowRight, Gift, Utensils
+  ShoppingBag, ArrowRight, Gift, Utensils, User, Phone, CreditCard, Banknote
 } from 'lucide-react';
 import { useLoadScript, GoogleMap } from '@react-google-maps/api';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
@@ -161,10 +161,18 @@ export default function CartPage() {
   const [toastMsg, setToastMsg] = useState<{ title: string; message: string; type: 'success'|'error'|'loading' } | null>(null);
   
   const submittingRef = useRef(false);
-  const prevTotalRef = useRef(0);
-  const [displayTotal, setDisplayTotal] = useState(0);
+  
+
+  const subtotalInitial = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
+  const prevTotalRef = useRef(subtotalInitial);
+  const [displayTotal, setDisplayTotal] = useState(subtotalInitial);
+  
   const [confettiActive, setConfettiActive] = useState(false);
   const prevIsFreeDelivery = useRef(false);
+
+  // Generadores de IDs estables por sesión de pedido
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const ticketIdRef = useRef<string | null>(null);
 
   // VIP
   const [usarBeneficioNormal, setUsarBeneficioNormal] = useState(false);
@@ -221,12 +229,14 @@ export default function CartPage() {
     const loadRestaurante = async () => {
       if (!id) return;
       
-      const { data: sucursales } = await supabase.from('restaurantes').select('*');
-      if (sucursales) {
-        const found = sucursales.find(s => s.id === id || s.slug?.toLowerCase() === id.toLowerCase() || s.subdominio?.toLowerCase() === id.toLowerCase());
-        if (found) {
-          setRestaurante(found);
-        }
+      const { data } = await supabase.from('restaurantes')
+        .select('*')
+        .or(`id.eq.${id},slug.ilike.${id},subdominio.ilike.${id}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setRestaurante(data);
       }
       setLoading(false);
     };
@@ -697,6 +707,11 @@ export default function CartPage() {
       else { setDisplayTotal(to); prevTotalRef.current = to; }
     };
     requestAnimationFrame(tick);
+    
+    // Bug 5 fix: Si el monto en efectivo es menor al nuevo total, resetearlo
+    if (montoEfectivo && parseFloat(montoEfectivo) < to) {
+      setMontoEfectivo('');
+    }
   }, [total]);
 
   // Confetti cuando se desbloquea envío gratis
@@ -731,11 +746,18 @@ export default function CartPage() {
                          
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr + notasPagoStr;
     
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+      ticketIdRef.current = Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
     return {
       cliente_tel: clienteTel.replace(/\D/g, ''),
       cliente_nombre: clienteNombre.trim(),
       restaurante: restaurante?.nombre || '',
       restaurante_id: restaurante?.id || null,
+      restaurante_lat: restaurante?.lat || null,
+      restaurante_lng: restaurante?.lng || null,
       descripcion: pedidoCompleto,
       direccion: tipoEntrega === 'domicilio' ? direccionEntrega : null,
       referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,
@@ -749,8 +771,8 @@ export default function CartPage() {
       tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
       pin_seguridad: pinSeguridad,
       pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(), // Generamos un PIN anti-robo de 4 dígitos
-      wb_message_id: Math.random().toString(36).substring(2, 8).toUpperCase(),
-      idempotency_key: crypto.randomUUID(),
+      wb_message_id: ticketIdRef.current,
+      idempotency_key: idempotencyKeyRef.current,
       cupon_plataforma_id: cuponPlataformaIdManual || null,
       descuento_plataforma: descuentoTotal + (costoEnvioCalculado - costoEnvioFinal), // Registramos que hubo un descuento en el envío si aplica
       cupon_cliente: cuponCliente || null,
@@ -776,7 +798,6 @@ export default function CartPage() {
         return;
       }
     }
-    setProcesando(false);
 
     const isReturningCustomer = !!datosCliente;
     if (!isReturningCustomer && metodoPago === 'efectivo') {
@@ -1369,25 +1390,25 @@ export default function CartPage() {
                 </div>
 
                 {/* Detalles financieros */}
-                <div className="px-4 py-3 space-y-2.5 border-b border-slate-100/80">
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-400 font-medium">Subtotal</span>
-                    <span className="font-semibold text-slate-700">${subtotal.toFixed(2)}</span>
+                <div className="px-5 py-4 space-y-3.5 border-b-2 border-dashed border-slate-200/70">
+                  <div className="flex justify-between items-center text-[14px]">
+                    <span className="text-slate-500 font-semibold tracking-tight">Subtotal</span>
+                    <span className="font-bold text-slate-800 tabular-nums">${subtotal.toFixed(2)}</span>
                   </div>
                   {descuentoTotal > 0 && (
-                    <div className="flex justify-between text-[13px]">
-                      <span className="text-slate-400 font-medium">Descuento</span>
-                      <span className="font-semibold text-green-600">−${descuentoTotal.toFixed(2)}</span>
+                    <div className="flex justify-between items-center text-[14px]">
+                      <span className="text-slate-500 font-semibold tracking-tight">Descuento</span>
+                      <span className="font-bold text-emerald-600 tabular-nums bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">−${descuentoTotal.toFixed(2)}</span>
                     </div>
                   )}
                   {tipoEntrega === 'domicilio' && (
-                    <div className="flex justify-between text-[13px]">
-                      <span className="text-slate-400 font-medium">Envío</span>
-                      <span className="font-semibold text-slate-700">
+                    <div className="flex justify-between items-center text-[14px]">
+                      <span className="text-slate-500 font-semibold tracking-tight">Envío</span>
+                      <span className="font-bold text-slate-800 tabular-nums">
                         {calculandoEnvio
-                          ? <Loader2 size={12} className="animate-spin inline"/>
+                          ? <Loader2 size={14} className="animate-spin text-slate-400" />
                           : costoEnvioFinal === 0
-                            ? <span className="text-green-600 font-bold">GRATIS</span>
+                            ? <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider text-[11px] border border-emerald-100/50">Gratis</span>
                             : `$${costoEnvioFinal.toFixed(2)}`
                         }
                       </span>
@@ -1396,35 +1417,59 @@ export default function CartPage() {
                 </div>
 
                 {/* Total */}
-                <div className="flex justify-between items-center px-4 py-3.5 border-b border-slate-100/80">
-                  <span className="font-black text-[15px] text-slate-800">Total</span>
+                <div className="flex justify-between items-center px-5 py-6 border-b-2 border-dashed border-slate-200/70 bg-gradient-to-b from-white to-slate-50/50">
+                  <span className="font-black text-[18px] text-slate-900 tracking-tight">Total</span>
                   <motion.span
                     key={Math.round(displayTotal)}
-                    initial={{ scale: 0.9, opacity: 0 }}
+                    initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="font-black text-[22px] text-green-600 leading-none tabular-nums"
+                    className="font-black text-[32px] text-[#FA4A0C] leading-none tabular-nums tracking-tighter drop-shadow-sm"
                   >
                     ${displayTotal.toFixed(2)}
                   </motion.span>
                 </div>
 
                 {/* Entregar a */}
-                <div className="px-4 py-3 space-y-2.5">
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-400 font-medium">Nombre</span>
-                    <span className="font-semibold text-slate-800 text-right">{clienteNombre}</span>
-                  </div>
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-400 font-medium">Teléfono</span>
-                    <span className="font-semibold text-slate-800">{clienteTel}</span>
-                  </div>
-                  <div className="flex justify-between text-[13px] gap-4">
-                    <span className="text-slate-400 font-medium shrink-0">Dirección</span>
-                    <span className="font-semibold text-slate-800 text-right leading-snug">{tipoEntrega === 'domicilio' ? direccionEntrega : 'Recoger en sucursal'}</span>
-                  </div>
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-400 font-medium">Pago</span>
-                    <span className="font-semibold text-slate-800">{metodoPago === 'efectivo' ? `Efectivo${montoEfectivo ? ' ($' + montoEfectivo + ')' : ''}` : 'En Línea'}</span>
+                <div className="px-5 py-6 bg-white rounded-b-3xl">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Detalles de Entrega</h3>
+                  <div className="flex flex-col gap-4">
+                    {/* Nombre */}
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <User className="w-[15px] h-[15px] text-slate-400" strokeWidth={2.5} />
+                        <span className="text-[13px] text-slate-500 font-medium">Nombre</span>
+                      </div>
+                      <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg font-semibold text-[13px] capitalize">{clienteNombre}</span>
+                    </div>
+
+                    {/* Teléfono */}
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <Phone className="w-[15px] h-[15px] text-slate-400" strokeWidth={2.5} />
+                        <span className="text-[13px] text-slate-500 font-medium">Teléfono</span>
+                      </div>
+                      <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg font-semibold text-[13px] tabular-nums tracking-wide">{clienteTel}</span>
+                    </div>
+
+                    {/* Dirección */}
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <MapPin className="w-[15px] h-[15px] text-slate-400" strokeWidth={2.5} />
+                        <span className="text-[13px] text-slate-500 font-medium">Destino</span>
+                      </div>
+                      <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-semibold text-[13px] text-right leading-snug max-w-[65%]">{tipoEntrega === 'domicilio' ? direccionEntrega : 'Recoger en sucursal'}</span>
+                    </div>
+
+                    {/* Pago */}
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        {metodoPago === 'efectivo' ? <Banknote className="w-[15px] h-[15px] text-slate-400" strokeWidth={2.5} /> : <CreditCard className="w-[15px] h-[15px] text-slate-400" strokeWidth={2.5} />}
+                        <span className="text-[13px] text-slate-500 font-medium">Pago</span>
+                      </div>
+                      <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg font-semibold text-[13px]">
+                        {metodoPago === 'efectivo' ? `Efectivo${montoEfectivo ? ' ($' + montoEfectivo + ')' : ''}` : 'En Línea'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1456,9 +1501,11 @@ export default function CartPage() {
           {checkoutStep < 3 ? (
             <button 
               onClick={() => {
+                setTelError(false);
                 if (checkoutStep === 2) {
-                  if (clienteTel.replace(/\D/g, '').length !== 10 || !clienteNombre.trim()) {
-                    setTelError(clienteTel.replace(/\D/g, '').length !== 10);
+                  const telLimpio = clienteTel.replace(/\D/g, '');
+                  if (telLimpio.length !== 10 || !clienteNombre.trim()) {
+                    setTelError(telLimpio.length !== 10);
                     showToast('Error', 'Completa tus datos personales', 'error');
                     const el = document.getElementById('seccion-datos');
                     if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);

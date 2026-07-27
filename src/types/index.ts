@@ -7,7 +7,7 @@ export type CartItemOption = {
 };
 
 export type CartItem = {
-  cartItemId?: string;
+  cartItemId: string;
   id: string;
   nombre: string;
   precio: number;
