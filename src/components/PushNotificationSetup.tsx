@@ -98,11 +98,20 @@ export function PushNotificationSetup() {
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id || null;
 
+      // Evitar guardar duplicados en cada recarga
+      if (silent && localStorage.getItem('push_subscription_saved') === 'true') {
+        return;
+      }
+
       // Guardar en Supabase
       const { error } = await supabase.from('push_subscriptions').insert([{
         user_id: userId,
         subscription: subscription
       }]);
+
+      if (!error || error.code === '23505') {
+        localStorage.setItem('push_subscription_saved', 'true');
+      }
 
       if (error && error.code !== '23505') { // Ignorar error si ya existe (clave única)
         console.error("Error guardando suscripción:", error);
