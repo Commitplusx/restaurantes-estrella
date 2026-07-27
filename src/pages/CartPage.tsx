@@ -1080,7 +1080,13 @@ export default function CartPage() {
       </div>
 
       <main id="cart-scroll-container" className="flex-1 overflow-y-auto p-4 w-full relative scroll-smooth">
-        <div className="max-w-lg md:max-w-2xl mx-auto pb-32">
+        <div className="max-w-7xl mx-auto">
+          {/* Desktop 2-col layout */}
+          <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8 lg:items-start">
+
+          {/* LEFT COLUMN — checkout steps */}
+          <div>
+          <div className="max-w-lg md:max-w-2xl lg:max-w-none mx-auto pb-32 lg:pb-8">
           <AnimatePresence mode="wait">
           
           {/* ══════════════════════════════════════
@@ -1494,9 +1500,155 @@ export default function CartPage() {
 
 
         </AnimatePresence>
-        
-        {/* BOTÓN DE NAVEGACIÓN FIJO */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-slate-100/95 backdrop-blur-md z-40">
+        </div>
+        </div>
+        {/* END LEFT COLUMN */}
+
+        {/* RIGHT COLUMN — sticky order summary, desktop only */}
+        <div className="hidden lg:block">
+          <div className="sticky top-[78px] space-y-4">
+
+            {/* Summary card */}
+            <div className="bg-white rounded-3xl shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] overflow-hidden">
+              <div className="px-5 pt-5 pb-3 border-b border-slate-100">
+                <h2 className="font-black text-[16px] text-slate-800">Resumen del pedido</h2>
+                <p className="text-[12px] text-slate-400 font-medium mt-0.5">{carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</p>
+              </div>
+              <div className="px-5 py-3 max-h-56 overflow-y-auto space-y-3">
+                {carrito.map((p, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-slate-100">
+                      <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[13px] text-slate-800 truncate">{p.item.nombre}</p>
+                      <p className="text-[11px] text-slate-400 font-medium">x{p.cantidad}</p>
+                    </div>
+                    <span className="font-black text-[13px] text-slate-900 shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="px-5 py-4 bg-slate-50 space-y-2.5">
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-slate-500 font-medium">Subtotal</span>
+                  <span className="font-bold text-slate-800">${subtotal.toFixed(2)}</span>
+                </div>
+                {tipoEntrega === 'domicilio' && (
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-slate-500 font-medium">Envío</span>
+                    <span className={`font-bold ${isFreeDelivery ? 'text-green-600' : 'text-slate-800'}`}>
+                      {isFreeDelivery
+                        ? '¡Gratis! 🎉'
+                        : calculandoEnvio
+                        ? 'Calculando...'
+                        : costoEnvioFinal > 0
+                        ? `$${costoEnvioFinal.toFixed(2)}`
+                        : 'Por confirmar'}
+                    </span>
+                  </div>
+                )}
+                {descuentoAplicable > 0 && (
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-green-600 font-medium">Descuento</span>
+                    <span className="font-bold text-green-600">-${descuentoAplicable.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="border-t border-slate-200 pt-2.5 flex justify-between">
+                  <span className="font-black text-slate-900 text-[15px]">Total</span>
+                  <span className="font-black text-slate-900 text-[18px]">${displayTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Step progress */}
+            <div className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.06)]">
+              <div className="flex items-center">
+                {[1, 2, 3].map(step => (
+                  <div key={step} className="flex items-center flex-1">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 transition-all duration-300 ${
+                      checkoutStep > step
+                        ? 'bg-green-500 text-white'
+                        : checkoutStep === step
+                        ? 'bg-[#1D4ED8] text-white'
+                        : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {checkoutStep > step ? '✓' : step}
+                    </div>
+                    <span className={`text-[11px] font-semibold ml-1.5 ${
+                      checkoutStep === step ? 'text-slate-800' : 'text-slate-400'
+                    }`}>
+                      {step === 1 ? 'Carrito' : step === 2 ? 'Entrega' : 'Pago'}
+                    </span>
+                    {step < 3 && (
+                      <div className={`h-[2px] flex-1 mx-2 rounded-full transition-all duration-300 ${
+                        checkoutStep > step ? 'bg-green-400' : 'bg-slate-200'
+                      }`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Desktop action button */}
+            {checkoutStep < 3 ? (
+              <button
+                onClick={() => {
+                  setTelError(false);
+                  if (checkoutStep === 2) {
+                    const telLimpio = clienteTel.replace(/\D/g, '');
+                    if (telLimpio.length !== 10 || !clienteNombre.trim()) {
+                      setTelError(telLimpio.length !== 10);
+                      showToast('Error', 'Completa tus datos personales', 'error');
+                      const el = document.getElementById('seccion-datos');
+                      if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
+                      return;
+                    }
+                    if (!tipoEntrega || (tipoEntrega === 'domicilio' && (!direccionEntrega || fueraDeCobertura))) {
+                      showToast('Error', 'Revisa los datos de entrega', 'error');
+                      const el = document.getElementById('seccion-entrega');
+                      if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
+                      return;
+                    }
+                  }
+                  setCheckoutStep(checkoutStep + 1);
+                  smoothScroll(document.getElementById('cart-scroll-container'), 0, 400);
+                }}
+                disabled={checkingLoyalty}
+                className={`w-full text-white py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg ${
+                  !isStepValid() ? 'bg-slate-400 shadow-none' : 'bg-[#1D4ED8] shadow-blue-700/25 hover:bg-blue-700'
+                }`}
+              >
+                {getBotonText()}
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (!metodoPago || (metodoPago === 'efectivo' && (!montoEfectivo || parseFloat(montoEfectivo) < total))) {
+                    showToast('Error', 'Completa tu método de pago', 'error');
+                    return;
+                  }
+                  handlePedir();
+                }}
+                disabled={procesando || !isStepValid()}
+                className={`w-full py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 ${
+                  !isStepValid()
+                    ? 'bg-slate-300 text-slate-400 shadow-none'
+                    : 'bg-[#1D4ED8] text-white shadow-blue-700/25 hover:bg-blue-700'
+                } disabled:opacity-60`}
+              >
+                {procesando ? <Loader2 size={22} className="animate-spin text-white" /> : getBotonText()}
+              </button>
+            )}
+
+          </div>
+        </div>
+        {/* END RIGHT COLUMN */}
+
+        </div>{/* end desktop grid */}
+        </div>{/* end max-w-7xl */}
+
+        {/* BOTÓN FIJO MOBILE ONLY */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 pb-6 bg-slate-100/95 backdrop-blur-md z-40">
           <div className="max-w-lg md:max-w-2xl mx-auto">
           {checkoutStep < 3 ? (
             <button 
@@ -1550,61 +1702,185 @@ export default function CartPage() {
             </button>
           )}
           </div>
-        </div>
+        </div>{/* END MOBILE BUTTON */}
 
-        </div>
       </main>
 
       {/* MAP MODAL */}
       <AnimatePresence>
         {isMapModalOpen && (
-          <motion.div initial={{ opacity: 0, y: '100%' }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: '100%' }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="fixed inset-0 z-[200] bg-white flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b bg-white z-20 shadow-sm">
-              <button onClick={() => setIsMapModalOpen(false)} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors"><X size={20} className="text-slate-700"/></button>
-              <h2 className="font-black text-lg">Ubicación de entrega</h2>
-              <div className="w-10"></div>
-            </div>
-            <div className="flex-1 relative bg-slate-50">
-              <div className="absolute top-4 right-4 z-20">
-                <button onClick={obtenerUbicacionGPS} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-700 hover:text-black transition-colors relative">
-                  {buscandoGPS ? <Loader2 className="animate-spin" /> : <LocateFixed size={20} />}
-                  
-                  {/* Tooltip Guía */}
-                  {!ubicacionGPS && (
-                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8, type: 'spring' }} className="absolute right-[calc(100%+12px)] top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[11px] font-bold px-3 py-2 rounded-xl whitespace-nowrap pointer-events-none shadow-xl flex items-center">
-                      Toca aquí para ubicarte 📍
-                      <div className="absolute top-1/2 right-[-5px] -translate-y-1/2 border-y-4 border-y-transparent border-l-[6px] border-l-slate-900 w-0 h-0"></div>
-                    </motion.div>
-                  )}
-                </button>
-              </div>
-              <div className="absolute top-4 left-4 right-20 z-20 pointer-events-none">
-                <div className="bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border border-slate-100 pointer-events-auto">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Entregar en:</p>
-                  <p className="text-sm font-bold text-slate-800 line-clamp-2 leading-tight">{draftDireccion || 'Mueve el mapa para ubicarte'}</p>
+          /* Layer 1: full-screen container = backdrop (desktop) + slide-in base (mobile) */
+          <motion.div
+            key="map-modal-outer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] lg:bg-slate-900/60 lg:backdrop-blur-sm lg:flex lg:items-center lg:justify-center"
+            onClick={(e) => { if (e.target === e.currentTarget) setIsMapModalOpen(false) }}
+          >
+            {/* Layer 2: the dialog itself */}
+            <motion.div
+              key="map-modal-inner"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+              onClick={(e) => e.stopPropagation()}
+              className="
+                fixed inset-0 bg-[#f0f4f0] flex flex-col
+                lg:static lg:inset-auto lg:w-[860px] lg:h-[560px]
+                lg:rounded-3xl lg:overflow-hidden lg:shadow-2xl lg:flex-row
+              "
+            >
+              {/* ═══ LEFT: MAP ═══ */}
+              <div className="flex-1 relative overflow-hidden">
+
+                {/* Mobile-only header */}
+                <div className="lg:hidden absolute top-0 left-0 right-0 z-30 flex items-center gap-3 px-5 pt-12 pb-4">
+                  <button
+                    onClick={() => setIsMapModalOpen(false)}
+                    className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md"
+                  >
+                    <ChevronLeft size={22} className="text-slate-800" strokeWidth={2.5} />
+                  </button>
+                  <h2 className="font-black text-[17px] text-slate-900">Elige tu ubicación</h2>
                 </div>
-              </div>
-              {isGoogleMapsLoaded ? (
-                <div className="w-full h-full relative">
-                  <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={draftUbicacion || ubicacionGPS || { lat: 16.2516, lng: -92.1332 }} zoom={17} onLoad={map => setMapInstance(map)} onDragEnd={handleMapDragEnd} options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: PREMIUM_MAP_STYLE }}>
-                  </GoogleMap>
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none drop-shadow-xl">
-                    <MapPin className="text-black w-12 h-12 fill-black" />
-                    <div className="w-4 h-1 bg-black/20 rounded-full mx-auto mt-1 blur-[1px]"></div>
+
+                {/* Map */}
+                {isGoogleMapsLoaded ? (
+                  <>
+                    <GoogleMap
+                      mapContainerStyle={{ width: '100%', height: '100%' }}
+                      center={draftUbicacion || ubicacionGPS || { lat: 16.2516, lng: -92.1332 }}
+                      zoom={17}
+                      onLoad={map => setMapInstance(map)}
+                      onDragEnd={handleMapDragEnd}
+                      options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: PREMIUM_MAP_STYLE }}
+                    />
+
+                    {/* Center pin */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none flex flex-col items-center">
+                      <div className="w-14 h-14 bg-[#1D4ED8] rounded-full flex items-center justify-center shadow-xl shadow-blue-700/40 border-4 border-white">
+                        <MapPin size={26} className="text-white fill-white/30" strokeWidth={2} />
+                      </div>
+                      <div className="w-[3px] h-4 bg-[#1D4ED8] rounded-full -mt-0.5" />
+                      <div className="w-5 h-2 bg-black/15 rounded-full blur-[2px] -mt-0.5" />
+                    </div>
+
+                    {/* Drag guide */}
+                    <AnimatePresence>
+                      {!draftUbicacion && !ubicacionGPS && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }} transition={{ delay: 0.5 }}
+                          className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-10 z-10 pointer-events-none flex flex-col items-center"
+                        >
+                          <motion.div
+                            animate={{ scale: [1, 1.5, 1], opacity: [0.6, 0, 0.6] }}
+                            transition={{ repeat: Infinity, duration: 1.8 }}
+                            className="w-10 h-10 rounded-full border-2 border-[#1D4ED8] absolute"
+                          />
+                          <div className="bg-slate-900/80 backdrop-blur-sm text-white text-[12px] font-bold px-3 py-1.5 rounded-full whitespace-nowrap mt-8 shadow-lg">
+                            🖐️ Arrastra el mapa para mover el pin
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-slate-100">
+                    <Loader2 className="animate-spin text-[#1D4ED8] w-10 h-10" />
+                  </div>
+                )}
+
+                {/* GPS button + tooltip */}
+                <div className="absolute bottom-6 right-5 z-20 flex flex-col items-end gap-3">
+                  <AnimatePresence>
+                    {!ubicacionGPS && !buscandoGPS && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.85, x: 20 }}
+                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                        exit={{ opacity: 0, scale: 0.85, x: 20 }}
+                        transition={{ delay: 0.7, type: 'spring', stiffness: 260, damping: 22 }}
+                        className="pointer-events-none flex flex-col items-end gap-1.5"
+                      >
+                        <div className="bg-white rounded-2xl px-4 py-3 shadow-xl border border-slate-100 max-w-[200px] relative">
+                          <p className="text-[13px] font-black text-slate-800 leading-snug">¡Haz clic aquí!</p>
+                          <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
+                            Te ubicamos automáticamente en el mapa
+                          </p>
+                          <div className="absolute bottom-[-8px] right-6 w-4 h-4 bg-white rotate-45 border-b border-r border-slate-100" />
+                        </div>
+                        <motion.span
+                          animate={{ y: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}
+                          className="text-xl mr-1"
+                        >↓</motion.span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <div className="relative">
+                    {!ubicacionGPS && !buscandoGPS && (
+                      <motion.div
+                        animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
+                        transition={{ repeat: Infinity, duration: 1.6 }}
+                        className="absolute inset-0 rounded-full bg-[#1D4ED8]/30"
+                      />
+                    )}
+                    <button
+                      onClick={obtenerUbicacionGPS}
+                      className={`relative w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all active:scale-95 ${
+                        ubicacionGPS ? 'bg-white text-slate-600' : 'bg-[#1D4ED8] text-white hover:bg-blue-700 shadow-blue-700/30'
+                      }`}
+                    >
+                      {buscandoGPS ? <Loader2 size={22} className="animate-spin" /> : <LocateFixed size={22} strokeWidth={2.5} />}
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center"><Loader2 className="animate-spin text-[#FA4A0C] w-10 h-10"/></div>
-              )}
-            </div>
-            <div className="p-5 bg-white z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] rounded-t-[32px] relative -mt-4">
-              <button onClick={handleConfirmarUbicacion} disabled={!draftUbicacion && !ubicacionGPS} className="w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-black text-lg disabled:opacity-50 shadow-lg shadow-blue-700/25 hover:bg-blue-700 active:scale-[0.98] transition-all">
-                Confirmar esta ubicación
-              </button>
-            </div>
+              </div>
+
+              {/* ═══ RIGHT: PANEL ═══ */}
+              <div className="bg-white lg:w-[300px] rounded-t-[32px] lg:rounded-none px-5 pt-5 pb-8 flex flex-col lg:justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.08)] lg:shadow-[-4px_0_20px_rgba(0,0,0,0.06)]">
+                <div>
+                  {/* Desktop header */}
+                  <div className="hidden lg:flex items-center justify-between mb-6">
+                    <h2 className="font-black text-[18px] text-slate-900">Elige tu ubicación</h2>
+                    <button
+                      onClick={() => setIsMapModalOpen(false)}
+                      className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors"
+                    >
+                      <X size={16} className="text-slate-600" />
+                    </button>
+                  </div>
+                  {/* Mobile drag handle */}
+                  <div className="lg:hidden w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
+
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Ubicación seleccionada</p>
+                  <div className="flex items-start gap-3 bg-slate-50 rounded-2xl px-4 py-3.5 mb-4 border border-slate-100">
+                    <MapPin size={18} className="text-[#1D4ED8] shrink-0 mt-0.5" strokeWidth={2.5} />
+                    <p className="text-[14px] font-semibold text-slate-800 leading-snug">
+                      {draftDireccion || 'Mueve el mapa o usa el GPS para seleccionar tu dirección'}
+                    </p>
+                  </div>
+                  <div className="hidden lg:flex items-center gap-2 text-[12px] text-slate-400 font-medium mb-2">
+                    <LocateFixed size={13} />
+                    <span>Usa el botón azul en el mapa para ubicarte automáticamente</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleConfirmarUbicacion}
+                  disabled={!draftUbicacion && !ubicacionGPS}
+                  className="w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-black text-[16px] disabled:opacity-40 shadow-lg shadow-blue-700/25 hover:bg-blue-700 active:scale-[0.98] transition-all"
+                >
+                  Confirmar ubicación
+                </button>
+              </div>
+
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
 
       {/* OTP MODAL */}
       <AnimatePresence>

@@ -45,11 +45,11 @@ const EMOJI_MAP: Record<string, string> = {
 
 function RestaurantCardSkeleton({ horizontal = false }: { horizontal?: boolean }) {
   return (
-    <div className={`flex flex-col group relative bg-white sm:bg-transparent rounded-2xl sm:rounded-none shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none p-3 sm:p-0 gap-2 sm:gap-0 animate-pulse`}>
-      <div className={`relative mx-auto shrink-0 aspect-square rounded-full overflow-hidden bg-slate-200 sm:mb-3 shadow-sm border border-slate-100 ${horizontal ? 'w-[100px]' : 'w-[90px] sm:w-[160px] md:w-[180px]'}`}></div>
-      <div className={`flex flex-col items-center sm:items-center gap-2 sm:px-1 flex-1 w-full ${horizontal ? 'mt-1' : 'mt-2 sm:mt-0'}`}>
-        <div className="w-3/4 h-3 sm:h-4 bg-slate-200 rounded-full"></div>
-        <div className="w-1/2 h-2 sm:h-3 bg-slate-200 rounded-full"></div>
+    <div className={`flex flex-col group relative bg-white sm:bg-transparent md:bg-white md:p-3 md:rounded-[24px] md:border md:border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none p-3 sm:p-0 gap-2 sm:gap-3 animate-pulse`}>
+      <div className={`relative mx-auto md:mx-0 shrink-0 aspect-square md:aspect-[4/3] md:w-full rounded-[24px] overflow-hidden bg-slate-200 shadow-sm border border-slate-100 ${horizontal ? 'w-[100px]' : 'w-[90px] sm:w-[160px]'}`}></div>
+      <div className={`flex flex-col items-center md:items-start gap-2 sm:px-1 flex-1 w-full text-center md:text-left ${horizontal ? 'mt-1' : ''}`}>
+        <div className="w-3/4 md:w-full h-3 sm:h-4 bg-slate-200 rounded-full"></div>
+        <div className="w-1/2 md:w-2/3 h-2 sm:h-3 bg-slate-200 rounded-full"></div>
       </div>
     </div>
   )
@@ -72,9 +72,8 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
   }
 
   return (
-    <Link to={`/menu/${res.slug || res.id}`} className={`flex flex-col group relative bg-white sm:bg-transparent rounded-2xl sm:rounded-none shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none p-3 sm:p-0 gap-2 sm:gap-0`}>
-       {/* Imagen Circular */}
-       <div className={`relative mx-auto shrink-0 aspect-square rounded-full overflow-hidden bg-white sm:mb-3 shadow-sm border border-slate-100 isolate ${horizontal ? 'w-[100px]' : 'w-[90px] sm:w-[160px] md:w-[180px]'}`}>
+    <Link to={`/menu/${res.slug || res.id}`} className={`flex flex-col group relative bg-white sm:bg-transparent md:hover:bg-white md:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] md:hover:-translate-y-1 transition-all duration-300 md:p-3 md:rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none md:border md:border-transparent md:hover:border-slate-100 p-3 sm:p-0 gap-2 sm:gap-3 rounded-2xl sm:rounded-none`}>
+       <div className={`relative mx-auto md:mx-0 shrink-0 aspect-square md:aspect-[4/3] md:w-full rounded-[24px] overflow-hidden bg-white shadow-sm border border-slate-100 isolate ${horizontal ? 'w-[100px]' : 'w-[90px] sm:w-[160px]'}`}>
           {res.foto_fachada_url ? (
             <img 
               src={res.foto_fachada_url} 
@@ -83,7 +82,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
               alt={res.nombre} 
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-orange-50"><Store size={24} className="text-orange-200 sm:w-10 sm:h-10" /></div>
+            <div className="w-full h-full flex items-center justify-center bg-slate-50"><Store size={24} className="text-slate-300 sm:w-10 sm:h-10" /></div>
           )}
           
           <motion.button 
@@ -103,7 +102,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
           {/* Badge de Tiempo */}
           {isAbierto && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-2 py-1 rounded-full shadow-sm text-[9px] sm:text-[11px] font-bold text-slate-900 flex items-center gap-1 z-20 whitespace-nowrap">
-               <Clock size={10} strokeWidth={3} className="text-[#FA4A0C]"/> 25-35 min
+               <Clock size={10} strokeWidth={3} className="text-[#1D4ED8]"/> 25-35 min
             </div>
           )}
 
@@ -116,18 +115,25 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
        </div>
        
        {/* Info Header */}
-       <div className={`flex flex-col items-center sm:items-center gap-1 sm:px-1 flex-1 min-w-0 text-center w-full ${horizontal ? 'mt-0' : 'mt-1 sm:mt-0'}`}>
-          <div className="min-w-0 w-full flex flex-col items-center">
-             <h3 className="font-bold text-[13px] sm:text-[15px] md:text-[16px] text-slate-900 leading-tight group-hover:text-[#FA4A0C] transition-colors truncate w-full px-2">
-               {res.nombre}
-             </h3>
-             <p className={`text-slate-500 text-[10px] sm:text-[12px] font-medium mt-0.5 truncate w-full px-2 ${costoStr.includes('Gratis') ? 'text-green-600' : ''}`}>
+       <div className={`flex flex-col items-center md:items-start gap-1 sm:px-1 flex-1 min-w-0 text-center md:text-left w-full ${horizontal ? 'mt-0' : ''}`}>
+          <div className="min-w-0 w-full flex flex-col items-center md:items-start">
+             <div className="flex w-full items-start justify-between gap-2 px-2 md:px-0">
+               <h3 className="font-bold text-[13px] sm:text-[15px] md:text-[17px] text-slate-900 leading-tight group-hover:text-[#1D4ED8] transition-colors truncate">
+                 {res.nombre}
+               </h3>
+               {/* Rating on Desktop */}
+               <div className="hidden md:flex items-center gap-1 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-full text-[11px] font-black text-slate-700 shrink-0">
+                 4.8 <Star size={10} className="fill-yellow-400 text-yellow-500" />
+               </div>
+             </div>
+             
+             <p className={`text-slate-500 text-[10px] sm:text-[12px] font-medium mt-0.5 md:mt-1 truncate w-full px-2 md:px-0 ${costoStr.includes('Gratis') ? 'text-green-600' : ''}`}>
                {res.categorias?.[0] || 'Restaurante'} • {costoStr} {distanceStr && `(${distanceStr})`}
              </p>
           </div>
-          {/* Fake Rating */}
-          <div className="bg-slate-50 border border-slate-100 flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black text-slate-700 shrink-0 gap-1 mt-0.5">
-            4.8 <Star size={10} className="fill-orange-400 text-orange-400" />
+          {/* Rating on Mobile */}
+          <div className="md:hidden bg-slate-50 border border-slate-100 flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black text-slate-700 shrink-0 gap-1 mt-0.5">
+            4.8 <Star size={10} className="fill-yellow-400 text-yellow-500" />
           </div>
        </div>
     </Link>
@@ -143,6 +149,8 @@ export function PublicLandingPage() {
 
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
+  const [heroBanners, setHeroBanners] = useState<any[]>([])
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
   const [activeCategories, setActiveCategories] = useState<{name: string, emoji: string}[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingPromos, setLoadingPromos] = useState(false)
@@ -374,10 +382,28 @@ export function PublicLandingPage() {
     setLoadingPromos(false)
   }
 
+  async function loadBanners() {
+    try {
+      const { data } = await supabase.from('app_banners').select('*').eq('activo', true).order('orden', { ascending: true }).order('creado_en', { ascending: false }).limit(5);
+      if (data) setHeroBanners(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   useEffect(() => {
     loadRestaurants(0)
     loadPromos()
+    loadBanners()
   }, [])
+
+  useEffect(() => {
+    if (heroBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBannerIndex(prev => (prev + 1) % heroBanners.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [heroBanners]);
 
   // Auto-geocode si hay ubicación pero no hay dirección guardada
   useEffect(() => {
@@ -603,7 +629,7 @@ export function PublicLandingPage() {
   }, [restaurantes, search, selectedCategory, activeTab, userLocation]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-orange-100">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-blue-100">
 
       {/* Header Pegajoso Premium (Estilo Delivery App) */}
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'bg-slate-50'} ${!showHeader ? '-translate-y-full' : 'translate-y-0'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2`}>
@@ -615,14 +641,14 @@ export function PublicLandingPage() {
               <div className="hidden md:flex items-center gap-2 mr-4 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
                  <img src="/estrella-circle.png" alt="Estrella Eats" className="w-10 h-10 object-contain" />
                  <span className="text-xl font-black text-slate-900 tracking-tighter hidden lg:block">
-                   Estrella<span className="text-[#FA4A0C]">Eats</span>
+                   Estrella<span className="text-[#1D4ED8]">Eats</span>
                  </span>
               </div>
 
               {/* Address Picker Premium */}
               <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity bg-white md:bg-transparent pl-1.5 pr-4 py-1.5 md:p-0 rounded-full md:rounded-none shadow-sm md:shadow-none border border-slate-100 md:border-transparent flex-1 md:flex-none" onClick={() => requestLocation()}>
-                 <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-                    <MapPin size={18} strokeWidth={2.5} className="text-orange-600"/>
+                 <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                    <MapPin size={18} strokeWidth={2.5} className="text-[#1D4ED8]"/>
                  </div>
                  <div className="flex flex-col min-w-0">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-[1px]">Entregar en</span>
@@ -630,7 +656,7 @@ export function PublicLandingPage() {
                        <span className="font-bold text-slate-800 text-[13px] md:text-[15px] truncate max-w-[180px] md:max-w-[250px] leading-none">
                          {locationLoading ? "Buscando..." : (userAddress ? userAddress.split(',')[0] : (userLocation ? "Ubicación actual" : "Comitán de Domínguez"))}
                        </span>
-                       {locationLoading ? <Loader2 size={13} className="animate-spin text-orange-500 shrink-0"/> : <ChevronDown size={14} strokeWidth={3} className="text-slate-800 shrink-0 ml-0.5"/>}
+                       {locationLoading ? <Loader2 size={13} className="animate-spin text-[#1D4ED8] shrink-0"/> : <ChevronDown size={14} strokeWidth={3} className="text-slate-800 shrink-0 ml-0.5"/>}
                     </div>
                  </div>
               </div>
@@ -642,7 +668,7 @@ export function PublicLandingPage() {
                    onClick={() => setShowNotifications(!showNotifications)}
                  >
                     <Bell size={20} className="text-slate-700" />
-                    <div className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-white"></div>
+                    <div className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-[#1D4ED8] rounded-full border-2 border-white"></div>
                  </div>
 
                  {/* Notifications Dropdown */}
@@ -676,8 +702,8 @@ export function PublicLandingPage() {
                                NotifIcon = ChefHat;
                                statusTitle = 'Preparando Orden';
                                statusDesc = 'El restaurante está cocinando tu comida.';
-                               colorClass = 'text-orange-500';
-                               bgClass = 'bg-orange-50';
+                               colorClass = 'text-[#1D4ED8]';
+                               bgClass = 'bg-blue-50';
                              } else if (activeOrderStatus === 'en_camino') {
                                NotifIcon = Truck;
                                statusTitle = '¡Va en camino!';
@@ -704,8 +730,8 @@ export function PublicLandingPage() {
                            })()
                          ) : (
                            <>
-                             <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mb-1">
-                               <Bell size={24} className="text-orange-500 opacity-50" />
+                             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-1">
+                               <Bell size={24} className="text-slate-400 opacity-50" />
                              </div>
                              <p className="text-[13px] font-bold text-slate-700">No hay notificaciones nuevas</p>
                              <p className="text-[12px] text-slate-500 leading-relaxed">Aquí te avisaremos sobre el estado de tus pedidos y promociones exclusivas.</p>
@@ -730,12 +756,12 @@ export function PublicLandingPage() {
            <div className="relative group flex-1 w-full md:max-w-2xl flex items-center gap-2">
               <div className="relative flex-1">
                  <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                   <Search className="text-slate-400 group-focus-within:text-orange-500 transition-colors" size={18} strokeWidth={2.5} />
+                   <Search className="text-slate-400 group-focus-within:text-[#1D4ED8] transition-colors" size={18} strokeWidth={2.5} />
                  </div>
                  <input 
                    type="text" 
                    placeholder="Restaurantes, platillos, antojos..."
-                   className="w-full bg-white hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-orange-500 rounded-full py-3 pl-12 pr-4 text-[14px] md:text-[15px] font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+                   className="w-full bg-white hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-[#1D4ED8] rounded-full py-3 pl-12 pr-4 text-[14px] md:text-[15px] font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
                    value={search}
                    onChange={(e) => setSearch(e.target.value)}
                  />
@@ -744,7 +770,7 @@ export function PublicLandingPage() {
               {/* Botón Beneficios (Desktop) */}
               <Link 
                 to="/beneficios" 
-                className="hidden md:flex h-12 items-center gap-2 px-6 bg-gradient-to-r from-orange-500 to-[#FA4A0C] hover:from-orange-600 hover:to-orange-700 text-white rounded-full font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                className="hidden md:flex h-12 items-center gap-2 px-6 bg-gradient-to-r from-[#1D4ED8] to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-full font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
               >
                 <Star size={18} className="fill-white" />
                 <span>Beneficios VIP</span>
@@ -753,12 +779,12 @@ export function PublicLandingPage() {
               {/* Botón Beneficios (Mobile) */}
               <Link 
                 to="/beneficios" 
-                className="w-12 h-12 shrink-0 bg-gradient-to-r from-orange-500 to-[#FA4A0C] rounded-full flex items-center justify-center shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-white hover:-translate-y-0.5 transition-all md:hidden"
+                className="w-12 h-12 shrink-0 bg-gradient-to-r from-[#1D4ED8] to-blue-700 rounded-full flex items-center justify-center shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-white hover:-translate-y-0.5 transition-all md:hidden"
               >
                 <Star size={20} className="fill-white" />
               </Link>
 
-              <button className="w-12 h-12 shrink-0 bg-white rounded-full flex items-center justify-center border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-colors md:hidden">
+              <button className="w-12 h-12 shrink-0 bg-white rounded-full flex items-center justify-center border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-slate-600 hover:border-[#1D4ED8] hover:text-[#1D4ED8] transition-colors md:hidden">
                  <SlidersHorizontal size={20} strokeWidth={2.5} />
               </button>
            </div>
@@ -770,19 +796,71 @@ export function PublicLandingPage() {
 
       <main className="pt-[140px] md:pt-32 max-w-[1400px] mx-auto px-4 md:px-12">
         
-        {/* Carrusel de Categorías (Solo Sticky en Desktop) */}
-        <div className="md:sticky top-[128px] md:top-[80px] z-40 bg-slate-50 md:bg-slate-50/95 md:backdrop-blur-xl border-b border-slate-200/50 -mx-4 px-4 md:mx-0 md:px-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-          <div className="flex overflow-x-auto gap-2.5 md:gap-4 pb-3 pt-3 no-scrollbar max-w-[1400px] mx-auto">
+        {/* Banner/Hero Space */}
+        {heroBanners.length > 0 && (
+          <div className="relative mb-6 w-full h-[140px] md:h-[220px] rounded-[24px] overflow-hidden shadow-lg shadow-blue-900/10">
+            <div 
+              className="flex w-full h-full transition-transform duration-700 ease-in-out"
+              style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
+            >
+              {heroBanners.map((banner, idx) => {
+                const isDyn = banner.imagen_url === 'dynamic-gradient';
+                const isActive = idx === currentBannerIndex;
+                
+                return (
+                  <div 
+                    key={banner.id}
+                    onClick={() => {
+                       const url = banner.link_url;
+                       if (url) {
+                         if (url.startsWith('http')) window.location.href = url;
+                         else navigate(url);
+                       }
+                    }}
+                    className={`w-full h-full shrink-0 relative bg-cover bg-center ${banner.link_url ? 'cursor-pointer' : ''} ${isDyn ? 'bg-gradient-to-br from-indigo-500 via-purple-600 to-blue-700 p-6 md:p-10 flex items-center justify-center' : ''}`}
+                    style={!isDyn ? { backgroundImage: `url(${banner.imagen_url})` } : {}}
+                  >
+                     {isDyn && (
+                       <>
+                         <div className={`relative z-10 w-full text-center transition-all duration-700 ${isActive ? 'scale-100 opacity-100' : 'scale-95 opacity-50'}`}>
+                           <h2 className="text-white text-xl md:text-3xl font-black mb-1 md:mb-2 leading-tight drop-shadow-md" dangerouslySetInnerHTML={{ __html: banner.titulo.replace(/\n/g, '<br/>') }}></h2>
+                           {banner.subtitulo && <p className="text-blue-100 text-[12px] md:text-sm font-medium drop-shadow-md">{banner.subtitulo}</p>}
+                         </div>
+                         <div className="absolute inset-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay pointer-events-none"></div>
+                       </>
+                     )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Carousel Indicators */}
+            {heroBanners.length > 1 && (
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 z-20 pointer-events-none">
+                {heroBanners.map((_, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`h-2 rounded-full transition-all duration-500 ${idx === currentBannerIndex ? 'bg-white w-6 opacity-100 shadow-md' : 'bg-white/50 w-2 opacity-60'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Carrusel de Categorías */}
+        <div className="-mx-4 px-4 md:mx-0 md:px-0 mb-6">
+          <div className="flex overflow-x-auto gap-2.5 md:gap-4 pb-4 pt-2 no-scrollbar max-w-[1400px] mx-auto">
             {activeCategories.map(c => (
                <button 
                   key={c.name}
                   onClick={() => setSelectedCategory(selectedCategory === c.name ? null : c.name)} 
                   className="flex flex-col items-center gap-1.5 md:gap-2 min-w-[64px] md:min-w-[80px] group"
                 >
-                  <div className={`w-14 h-14 md:w-16 md:h-16 rounded-[14px] md:rounded-2xl flex items-center justify-center text-[28px] md:text-[32px] shadow-[0_2px_10px_rgba(0,0,0,0.04)] border transition-all duration-300 ${selectedCategory === c.name ? 'bg-orange-50 border-orange-500 scale-105' : 'bg-white border-slate-100 group-hover:border-orange-200 group-hover:scale-105'}`}>
+                  <div className={`w-14 h-14 md:w-16 md:h-16 rounded-[14px] md:rounded-2xl flex items-center justify-center text-[28px] md:text-[32px] shadow-[0_2px_10px_rgba(0,0,0,0.04)] border transition-all duration-300 ${selectedCategory === c.name ? 'bg-blue-50 border-[#1D4ED8] scale-105' : 'bg-white border-slate-100 group-hover:border-blue-200 group-hover:scale-105'}`}>
                     {c.emoji}
                   </div>
-                  <span className={`text-[11px] md:text-[12px] font-bold ${selectedCategory === c.name ? 'text-orange-600' : 'text-slate-600'}`}>{c.name}</span>
+                  <span className={`text-[11px] md:text-[12px] font-bold ${selectedCategory === c.name ? 'text-[#1D4ED8]' : 'text-slate-600'}`}>{c.name}</span>
                </button>
             ))}
           </div>
@@ -797,15 +875,15 @@ export function PublicLandingPage() {
                 {/* Indicadores */}
                 <div className="hidden sm:flex gap-1.5">
                   {promosGlobales.map((_, i) => (
-                    <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${i === currentPromoIndex ? 'bg-orange-500 w-4' : 'bg-slate-300'}`} />
+                    <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${i === currentPromoIndex ? 'bg-[#1D4ED8] w-4' : 'bg-slate-300'}`} />
                   ))}
                 </div>
                 {/* Flechas */}
                 <div className="flex items-center gap-2">
-                  <button onClick={prevPromo} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-orange-500 transition-colors">
+                  <button onClick={prevPromo} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-[#1D4ED8] transition-colors">
                     <ChevronLeft size={18} />
                   </button>
-                  <button onClick={nextPromo} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-orange-500 transition-colors">
+                  <button onClick={nextPromo} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-[#1D4ED8] transition-colors">
                     <ChevronRight size={18} />
                   </button>
                 </div>
@@ -837,15 +915,15 @@ export function PublicLandingPage() {
                     return (
                       <Link 
                         to={`/menu/${promo.restaurantes.slug || promo.restaurantes.id}?tab=promos`} 
-                        className="w-full h-full bg-white rounded-[20px] p-3 md:p-4 flex gap-4 md:gap-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:border-orange-200 transition-colors group"
+                        className="w-full h-full bg-white rounded-[20px] p-3 md:p-4 flex gap-4 md:gap-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 hover:border-blue-200 transition-colors group"
                       >
                         <div className="w-[86px] h-[86px] md:w-[98px] md:h-[98px] rounded-[14px] overflow-hidden bg-slate-50 shrink-0 relative shadow-sm">
                            {promo.foto_url ? (
                              <img src={promo.foto_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={promo.titulo} />
                            ) : (
-                             <div className="w-full h-full flex items-center justify-center bg-orange-50 text-orange-400"><Ticket size={24} /></div>
+                             <div className="w-full h-full flex items-center justify-center bg-blue-50 text-[#1D4ED8]"><Ticket size={24} /></div>
                            )}
-                           <div className="absolute top-1.5 left-1.5 bg-[#FA4A0C] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm">
+                           <div className="absolute top-1.5 left-1.5 bg-[#1D4ED8] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm">
                              Promo
                            </div>
                         </div>
@@ -855,13 +933,13 @@ export function PublicLandingPage() {
                            </p>
                            <h4 className="font-black text-slate-900 text-[15px] md:text-[18px] leading-tight mb-1 md:mb-2 line-clamp-2">{promo.titulo}</h4>
                            <div className="mt-auto">
-                             <span className="text-[#FA4A0C] font-black text-[16px] md:text-[20px] tracking-tight">${promo.precio_especial?.toFixed(2)}</span>
+                             <span className="text-[#1D4ED8] font-black text-[16px] md:text-[20px] tracking-tight">${promo.precio_especial?.toFixed(2)}</span>
                            </div>
                         </div>
                         <div className="hidden sm:flex shrink-0 items-center justify-center pr-2">
                            <button 
                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPromo(); }}
-                             className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-orange-50 hover:text-orange-500 transition-colors z-10 relative"
+                             className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-blue-50 hover:text-[#1D4ED8] transition-colors z-10 relative"
                            >
                               <ChevronRight size={20} />
                            </button>
@@ -893,7 +971,7 @@ export function PublicLandingPage() {
 
         {/* Grid de Restaurantes */}
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 mt-4 md:mt-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 mt-4 md:mt-6">
             {[1,2,3,4,5,6,7,8,9,10].map(i => (
               <RestaurantCardSkeleton key={i} />
             ))}
@@ -956,7 +1034,7 @@ export function PublicLandingPage() {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6"
+                className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-6"
               >
                 {displayRestaurants.map(res => (
                   <motion.div key={res.id} whileInView={{ opacity: 1, y: 0 }} initial={{ opacity: 0, y: 20 }} viewport={{ once: true, margin: "0px 0px -50px 0px" }}>
