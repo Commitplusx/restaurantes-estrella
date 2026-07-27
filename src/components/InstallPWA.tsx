@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 
 export function InstallPWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -12,6 +13,11 @@ export function InstallPWA() {
     const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     // Detectar si ya está instalada (en modo standalone)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    
+    // Si ya lo cerró manualmente, no mostrar
+    if (localStorage.getItem('install_prompt_dismissed') === 'true') {
+      return;
+    }
     
     if (isStandalone) {
       return; // Si ya está instalada, no hacemos nada más
@@ -62,6 +68,11 @@ export function InstallPWA() {
     }
   };
 
+  const handleDismiss = () => {
+    setShowPrompt(false);
+    localStorage.setItem('install_prompt_dismissed', 'true');
+  };
+
   if (!showPrompt) return null;
 
   return (
@@ -95,6 +106,13 @@ export function InstallPWA() {
             </button>
           </div>
         )}
+        
+        <button 
+          onClick={handleDismiss}
+          className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors z-10"
+        >
+          <X size={14} strokeWidth={3} />
+        </button>
       </div>
       
       {/* Flecha apuntando al botón de compartir en Safari */}

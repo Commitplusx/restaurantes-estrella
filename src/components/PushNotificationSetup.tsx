@@ -27,28 +27,37 @@ export function PushNotificationSetup() {
   useEffect(() => {
     const checkSubscription = async () => {
       // 1. Verificar soporte
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      if (!('serviceWorker' in navigator)) {
+        console.log("No soporta Service Worker");
+        return;
+      }
+      if (!('PushManager' in window)) {
+        console.log("No soporta PushManager (Si estás en iPhone, DEBES instalarla primero con Agregar a Inicio)");
         return;
       }
 
       // 2. Si ya lo rechazó o ya lo cerramos, no molestar por un tiempo
       if (localStorage.getItem('push_prompt_dismissed') === 'true') {
+        console.log("El prompt fue cerrado anteriormente (limpia localStorage para volver a verlo)");
         return;
       }
 
       // 3. Verificar permiso actual
       if (Notification.permission === 'granted') {
-        // Ya tiene permiso, asegurarnos de que la suscripción está en la base de datos
+        console.log("Permiso ya concedido, suscribiendo silenciosamente...");
         await subscribeUser(true); // true = modo silencioso (sin UI)
         return;
       }
 
       if (Notification.permission === 'denied') {
+        console.log("El usuario bloqueó las notificaciones en el navegador");
         return;
       }
 
+      console.log("Mostrando prompt de notificaciones...");
       // 4. Mostrar el prompt amigable si no ha interactuado
-      setTimeout(() => setShowPrompt(true), 5000); // Mostrar después de 5 seg
+      setTimeout(() => setShowPrompt(true), 1000); // Reducido a 1 segundo para pruebas
+
     };
 
     checkSubscription();
@@ -63,7 +72,17 @@ export function PushNotificationSetup() {
     try {
       if (!silent) setIsSubscribing(true);
 
-      const registration = await navigator.serviceWorker.ready;
+      let registration = await navigator.serviceWorker.getRegistration();
+      
+      if (!registration) {
+        console.log("No se encontró Service Worker activo, registrando manualmente...");
+        registration = await navigator.serviceWorker.register('/push-sw.js');
+      }
+
+      // Asegurarnos que esté activo
+      if (!registration.active) {
+         await navigator.serviceWorker.ready;
+      }
       
       let subscription = await registration.pushManager.getSubscription();
       
