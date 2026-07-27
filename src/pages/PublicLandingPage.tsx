@@ -798,7 +798,7 @@ export function PublicLandingPage() {
         
         {/* Banner/Hero Space */}
         {heroBanners.length > 0 && (
-          <div className="relative mb-6 w-full h-[140px] md:h-[220px] rounded-[24px] overflow-hidden shadow-lg shadow-blue-900/10">
+          <div className="relative mb-6 w-full h-[160px] sm:h-[200px] md:h-[280px] lg:h-[360px] rounded-[24px] overflow-hidden shadow-lg shadow-blue-900/10">
             <div 
               className="flex w-full h-full transition-transform duration-700 ease-in-out"
               style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
