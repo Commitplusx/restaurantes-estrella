@@ -229,14 +229,23 @@ export default function CartPage() {
     const loadRestaurante = async () => {
       if (!id) return;
       
-      const { data } = await supabase.from('restaurantes')
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+      const orQuery = isUUID 
+        ? `id.eq.${id},slug.ilike.${id}` 
+        : `slug.ilike.${id}`;
+        
+      const { data, error } = await supabase.from('restaurantes')
         .select('*')
-        .or(`id.eq.${id},slug.ilike.${id},subdominio.ilike.${id}`)
+        .or(orQuery)
         .limit(1)
         .maybeSingle();
 
+      if (error) console.error("Error cargando restaurante:", error);
+
       if (data) {
         setRestaurante(data);
+      } else {
+        console.warn("No se encontró el restaurante con el ID/slug:", id);
       }
       setLoading(false);
     };
@@ -788,7 +797,11 @@ export default function CartPage() {
     
     setProcesando(true);
     // SOFT-CHECK: Consultar la base de datos justo antes de pagar
-    const { data: restData } = await supabase.from('restaurantes').select('activo, hora_apertura, hora_cierre, horarios').eq('id', restaurante.id).single();
+    console.log("Iniciando soft-check. Restaurante ID:", restaurante.id);
+    const { data: restData, error: restError } = await supabase.from('restaurantes').select('*').eq('id', restaurante.id).single();
+    if (restError) {
+      console.error('Error EXACTO soft-check restaurante:', JSON.stringify(restError, null, 2));
+    }
     
     if (restData) {
       // Re-evaluar lógica de horarios o simplemente `activo`. Si el dashboard lo apaga, activo = false.
@@ -805,15 +818,21 @@ export default function CartPage() {
         setProcesando(true);
         const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp';
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        console.log("POST request to:", edgeUrl);
         const res = await fetch(edgeUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
           body: JSON.stringify({ action: 'request-client-otp', telefono: clienteTel.replace(/\D/g, '') })
         });
-        if (!res.ok) throw new Error('No se pudo enviar el OTP');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error("Error OTP response:", res.status, errData);
+          throw new Error('No se pudo enviar el OTP');
+        }
         setShowOtpModal(true);
         setProcesando(false);
-      } catch (err) {
+      } catch (err: any) {
+        console.error("Error OTP exception:", err);
         showToast('Error', 'No pudimos enviarte el código a WhatsApp. Intenta de nuevo o paga en línea.', 'error');
         setProcesando(false);
       }
@@ -834,6 +853,7 @@ export default function CartPage() {
     try {
       const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp';
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      console.log("POST request (direct-order) to:", edgeUrl, payload);
       const res = await fetch(edgeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
@@ -844,10 +864,13 @@ export default function CartPage() {
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al crear pedido');
+      if (!res.ok) {
+        console.error("Error EXACTO procesarOrden API:", res.status, data);
+        throw new Error(data.error || 'Error al crear pedido');
+      }
       pedidoCreadoId = data.pedido?.wb_message_id || 'desconocido';
     } catch (err: any) {    
-      console.error('Error insertando en supabase:', err);
+      console.error('Error EXACTO insertando en supabase:', err);
       if (err.details) console.error('Detalles:', err.details);
       
       alert(`Hubo un problema registrando el pedido: ${err.message}. Intenta nuevamente.`);
