@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Loader2, Phone, MessageCircle, Navigation, MapPin, Store, Home, Bike, ChevronDown, CheckCircle, Clock, ChevronUp } from 'lucide-react';
-import { useJsApiLoader, GoogleMap, Marker, OverlayView, DirectionsRenderer } from '@react-google-maps/api';
+import { useJsApiLoader, GoogleMap, OverlayView, DirectionsRenderer } from '@react-google-maps/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLottie } from 'lottie-react';
 import cookingAnimation from '../assets/Cooking.json';
@@ -422,9 +422,20 @@ export function TrackerPage() {
           
           <div className="flex items-center justify-between mb-6 md:mt-2">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0 shadow-sm">
-                {restaurante?.logo_url ? (
-                  <img src={restaurante.logo_url} className="w-full h-full object-cover" />
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-md ${
+                pedido?.estado === 'en_camino' ? 'bg-blue-600 text-white shadow-blue-500/20' : 
+                pedido?.estado === 'entregado' ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 
+                pedido?.estado === 'cancelado' ? 'bg-red-500 text-white shadow-red-500/20' :
+                'bg-slate-100 border border-slate-200'
+              }`}>
+                {pedido?.estado === 'en_camino' ? (
+                  <Navigation className="w-6 h-6" />
+                ) : pedido?.estado === 'entregado' ? (
+                  <MapPin className="w-6 h-6" />
+                ) : pedido?.estado === 'cancelado' ? (
+                  <Navigation className="w-6 h-6" />
+                ) : restaurante?.logo_url ? (
+                  <img src={restaurante.logo_url} className="w-full h-full object-cover rounded-full" />
                 ) : (
                   <span className="text-xl font-black text-slate-400">{pedido?.restaurante?.[0]}</span>
                 )}
@@ -435,11 +446,20 @@ export function TrackerPage() {
                    pedido?.estado === 'entregado' ? 'PEDIDO ENTREGADO' : 
                    pedido?.estado === 'cancelado' ? 'PEDIDO CANCELADO' : pedido?.restaurante}
                 </h2>
-                <p className="text-[12px] font-bold text-slate-400 mt-0.5 flex items-center gap-2">
-                  {pedido?.estado === 'en_camino' ? 'Nos vemos pronto' : 
-                   pedido?.estado === 'entregado' ? '¡Disfruta tu comida!' : 
-                   pedido?.estado === 'cancelado' ? 'Este viaje terminó' : 'Está preparando tu pedido'}
-                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-[12px] font-bold text-slate-400">
+                    {pedido?.estado === 'en_camino' ? 'Nos vemos pronto' : 
+                     pedido?.estado === 'entregado' ? '¡Disfruta tu comida!' : 
+                     pedido?.estado === 'cancelado' ? 'Este viaje terminó' : 'Está preparando tu pedido'}
+                  </p>
+                  
+                  {pedido?.estado === 'en_camino' && eta && (
+                    <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1 text-[10px] font-bold border border-blue-100 shadow-sm">
+                      <Clock className="w-3 h-3" />
+                      Llega en {eta}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             
@@ -486,41 +506,7 @@ export function TrackerPage() {
             </div>
           )}
 
-          {['cancelado', 'en_camino', 'entregado'].includes(pedido?.estado) && (
-            <div className="pt-0 pb-6 flex flex-col items-center text-center">
-              {pedido?.estado === 'cancelado' ? (
-                <>
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-3 md:mb-4">
-                    <Navigation className="w-6 h-6 md:w-8 md:h-8" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-black text-slate-800 mb-1 md:mb-2">El viaje fue cancelado</h3>
-                  <p className="text-xs md:text-sm font-medium text-slate-500">Este pedido ya no está activo.</p>
-                </>
-              ) : pedido?.estado === 'en_camino' ? (
-                <>
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-3 md:mb-4 shadow-inner">
-                    <Navigation className="w-6 h-6 md:w-8 md:h-8" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-black text-slate-800 mb-1 md:mb-2">Repartidor en camino</h3>
-                  <p className="text-xs md:text-sm font-medium text-slate-500">Prepárate para recibir tu orden en breve.</p>
-                  {eta && (
-                    <div className="mt-3 md:mt-4 bg-blue-50 px-4 py-2 rounded-full border border-blue-100 flex items-center gap-2 text-blue-600">
-                      <Clock className="w-4 h-4" />
-                      <span className="text-xs md:text-sm font-bold">Llega en aprox. {eta}</span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3 md:mb-4">
-                    <MapPin className="w-6 h-6 md:w-8 md:h-8" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-black text-slate-800 mb-1 md:mb-2">Pedido entregado</h3>
-                  <p className="text-xs md:text-sm font-medium text-slate-500">¡Que disfrutes tu comida!</p>
-                </>
-              )}
-            </div>
-          )}
+          {/* End Timeline Progress */}
           
           {/* Order Details Toggle */}
           <div className="mt-4 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
