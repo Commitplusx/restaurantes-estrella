@@ -47,7 +47,11 @@ export function TrackerPage() {
       .or(`id.eq.${repId},user_id.eq.${repId}`)
       .maybeSingle();
     
-    if (repData) setRepartidor(repData);
+    if (repData) {
+      setRepartidor(repData);
+      return repData;
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -101,8 +105,11 @@ export function TrackerPage() {
 
         // Fetch repartidor if assigned
         if (orderData.repartidor_id) {
-          fetchRepartidor(orderData.repartidor_id);
-          subscribeToDriver(orderData.repartidor_id);
+          fetchRepartidor(orderData.repartidor_id).then(repData => {
+            if (repData && repData.id) {
+              subscribeToDriver(repData.id);
+            }
+          });
         }
 
         // Subscribirse al estado del pedido
@@ -115,8 +122,11 @@ export function TrackerPage() {
               
               // Si el repartidor se asignó o cambió
               if (payload.new.repartidor_id) {
-                fetchRepartidor(payload.new.repartidor_id);
-                subscribeToDriver(payload.new.repartidor_id);
+                fetchRepartidor(payload.new.repartidor_id).then(repData => {
+                  if (repData && repData.id) {
+                    subscribeToDriver(repData.id);
+                  }
+                });
               }
             }
           ).subscribe();
