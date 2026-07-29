@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Loader2, Phone, MessageCircle, Navigation, MapPin, Store, Home, Bike, ChevronDown, CheckCircle, Clock, ChevronUp } from 'lucide-react';
-import { useJsApiLoader, GoogleMap, OverlayView, DirectionsRenderer } from '@react-google-maps/api';
+import { useJsApiLoader, GoogleMap, OverlayView, DirectionsRenderer, Polyline } from '@react-google-maps/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLottie } from 'lottie-react';
 import cookingAnimation from '../assets/Cooking.json';
@@ -292,17 +292,13 @@ export function TrackerPage() {
             }}
           >
             {/* Ruta (Polyline) */}
-            {directions && (
-              <DirectionsRenderer
-                directions={directions}
+            {directions && directions.routes[0]?.overview_path && (
+              <Polyline
+                path={directions.routes[0].overview_path}
                 options={{
-                  suppressMarkers: true,
-                  preserveViewport: true, // Esto evita que Google Maps haga su propio zoom loco
-                  polylineOptions: {
-                    strokeColor: '#3b82f6',
-                    strokeWeight: 6,
-                    strokeOpacity: 0.8,
-                  },
+                  strokeColor: '#3b82f6',
+                  strokeWeight: 6,
+                  strokeOpacity: 0.8,
                 }}
               />
             )}
