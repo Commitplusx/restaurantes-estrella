@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Gift, ShieldCheck, ChefHat, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { ArrowRight } from 'lucide-react';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -58,7 +58,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     onComplete();
   };
 
-  const slideVariants = {
+  const slideVariants: Variants = {
     enter: (dir: number) => ({
       x: dir > 0 ? 100 : -100,
       opacity: 0,
@@ -66,12 +66,12 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     center: {
       x: 0,
       opacity: 1,
-      transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
+      transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const }
     },
     exit: (dir: number) => ({
       x: dir < 0 ? 100 : -100,
       opacity: 0,
-      transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+      transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }
     })
   };
 
