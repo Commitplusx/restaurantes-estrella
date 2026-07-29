@@ -188,7 +188,7 @@ export function FloatingOrderTracker() {
                 </div>
               </div>
               <button 
-                onClick={() => navigate(`/success?pedido=${orderId}`)}
+                onClick={() => navigate(`/tracker?pedido=${orderId}`)}
                 className={`w-full py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 shadow-md transition-all active:scale-95 ${bgColor}`}
               >
                 Ver Ticket Completo

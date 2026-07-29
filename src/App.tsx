@@ -34,6 +34,7 @@ const PublicLandingPage = lazyWithRetry(() => import('./pages/PublicLandingPage'
 const PublicMenuView = lazyWithRetry(() => import('./pages/PublicMenuView').then(module => ({ default: module.PublicMenuView })))
 const CartPage = lazyWithRetry(() => import('./pages/CartPage').then(module => ({ default: module.default })))
 const SuccessPage = lazyWithRetry(() => import('./pages/SuccessPage').then(module => ({ default: module.SuccessPage })))
+const TrackerPage = lazyWithRetry(() => import('./pages/TrackerPage').then(module => ({ default: module.TrackerPage })))
 const BeneficiosPage = lazyWithRetry(() => import('./pages/BeneficiosPage').then(module => ({ default: module.BeneficiosPage })))
 const PrivacyPage = lazyWithRetry(() => import('./pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })))
 const TermsPage = lazyWithRetry(() => import('./pages/TermsPage').then(module => ({ default: module.TermsPage })))
@@ -112,6 +113,7 @@ export default function App() {
           <Route path="/menu/:id" element={<PublicMenuView />} />
           <Route path="/menu/:id/carrito" element={<CartPage />} />
           <Route path="/success" element={<SuccessPage />} />
+          <Route path="/tracker" element={<TrackerPage />} />
           <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />
           <Route path="/portal/pedidos/:pedidoId" element={session ? <PortalPage initialTab="pedidos" /> : <Navigate to="/login" replace />} />
           <Route path="/portal/*" element={session ? <PortalPage /> : <Navigate to="/login" replace />} />

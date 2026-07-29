@@ -525,7 +525,6 @@ function KanbanCol({ title, count, headerCls, colCls, children }: {
   )
 }
 
-/* ─── Tarjeta de Pedido ──────────────────────────────────── */
 function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted }: {
   pedido: any
   actionLabel: string
@@ -543,14 +542,35 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
   const driverLabel = (() => {
     if (pedido.estado_cocina === 'pendiente') return null
     const map: Record<string, string> = {
-      buscando_repartidor: '🔍 Buscando',
-      asignado:            '🛵 En camino',
-      en_camino:           '📦 Al cliente',
-      entregado:           '✓ Entregado',
-      cancelado:           '✕ Cancelado',
+      buscando_repartidor: 'Buscando Repartidor',
+      asignado:            'Repartidor Asignado',
+      en_camino:           'En Camino al Cliente',
+      entregado:           'Entregado',
+      cancelado:           'Cancelado',
     }
     return map[pedido.estado] ?? null
   })()
+
+  // Helper to parse simple markdown like *bold*
+  const renderMarkdown = (text: string) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    return lines.map((line, idx) => {
+      if (line.trim() === '') return <div key={idx} className="h-1.5" />;
+      
+      const parts = line.split(/(\*[^*]+\*)/g);
+      return (
+        <p key={idx} className="text-[13px] text-slate-700 leading-snug">
+          {parts.map((part, i) => {
+            if (part.startsWith('*') && part.endsWith('*')) {
+              return <strong key={i} className="font-bold text-slate-900">{part.slice(1, -1)}</strong>;
+            }
+            return part;
+          })}
+        </p>
+      );
+    });
+  }
 
   return (
     <motion.div
@@ -559,79 +579,105 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
       layout
-      className={`bg-white rounded-lg border shadow-sm overflow-hidden transition-all duration-200 ${
+      className={`group bg-white rounded-xl border shadow-sm hover:shadow-md overflow-hidden transition-all duration-300 ${
         isHighlighted
-          ? 'border-orange-400 ring-2 ring-orange-300/40'
-          : 'border-slate-200'
+          ? 'border-orange-400 ring-4 ring-orange-400/20 shadow-orange-500/10'
+          : 'border-slate-200/60'
       }`}
     >
       {/* ── Header: folio + hora + total ── */}
-      <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1">
-        <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-          #{pedido?.wb_message_id || pedido?.id?.replace(/-/g,'').slice(-5).toUpperCase() || '—'}
-        </span>
-        <span className="text-[10px] text-slate-300 shrink-0">{hora}</span>
-        {pedido.restaurantes?.nombre && (
-          <span className="text-[9px] font-semibold text-indigo-500 truncate min-w-0">· {pedido.restaurantes.nombre}</span>
-        )}
-        <span className="ml-auto text-sm font-black text-emerald-600 shrink-0">${pedido.total}</span>
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-black tracking-wider text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
+              #{pedido?.wb_message_id || pedido?.id?.replace(/-/g,'').slice(-5).toUpperCase() || '—'}
+            </span>
+            <span className="text-[11px] font-semibold text-slate-400">{hora}</span>
+          </div>
+          {pedido.restaurantes?.nombre && (
+            <span className="text-[10px] font-bold text-indigo-500 truncate mt-0.5">
+              {pedido.restaurantes.nombre}
+            </span>
+          )}
+        </div>
+        <div className="ml-auto flex flex-col items-end">
+          <span className="text-base font-black text-emerald-600">${pedido.total}</span>
+        </div>
       </div>
 
       {/* ── Nombre cliente + estado repartidor ── */}
-      <div className="flex items-center justify-between gap-1 px-2.5 pb-1.5 border-b border-slate-100">
-        <p className="text-[13px] font-bold text-slate-800 truncate">{pedido.cliente_nombre || 'Cliente Web'}</p>
-        {driverLabel && (
-          <span className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded shrink-0">
-            {driverLabel}
-          </span>
+      <div className="px-3 pt-2 pb-1.5 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+              <span className="text-[10px] text-orange-600 font-black">
+                {(pedido.cliente_nombre || 'C').charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <p className="text-[14px] font-bold text-slate-800 truncate">{pedido.cliente_nombre || 'Cliente Web'}</p>
+          </div>
+          {driverLabel && (
+            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full shrink-0">
+              {driverLabel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Detalles (WhatsApp Text o Items) ── */}
+      <div className="px-3 pb-2">
+        {pedido.descripcion ? (
+          <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-2.5 mt-1.5 shadow-inner">
+            {renderMarkdown(pedido.descripcion)}
+          </div>
+        ) : items.length > 0 ? (
+          <div className="space-y-1.5 mt-1.5">
+            {items.map((item: any, idx: number) => (
+              <div key={idx} className="bg-slate-50 border border-slate-100 rounded-lg p-2 transition-colors hover:bg-slate-100">
+                <p className="text-[13px] font-bold text-slate-800 leading-snug">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-orange-100 text-orange-600 text-[11px] mr-1.5">
+                    {item.cantidad}x
+                  </span>
+                  {item.nombre}
+                </p>
+                {item.opcionesSeleccionadas?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1 ml-6.5">
+                    {item.opcionesSeleccionadas.map((opc: any, i: number) => (
+                      <span key={i} className="text-[10px] font-medium text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
+                        {opc.opcion}{opc.precio_extra > 0 ? ` +$${opc.precio_extra}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {/* ── PIN DE RECOLECCIÓN ── */}
+        {pedido.pickup_pin && (
+          <div className="mt-2.5 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-2 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></div>
+              <span className="text-[11px] font-bold tracking-wide text-orange-800 uppercase">PIN de Entrega</span>
+            </div>
+            <span className="text-lg font-black text-orange-600 tracking-[0.25em] bg-white px-2 rounded-md shadow-sm border border-orange-100">{pedido.pickup_pin}</span>
+          </div>
         )}
       </div>
 
-      {/* ── Nota / descripción (texto de WhatsApp) ── */}
-      {pedido.descripcion && (
-        <div className="mx-2.5 mt-1.5 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
-          <p className="text-[13px] font-black text-slate-900 leading-snug whitespace-pre-wrap break-words">
-            {pedido.descripcion}
-          </p>
-        </div>
-      )}
-
-      {/* ── PIN DE RECOLECCIÓN ── */}
-      {pedido.pickup_pin && (
-        <div className="mx-2.5 mt-2 bg-orange-100 border-2 border-orange-400 border-dashed rounded-md px-2 py-1 flex items-center justify-between shadow-sm">
-          <span className="text-[10px] font-black text-orange-600">PIN RECOLECCIÓN</span>
-          <span className="text-base font-black text-orange-700 tracking-[0.2em]">{pedido.pickup_pin}</span>
-        </div>
-      )}
-
-      {/* ── Items del pedido ── */}
-      {items.length > 0 && (
-        <div className="px-2.5 pt-1.5 space-y-1">
-          {items.map((item: any, idx: number) => (
-            <div key={idx} className="bg-slate-50 border border-slate-100 rounded-md px-2 py-1">
-              <p className="text-[13px] font-black text-slate-900 leading-snug">
-                <span className="text-orange-500 mr-1">{item.cantidad}×</span>{item.nombre}
-              </p>
-              {item.opcionesSeleccionadas?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-0.5 ml-4">
-                  {item.opcionesSeleccionadas.map((opc: any, i: number) => (
-                    <span key={i} className="text-[9px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
-                      {opc.opcion}{opc.precio_extra > 0 ? ` +$${opc.precio_extra}` : ''}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── Botón acción ── */}
-      <div className="px-2.5 pt-2 pb-2.5">
+      <div className="px-3 pb-3 pt-1">
         <ActionButton
           onClick={onAction}
-          className={`w-full py-1.5 rounded-md font-bold text-xs text-white ${actionColor}`}
-          loadingText="Espere..."
+          className={`w-full py-2.5 rounded-xl font-bold text-[13px] text-white shadow-sm hover:shadow transition-all active:scale-[0.98] ${
+            actionColor.includes('orange') 
+              ? 'bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500' 
+              : actionColor.includes('emerald')
+                ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-600 hover:to-emerald-500'
+                : 'bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-800 hover:to-slate-700'
+          }`}
+          loadingText="Procesando..."
         >
           {actionLabel}
         </ActionButton>

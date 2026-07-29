@@ -118,8 +118,12 @@ export function PushNotificationSetup() {
       }
 
       if (!silent) setShowPrompt(false);
-    } catch (error) {
-      console.error('Error suscribiendo a notificaciones push:', error);
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.message?.includes('AbortError')) {
+        console.warn('Suscripción push abortada (normal en local o navegadores sin soporte completo).');
+      } else {
+        console.error('Error suscribiendo a notificaciones push:', error);
+      }
     } finally {
       if (!silent) setIsSubscribing(false);
     }
