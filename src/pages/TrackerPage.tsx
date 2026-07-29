@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Loader2, Phone, MessageCircle, Navigation, MapPin } from 'lucide-react';
-import { useJsApiLoader, GoogleMap, Marker } from '@react-google-maps/api';
+import { Loader2, Phone, MessageCircle, Navigation, MapPin, Store, Home, Bike, ChevronDown, CheckCircle, Clock, ChevronUp } from 'lucide-react';
+import { useJsApiLoader, GoogleMap, Marker, OverlayView, DirectionsRenderer } from '@react-google-maps/api';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLottie } from 'lottie-react';
+import cookingAnimation from '../assets/Cooking.json';
+
+const CookingAnimation = () => {
+  const { View } = useLottie({ animationData: cookingAnimation, loop: true });
+  return <>{View}</>;
+};
 
 const mapContainerStyle = {
   width: '100%',
@@ -18,17 +26,52 @@ export function TrackerPage() {
   const [restaurante, setRestaurante] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Bottom Sheet state
+  const [isExpanded, setIsExpanded] = useState(false);
+  const touchStartY = useRef(0);
+
+  // Advanced feature states
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [eta, setEta] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+
   // Load Google Maps
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
   });
 
+  const fetchRepartidor = async (repId: string) => {
+    const { data: repData } = await supabase
+      .from('repartidores')
+      .select('*')
+      .or(`id.eq.${repId},user_id.eq.${repId}`)
+      .maybeSingle();
+    
+    if (repData) setRepartidor(repData);
+  };
+
   useEffect(() => {
     if (!pedidoId) return;
 
-    let isMounted = true;
     let orderChannel: any = null;
     let driverChannel: any = null;
+
+    const subscribeToDriver = (repId: string) => {
+      if (driverChannel) supabase.removeChannel(driverChannel);
+      
+      driverChannel = supabase.channel(`driver-tracker-${repId}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'repartidores', filter: `id=eq.${repId}` },
+          (payload) => {
+            setRepartidor((prev: any) => prev ? {
+              ...prev,
+              lat: payload.new.lat,
+              lng: payload.new.lng
+            } : prev);
+          }
+        ).subscribe();
+    };
 
     const fetchInitialData = async () => {
       // Fetch pedido (Soporta UUID largo o ID corto de 6 caracteres)
@@ -43,7 +86,7 @@ export function TrackerPage() {
       
       const { data: orderData } = await query.single();
         
-      if (orderData && isMounted) {
+      if (orderData) {
         setPedido(orderData);
         
         // Fetch restaurante
@@ -53,76 +96,116 @@ export function TrackerPage() {
             .select('*')
             .ilike('nombre', orderData.restaurante)
             .single();
-          if (isMounted) setRestaurante(restData);
+          if (restData) setRestaurante(restData);
         }
 
         // Fetch repartidor if assigned
         if (orderData.repartidor_id) {
-          const { data: repData } = await supabase
-            .from('repartidores')
-            .select('*')
-            .or(`id.eq.${orderData.repartidor_id},user_id.eq.${orderData.repartidor_id}`)
-            .maybeSingle();
-          if (isMounted) setRepartidor(repData);
-
-          // Subscribirse a la ubicación en tiempo real del repartidor
-          if (repData?.id) {
-            driverChannel = supabase.channel(`driver-tracker-${repData.id}`)
-              .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'repartidores', filter: `id=eq.${repData.id}` },
-                (payload) => {
-                  if (isMounted) {
-                    setRepartidor((prev: any) => ({
-                      ...prev,
-                      lat: payload.new.lat,
-                      lng: payload.new.lng
-                    }));
-                  }
-                }
-              ).subscribe();
-          }
+          fetchRepartidor(orderData.repartidor_id);
+          subscribeToDriver(orderData.repartidor_id);
         }
 
         // Subscribirse al estado del pedido
-        orderChannel = supabase.channel(`order-tracker-${orderData.id}`)
+        orderChannel = supabase.channel(`order-tracker-${orderData.id}-${Date.now()}`)
           .on(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${orderData.id}` },
             (payload) => {
-              if (isMounted) {
-                setPedido((prev: any) => ({ ...prev, estado: payload.new.estado }));
-                
-                // Si el repartidor apenas se asignó en este update
-                if (payload.new.repartidor_id && (!orderData.repartidor_id || orderData.repartidor_id !== payload.new.repartidor_id)) {
-                  fetchRepartidor(payload.new.repartidor_id);
-                }
+              setPedido((prev: any) => ({ ...prev, ...payload.new }));
+              
+              // Si el repartidor se asignó o cambió
+              if (payload.new.repartidor_id) {
+                fetchRepartidor(payload.new.repartidor_id);
+                subscribeToDriver(payload.new.repartidor_id);
               }
             }
           ).subscribe();
+          
+        setLoading(false);
+      } else {
+        setLoading(false); // No se encontró el pedido
       }
-      if (isMounted) setLoading(false);
-    };
-
-    const fetchRepartidor = async (repId: string) => {
-       const { data: repData } = await supabase
-         .from('repartidores')
-         .select('*')
-         .or(`id.eq.${repId},user_id.eq.${repId}`)
-         .maybeSingle();
-       if (isMounted && repData) {
-         setRepartidor(repData);
-       }
     };
 
     fetchInitialData();
 
     return () => {
-      isMounted = false;
       if (orderChannel) supabase.removeChannel(orderChannel);
       if (driverChannel) supabase.removeChannel(driverChannel);
     };
   }, [pedidoId]);
+
+  // Coordenadas base
+  const defaultCenter = useMemo(() => ({ lat: 16.2516, lng: -92.1332 }), []); // Comitán por defecto
+  
+  const restaurantLocation = useMemo(() => restaurante?.lat && restaurante?.lng 
+    ? { lat: Number(restaurante.lat), lng: Number(restaurante.lng) } 
+    : null, [restaurante?.lat, restaurante?.lng]);
+  
+  const driverLocation = useMemo(() => repartidor?.lat && repartidor?.lng
+    ? { lat: Number(repartidor.lat), lng: Number(repartidor.lng) }
+    : null, [repartidor?.lat, repartidor?.lng]);
+
+  const clientLocation = useMemo(() => pedido?.lat && pedido?.lng
+    ? { lat: Number(pedido.lat), lng: Number(pedido.lng) }
+    : null, [pedido?.lat, pedido?.lng]);
+
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  const fitMapToBounds = useCallback(() => {
+    if (!mapRef.current || !window.google?.maps) return;
+    
+    const bounds = new window.google.maps.LatLngBounds();
+    let count = 0;
+    
+    if (restaurantLocation) { bounds.extend(restaurantLocation); count++; }
+    if (clientLocation) { bounds.extend(clientLocation); count++; }
+    if (driverLocation) { bounds.extend(driverLocation); count++; }
+    
+    if (count > 1) {
+      // Usar un padding inferior para compensar el bottom sheet
+      mapRef.current.fitBounds(bounds, { top: 80, right: 80, bottom: window.innerWidth < 768 ? 320 : 80, left: window.innerWidth < 768 ? 80 : 400 });
+    } else if (count === 1) {
+      mapRef.current.setZoom(14);
+      mapRef.current.setCenter(driverLocation || restaurantLocation || clientLocation || defaultCenter);
+    }
+  }, [restaurantLocation, clientLocation, driverLocation, defaultCenter]);
+
+  useEffect(() => {
+    fitMapToBounds();
+  }, [fitMapToBounds]);
+
+  const lastDirectionsFetch = useRef<number>(0);
+
+  useEffect(() => {
+    if (pedido?.estado === 'en_camino' && driverLocation && clientLocation && isLoaded && window.google) {
+      const now = Date.now();
+      // Throttle: Solo pedir la ruta azul a Google Maps cada 30 segundos
+      if (now - lastDirectionsFetch.current < 30000) return;
+      lastDirectionsFetch.current = now;
+
+      const directionsService = new window.google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: driverLocation,
+          destination: clientLocation,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === window.google.maps.DirectionsStatus.OK && result) {
+            setDirections(result);
+            if (result.routes[0]?.legs[0]?.duration?.text) {
+              setEta(result.routes[0].legs[0].duration.text);
+            }
+          }
+        }
+      );
+    } else if (pedido?.estado !== 'en_camino') {
+      setDirections(null);
+      setEta(null);
+      lastDirectionsFetch.current = 0;
+    }
+  }, [pedido?.estado, driverLocation?.lat, driverLocation?.lng, clientLocation?.lat, clientLocation?.lng, isLoaded]);
 
   if (!pedidoId) {
     return (
@@ -140,21 +223,34 @@ export function TrackerPage() {
     );
   }
 
-  // Coordenadas base
-  const defaultCenter = { lat: 16.2516, lng: -92.1332 }; // Comitán por defecto
-  const restaurantLocation = restaurante?.lat && restaurante?.lng 
-    ? { lat: Number(restaurante.lat), lng: Number(restaurante.lng) } 
-    : defaultCenter;
-  
-  const driverLocation = repartidor?.lat && repartidor?.lng
-    ? { lat: Number(repartidor.lat), lng: Number(repartidor.lng) }
-    : null;
+  const mapStyles = [
+    { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
+    { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#bdbdbd' }] },
+    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#eeeeee' }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+    { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#dadada' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9c9c9' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
+  ];
 
-  // El mapa centra en el conductor si está en camino, sino en el restaurante
-  const mapCenter = (pedido?.estado === 'en_camino' && driverLocation) ? driverLocation : restaurantLocation;
+  let currentStep = 1;
+  if (pedido?.estado === 'entregado') currentStep = 4;
+  else if (pedido?.estado === 'en_camino') currentStep = 3;
+  else if (pedido?.estado && pedido?.estado !== 'cancelado') currentStep = 2;
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col md:flex-row bg-slate-50 overflow-hidden font-sans relative">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="h-[100dvh] w-full flex flex-col md:flex-row bg-slate-50 overflow-hidden font-sans relative"
+    >
       
       {/* MAPA (Fondo en móvil / Izquierda en Desktop) */}
       <div className="w-full h-full md:w-2/3 bg-slate-200 absolute md:relative inset-0 md:inset-auto z-0">
@@ -172,114 +268,283 @@ export function TrackerPage() {
         {isLoaded && (
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
-            zoom={15}
-            center={mapCenter}
+            zoom={13}
+            center={defaultCenter}
+            onLoad={(map) => {
+              mapRef.current = map;
+              fitMapToBounds();
+            }}
             options={{
               disableDefaultUI: true,
               zoomControl: true,
-              styles: [
-                { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
-              ]
+              maxZoom: 14, // Limita el zoom máximo de forma nativa para evitar que fitBounds haga zoom extremo
+              styles: mapStyles
             }}
           >
+            {/* Ruta (Polyline) */}
+            {directions && (
+              <DirectionsRenderer
+                directions={directions}
+                options={{
+                  suppressMarkers: true,
+                  preserveViewport: true, // Esto evita que Google Maps haga su propio zoom loco
+                  polylineOptions: {
+                    strokeColor: '#3b82f6',
+                    strokeWeight: 6,
+                    strokeOpacity: 0.8,
+                  },
+                }}
+              />
+            )}
+
             {/* Marcador Restaurante */}
-            <Marker 
-              position={restaurantLocation}
-              icon={{
-                url: restaurante?.logo_url || 'https://cdn-icons-png.flaticon.com/512/3170/3170733.png',
-                scaledSize: new window.google.maps.Size(40, 40)
-              }}
-            />
+            {restaurantLocation && (
+              <OverlayView
+                position={restaurantLocation}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+              >
+                <motion.div 
+                  initial={{ scale: 0, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.2 }}
+                  className="absolute -translate-x-1/2 -translate-y-full pb-1"
+                >
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-white rounded-full shadow-xl border-4 border-orange-500 overflow-hidden flex items-center justify-center relative z-10">
+                      {restaurante?.logo_url ? (
+                        <img src={restaurante.logo_url} className="w-full h-full object-cover" alt="Restaurante" />
+                      ) : (
+                        <Store className="w-6 h-6 text-orange-500" />
+                      )}
+                    </div>
+                    {/* Flechita del pin */}
+                    <div className="w-4 h-4 bg-orange-500 absolute -bottom-1.5 left-1/2 -translate-x-1/2 rotate-45 rounded-sm z-0"></div>
+                  </div>
+                </motion.div>
+              </OverlayView>
+            )}
+
+            {/* Marcador Cliente */}
+            {clientLocation && (
+              <OverlayView
+                position={clientLocation}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+              >
+                <motion.div 
+                  initial={{ scale: 0, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.4 }}
+                  className="absolute -translate-x-1/2 -translate-y-full pb-1"
+                >
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-emerald-500 rounded-full shadow-xl border-4 border-white flex items-center justify-center relative z-10">
+                      <Home className="w-6 h-6 text-white" />
+                    </div>
+                    {/* Flechita del pin */}
+                    <div className="w-4 h-4 bg-white absolute -bottom-1.5 left-1/2 -translate-x-1/2 rotate-45 rounded-sm z-0 shadow-sm"></div>
+                  </div>
+                </motion.div>
+              </OverlayView>
+            )}
 
             {/* Marcador Repartidor (Moto) */}
             {driverLocation && (
-              <Marker 
+              <OverlayView
                 position={driverLocation}
-                icon={{
-                  url: 'https://cdn-icons-png.flaticon.com/512/2983/2983804.png',
-                  scaledSize: new window.google.maps.Size(48, 48)
-                }}
-                zIndex={100}
-              />
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+              >
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.6 }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2"
+                >
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-slate-800 rounded-full shadow-2xl border-4 border-white flex items-center justify-center z-10 relative">
+                      <Bike className="w-7 h-7 text-white" />
+                    </div>
+                    {/* Efecto de pulso para la moto */}
+                    <div className="absolute inset-0 bg-slate-800 rounded-full animate-ping opacity-20 z-0"></div>
+                  </div>
+                </motion.div>
+              </OverlayView>
             )}
           </GoogleMap>
         )}
       </div>
 
+      {/* Floating Status Pill (Mobile Only - visible when sheet is collapsed) */}
+      <AnimatePresence>
+        {!isExpanded && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-4 left-4 right-4 md:hidden z-10 flex justify-center pointer-events-none"
+          >
+            <div className="bg-white px-5 py-2.5 rounded-full shadow-lg border border-slate-100 flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${pedido?.estado === 'cancelado' ? 'bg-red-500' : pedido?.estado === 'entregado' ? 'bg-emerald-500' : pedido?.estado === 'en_camino' ? 'bg-blue-500' : 'bg-orange-500 animate-pulse'}`} />
+              <span className="text-sm font-bold text-slate-800">
+                {pedido?.estado?.replace('_', ' ').toUpperCase() || 'PROCESANDO'}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* PANEL LATERAL (Bottom Sheet en móvil / Derecha en Desktop) */}
-      <div className="w-full max-h-[55dvh] md:max-h-full md:h-full md:w-1/3 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.12)] md:shadow-[-10px_0_30px_rgba(0,0,0,0.05)] z-10 flex flex-col absolute bottom-0 md:relative rounded-t-[32px] md:rounded-none">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-[-10px_0_30px_rgba(0,0,0,0.05)] z-20 flex flex-col absolute bottom-0 md:relative rounded-t-[32px] md:rounded-none h-[90vh] md:h-full md:w-1/3 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:translate-y-0 ${isExpanded ? 'translate-y-0' : 'translate-y-[55vh]'}`}
+      >
         
         {/* Mobile Drag Handle */}
-        <div className="w-full flex justify-center pt-4 pb-2 md:hidden shrink-0">
+        <div 
+          className="w-full flex justify-center items-center pt-4 pb-3 md:hidden shrink-0 cursor-pointer active:bg-slate-50 transition-colors rounded-t-[32px] relative"
+          onClick={() => setIsExpanded(!isExpanded)}
+          onTouchStart={(e) => { touchStartY.current = e.touches[0].clientY; }}
+          onTouchEnd={(e) => {
+            const touchEndY = e.changedTouches[0].clientY;
+            if (touchStartY.current - touchEndY > 30) setIsExpanded(true); // Deslizó arriba
+            if (touchEndY - touchStartY.current > 30) setIsExpanded(false); // Deslizó abajo
+          }}
+        >
           <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-        </div>
-        {/* Header (Fijo arriba) */}
-        <div className="p-5 md:p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <div>
-            <h1 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
-              Estrella Eats
-            </h1>
-            <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Seguimiento en vivo
-            </p>
+          <div className="absolute right-6 bg-slate-50 p-1 rounded-full">
+            {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
           </div>
-          <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
-            {pedido?.estado?.replace('_', ' ') || 'Procesando'}
-          </span>
         </div>
 
         {/* Content (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-5 md:p-6 custom-scrollbar">
+        <div className={`flex-1 p-5 md:p-6 custom-scrollbar ${isExpanded ? 'overflow-y-auto' : 'overflow-hidden md:overflow-y-auto'}`}>
           
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0 shadow-sm">
-              {restaurante?.logo_url ? (
-                <img src={restaurante.logo_url} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xl font-black text-slate-400">{pedido?.restaurante?.[0]}</span>
-              )}
+          <div className="flex items-center justify-between mb-6 md:mt-2">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0 shadow-sm">
+                {restaurante?.logo_url ? (
+                  <img src={restaurante.logo_url} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xl font-black text-slate-400">{pedido?.restaurante?.[0]}</span>
+                )}
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-800 leading-tight line-clamp-1 uppercase">
+                  {pedido?.estado === 'en_camino' ? 'TU ORDEN VA EN CAMINO' : 
+                   pedido?.estado === 'entregado' ? 'PEDIDO ENTREGADO' : 
+                   pedido?.estado === 'cancelado' ? 'PEDIDO CANCELADO' : pedido?.restaurante}
+                </h2>
+                <p className="text-[12px] font-bold text-slate-400 mt-0.5 flex items-center gap-2">
+                  {pedido?.estado === 'en_camino' ? 'Nos vemos pronto' : 
+                   pedido?.estado === 'entregado' ? '¡Disfruta tu comida!' : 
+                   pedido?.estado === 'cancelado' ? 'Este viaje terminó' : 'Está preparando tu pedido'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">PREPARANDO EN</p>
-              <h2 className="text-lg font-black text-slate-800 leading-tight line-clamp-1">{pedido?.restaurante}</h2>
-            </div>
+            
+            {/* Lottie Animation next to header when preparing */}
+            {pedido?.estado !== 'cancelado' && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
+              <div className="w-16 h-16 shrink-0 mr-1">
+                <CookingAnimation />
+              </div>
+            )}
           </div>
 
-          <div className="bg-slate-50 p-6 md:p-8 rounded-[24px] border border-slate-100 flex flex-col items-center text-center shadow-sm">
-            {pedido?.estado === 'cancelado' ? (
-              <>
-                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
-                  <Navigation className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-black text-slate-800 mb-2">El viaje fue cancelado</h3>
-                <p className="text-sm font-medium text-slate-500">Este pedido ya no está activo.</p>
-              </>
-            ) : pedido?.estado === 'en_camino' ? (
-              <>
-                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
-                  <Navigation className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-black text-slate-800 mb-2">Repartidor en camino</h3>
-                <p className="text-sm font-medium text-slate-500">Prepárate para recibir tu orden en breve.</p>
-              </>
-            ) : pedido?.estado === 'entregado' ? (
-              <>
-                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
-                  <MapPin className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-black text-slate-800 mb-2">Pedido entregado</h3>
-                <p className="text-sm font-medium text-slate-500">¡Que disfrutes tu comida!</p>
-              </>
-            ) : (
-              <>
-                <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mb-4 shadow-inner relative overflow-hidden">
-                  <Loader2 className="w-8 h-8 animate-spin relative z-10" />
-                </div>
-                <h3 className="text-xl font-black text-slate-800 mb-2">Preparando pedido</h3>
-                <p className="text-sm font-medium text-slate-500">El restaurante está cocinando.</p>
-              </>
-            )}
+          {/* Timeline Progress */}
+          {pedido?.estado !== 'cancelado' && (
+            <div className={`mb-2 mt-2 ${!isExpanded ? 'hidden md:block' : 'block'}`}>
+              <div className="flex items-center justify-between relative">
+                {/* Background Line */}
+                <div className="absolute left-0 right-0 top-1/2 h-1 bg-slate-100 -z-10 -translate-y-1/2 rounded-full" />
+                
+                {/* Active Line */}
+                <div 
+                  className="absolute left-0 top-1/2 h-1 bg-emerald-500 -z-10 -translate-y-1/2 rounded-full transition-all duration-500"
+                  style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
+                />
+
+                {/* Steps */}
+                {[1, 2, 3, 4].map((step) => (
+                  <div key={step} className="flex flex-col items-center gap-2">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors duration-300 ${
+                      step <= currentStep 
+                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' 
+                        : 'bg-white border-2 border-slate-200 text-slate-400'
+                    }`}>
+                      {step < currentStep ? <CheckCircle className="w-4 h-4" /> : step}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between mt-2 px-1">
+                <span className={`text-[10px] font-bold ${currentStep >= 1 ? 'text-emerald-600' : 'text-slate-400'}`}>Recibido</span>
+                <span className={`text-[10px] font-bold ${currentStep >= 2 ? 'text-emerald-600' : 'text-slate-400'}`}>Preparando</span>
+                <span className={`text-[10px] font-bold ${currentStep >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>En camino</span>
+                <span className={`text-[10px] font-bold ${currentStep >= 4 ? 'text-emerald-600' : 'text-slate-400'}`}>Entregado</span>
+              </div>
+            </div>
+          )}
+
+          {['cancelado', 'en_camino', 'entregado'].includes(pedido?.estado) && (
+            <div className="pt-0 pb-6 flex flex-col items-center text-center">
+              {pedido?.estado === 'cancelado' ? (
+                <>
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-3 md:mb-4">
+                    <Navigation className="w-6 h-6 md:w-8 md:h-8" />
+                  </div>
+                  <h3 className="text-lg md:text-xl font-black text-slate-800 mb-1 md:mb-2">El viaje fue cancelado</h3>
+                  <p className="text-xs md:text-sm font-medium text-slate-500">Este pedido ya no está activo.</p>
+                </>
+              ) : pedido?.estado === 'en_camino' ? (
+                <>
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-3 md:mb-4 shadow-inner">
+                    <Navigation className="w-6 h-6 md:w-8 md:h-8" />
+                  </div>
+                  <h3 className="text-lg md:text-xl font-black text-slate-800 mb-1 md:mb-2">Repartidor en camino</h3>
+                  <p className="text-xs md:text-sm font-medium text-slate-500">Prepárate para recibir tu orden en breve.</p>
+                  {eta && (
+                    <div className="mt-3 md:mt-4 bg-blue-50 px-4 py-2 rounded-full border border-blue-100 flex items-center gap-2 text-blue-600">
+                      <Clock className="w-4 h-4" />
+                      <span className="text-xs md:text-sm font-bold">Llega en aprox. {eta}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3 md:mb-4">
+                    <MapPin className="w-6 h-6 md:w-8 md:h-8" />
+                  </div>
+                  <h3 className="text-lg md:text-xl font-black text-slate-800 mb-1 md:mb-2">Pedido entregado</h3>
+                  <p className="text-xs md:text-sm font-medium text-slate-500">¡Que disfrutes tu comida!</p>
+                </>
+              )}
+            </div>
+          )}
+          
+          {/* Order Details Toggle */}
+          <div className="mt-4 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+            <button 
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+            >
+              <span className="text-sm font-bold text-slate-700">Ver detalles del pedido</span>
+              {showDetails ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+            </button>
+            <AnimatePresence>
+              {showDetails && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="px-4 pb-4 overflow-hidden"
+                >
+                  <div className="pt-3 border-t border-slate-100 text-sm text-slate-600 whitespace-pre-wrap font-medium">
+                    {pedido?.descripcion || 'No hay detalles disponibles.'}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           
           {repartidor && (
@@ -329,7 +594,7 @@ export function TrackerPage() {
             <span className="text-sm">Llamar</span>
           </a>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
