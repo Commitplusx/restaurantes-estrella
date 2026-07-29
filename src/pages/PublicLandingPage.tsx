@@ -5,6 +5,7 @@ import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, Chev
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript } from '@react-google-maps/api';
+import { OnboardingFlow } from '../components/OnboardingFlow';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
 interface Restaurante {
@@ -147,6 +148,7 @@ export function PublicLandingPage() {
     libraries: LIBRARIES
   });
 
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('estrella_onboarding_done'))
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
   const [heroBanners, setHeroBanners] = useState<any[]>([])
@@ -630,7 +632,9 @@ export function PublicLandingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-blue-100">
-
+      <AnimatePresence>
+        {showOnboarding && <OnboardingFlow onComplete={() => setShowOnboarding(false)} />}
+      </AnimatePresence>
       {/* Header Pegajoso Premium (Estilo Delivery App) */}
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'bg-slate-50'} ${!showHeader ? '-translate-y-full' : 'translate-y-0'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2`}>
         <div className="max-w-[1400px] mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
