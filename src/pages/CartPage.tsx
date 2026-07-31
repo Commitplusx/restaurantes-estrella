@@ -215,6 +215,16 @@ export default function CartPage() {
     }
   }, [checkoutStep, setCheckoutStep]);
 
+  // Sincronizar el estado del carrito (tienda vs domicilio) con la preferencia global del header
+  useEffect(() => {
+    const globalType = sessionStorage.getItem('est_delivery_type');
+    if (globalType === 'recoger') {
+      setTipoEntrega('tienda');
+    } else if (globalType === 'domicilio') {
+      setTipoEntrega('domicilio');
+    }
+  }, [setTipoEntrega]);
+
   useEffect(() => {
     if (ubicacionGPS) sessionStorage.setItem('est_ubicacion', JSON.stringify(ubicacionGPS));
     else sessionStorage.removeItem('est_ubicacion');
