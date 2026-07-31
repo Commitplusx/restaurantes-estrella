@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
-import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
+import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript, GoogleMap, OverlayView } from '@react-google-maps/api';
@@ -335,7 +335,6 @@ export function PublicLandingPage() {
   })
   const [userAddress, setUserAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
   const [locationLoading, setLocationLoading] = useState(false)
-  const [currentPromoIndex, setCurrentPromoIndex] = useState(0)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
   const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -429,16 +428,6 @@ export function PublicLandingPage() {
     })
   }
 
-  useEffect(() => {
-    if (promosGlobales.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentPromoIndex((prev) => (prev + 1) % promosGlobales.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [promosGlobales]);
-
-  const nextPromo = () => setCurrentPromoIndex((prev) => (prev + 1) % promosGlobales.length);
-  const prevPromo = () => setCurrentPromoIndex((prev) => (prev - 1 + promosGlobales.length) % promosGlobales.length);
 
   const PAGE_SIZE = 8
 
