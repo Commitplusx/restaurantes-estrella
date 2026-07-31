@@ -1,13 +1,25 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
-import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal, Package, ChefHat, Truck } from 'lucide-react'
+import { Store, Search, MapPin, Clock, Ticket, Loader2, Star, ChevronRight, ChevronLeft, Heart, ChevronDown, Bell, SlidersHorizontal, Package, ChefHat, Truck, User, ShoppingCart } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useLoadScript } from '@react-google-maps/api';
+import { useLoadScript, GoogleMap, OverlayView } from '@react-google-maps/api';
 import { OnboardingFlow } from '../components/OnboardingFlow';
+import { BottomNav } from '../components/BottomNav';
+import { SearchView } from '../components/SearchView';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
+
+const MAP_STYLES = [
+  { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#dadada' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9c9c9' }] },
+];
 interface Restaurante {
   id: string
   nombre: string
@@ -24,7 +36,94 @@ interface Restaurante {
   lng?: number
 }
 
-const EMOJI_MAP: Record<string, string> = {
+
+// Bottom Sheet draggable para la vista del mapa
+function MapBottomSheet({ nearbyRestaurants, estaAbierto }: { nearbyRestaurants: any[], estaAbierto: (r: any) => boolean }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const touchStartY = useRef(0);
+
+  return (
+    <div
+      className={`absolute left-0 right-0 z-10 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+        isExpanded ? 'bottom-0 max-h-[70vh]' : 'bottom-20'
+      }`}
+      onTouchStart={e => { touchStartY.current = e.touches[0].clientY; }}
+      onTouchEnd={e => {
+        const dy = touchStartY.current - e.changedTouches[0].clientY;
+        if (dy > 40) setIsExpanded(true);
+        if (dy < -40) setIsExpanded(false);
+      }}
+    >
+      {/* Handle */}
+      <div
+        className="w-full flex flex-col items-center pt-3 pb-2 cursor-pointer"
+        onClick={() => setIsExpanded(v => !v)}
+      >
+        <div className="w-10 h-1 bg-slate-200 rounded-full mb-2" />
+        <div className="flex items-center justify-between w-full px-5">
+          <p className="font-black text-slate-900 text-[15px]">Cerca de ti 📍</p>
+          <span className="text-[11px] font-bold text-slate-400">{nearbyRestaurants.length} restaurantes</span>
+        </div>
+      </div>
+
+      {/* Lista horizontal (siempre visible, scroll) */}
+      <div className={`overflow-y-auto transition-all duration-500 ${
+        isExpanded ? 'max-h-[55vh]' : 'max-h-[110px]'
+      }`}>
+        {/* Scroll horizontal de cards */}
+        <div className="flex gap-3 overflow-x-auto px-5 pb-4 no-scrollbar snap-x">
+          {nearbyRestaurants.map(res => (
+            <Link
+              key={res.id}
+              to={`/menu/${res.slug || res.id}`}
+              className="shrink-0 w-28 snap-start flex flex-col gap-1.5 active:scale-95 transition-transform"
+            >
+              <div className="w-full h-20 rounded-xl overflow-hidden bg-slate-100">
+                {res.foto_fachada_url
+                  ? <img src={res.foto_fachada_url} className="w-full h-full object-cover" alt={res.nombre} />
+                  : <div className="w-full h-full flex items-center justify-center"><Store size={20} className="text-slate-300" /></div>
+                }
+              </div>
+              <p className="font-bold text-[11px] text-slate-800 truncate leading-tight">{res.nombre}</p>
+              <p className={`text-[10px] font-semibold ${estaAbierto(res) ? 'text-emerald-500' : 'text-slate-400'}`}>
+                {estaAbierto(res) ? '● Abierto' : '● Cerrado'}
+              </p>
+            </Link>
+          ))}
+        </div>
+
+        {/* Lista vertical cuando está expandido */}
+        {isExpanded && (
+          <div className="px-5 pb-24 mt-2 flex flex-col gap-3">
+            {nearbyRestaurants.map(res => (
+              <Link
+                key={`v-${res.id}`}
+                to={`/menu/${res.slug || res.id}`}
+                className="flex gap-3 items-center py-2 border-b border-slate-50 active:bg-slate-50 rounded-xl px-1 transition-colors"
+              >
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                  {res.foto_fachada_url
+                    ? <img src={res.foto_fachada_url} className="w-full h-full object-cover" alt={res.nombre} />
+                    : <div className="w-full h-full flex items-center justify-center"><Store size={16} className="text-slate-300" /></div>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900 text-[13px] truncate">{res.nombre}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{res.categorias?.[0] || 'Restaurante'} · 25-35 min</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${
+                  estaAbierto(res) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                }`}>{estaAbierto(res) ? 'Abierto' : 'Cerrado'}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const EMOJI_MAP_DATA: Record<string, string> = {
   'Hamburguesas': '🍔',
   'Pizza': '🍕',
   'Tacos': '🌮',
@@ -44,6 +143,8 @@ const EMOJI_MAP: Record<string, string> = {
   'Comida Corrida': '🍲'
 }
 
+const EMOJI_MAP = EMOJI_MAP_DATA;
+
 function RestaurantCardSkeleton({ horizontal = false }: { horizontal?: boolean }) {
   return (
     <div className={`flex flex-col group relative bg-white sm:bg-transparent md:bg-white md:p-3 md:rounded-[24px] md:border md:border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none p-3 sm:p-0 gap-2 sm:gap-3 animate-pulse`}>
@@ -56,12 +157,12 @@ function RestaurantCardSkeleton({ horizontal = false }: { horizontal?: boolean }
   )
 }
 
-function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calculaDistancia, horizontal = false }: any) {
+function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calculaDistancia, horizontal = false, globalDeliveryType = 'domicilio' }: any) {
   const isAbierto = estaAbierto(res);
   let distanceStr = '';
-  let costoStr = 'Envío: $45';
+  let costoStr = globalDeliveryType === 'recoger' ? 'Para llevar' : 'Envío: $45';
   
-  if (userLocation && res.lat && res.lng) {
+  if (globalDeliveryType !== 'recoger' && userLocation && res.lat && res.lng) {
     const dist = calculaDistancia(userLocation.lat, userLocation.lng, res.lat, res.lng);
     distanceStr = dist < 1 ? '< 1 km' : `${dist.toFixed(1)} km`;
     if (dist <= 1.5) {
@@ -72,9 +173,12 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
     }
   }
 
+  // Si horizontal es true, forzamos un ancho en móvil, si no, ocupa todo el ancho.
+  // En desktop, la tarjeta siempre tendrá un layout estandar (vertical block, landscape image).
   return (
-    <Link to={`/menu/${res.slug || res.id}`} className={`flex flex-col group relative bg-white sm:bg-transparent md:hover:bg-white md:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] md:hover:-translate-y-1 transition-all duration-300 md:p-3 md:rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none md:border md:border-transparent md:hover:border-slate-100 p-3 sm:p-0 gap-2 sm:gap-3 rounded-2xl sm:rounded-none`}>
-       <div className={`relative mx-auto md:mx-0 shrink-0 aspect-square md:aspect-[4/3] md:w-full rounded-[24px] overflow-hidden bg-white shadow-sm border border-slate-100 isolate ${horizontal ? 'w-[100px]' : 'w-[90px] sm:w-[160px]'}`}>
+    <Link to={`/menu/${res.slug || res.id}`} className={`flex flex-col group relative bg-white sm:bg-transparent md:hover:bg-white md:p-2 md:rounded-[16px] transition-all duration-300 md:border md:border-transparent md:hover:border-slate-100 md:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] shadow-[0_2px_12px_rgba(0,0,0,0.03)] sm:shadow-none border border-slate-100 sm:border-none p-3 sm:p-0 gap-2 sm:gap-3 rounded-2xl sm:rounded-none ${horizontal ? 'w-[140px] sm:w-[180px] md:w-full' : 'w-full'}`}>
+       
+       <div className={`relative mx-auto md:mx-0 shrink-0 aspect-[4/3] md:aspect-[16/9] w-full rounded-[16px] overflow-hidden bg-slate-100 shadow-sm border border-slate-100/50 isolate`}>
           {res.foto_fachada_url ? (
             <img 
               src={res.foto_fachada_url} 
@@ -83,13 +187,13 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
               alt={res.nombre} 
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-slate-50"><Store size={24} className="text-slate-300 sm:w-10 sm:h-10" /></div>
+            <div className="w-full h-full flex items-center justify-center bg-slate-50"><Store size={32} className="text-slate-300" /></div>
           )}
           
           <motion.button 
             onClick={(e: any) => toggleFav(e, res.id)}
             whileTap={{ scale: 0.8 }}
-            className="absolute top-2 right-2 md:top-3 md:right-3 w-8 h-8 bg-white/90 backdrop-blur-md rounded-full shadow-md flex items-center justify-center z-30 transition-colors hover:bg-white"
+            className="absolute top-2 right-2 md:top-3 md:right-3 w-8 h-8 bg-white/90 backdrop-blur-md rounded-full shadow-sm flex items-center justify-center z-30 transition-colors hover:bg-white"
           >
             <motion.div
               initial={false}
@@ -100,42 +204,51 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
             </motion.div>
           </motion.button>
 
-          {/* Badge de Tiempo */}
-          {isAbierto && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-2 py-1 rounded-full shadow-sm text-[9px] sm:text-[11px] font-bold text-slate-900 flex items-center gap-1 z-20 whitespace-nowrap">
-               <Clock size={10} strokeWidth={3} className="text-[#1D4ED8]"/> 25-35 min
-            </div>
+          {/* Badge de Promoción Opcional (Mockup Uber Eats) */}
+          {res.etiqueta_zona === 'verde' && globalDeliveryType !== 'recoger' && (
+             <div className="absolute top-2 md:top-3 left-2 md:left-3 bg-[#1D4ED8] text-white text-[10px] md:text-[11px] font-bold px-2 py-1 rounded-full shadow-md z-20">
+               Envío Gratis
+             </div>
           )}
 
-          {/* Overlay Cerrado */}
-          {!isAbierto && (
-             <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-20">
-                <span className="bg-slate-900 text-white text-[8px] sm:text-[11px] font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] px-2 py-1 sm:px-4 sm:py-2 rounded-full shadow-lg">Cerrado</span>
-             </div>
+          {/* Badge de Tiempo */}
+          {isAbierto ? (
+            <div className="absolute bottom-2 md:bottom-3 right-2 md:right-3 bg-white/95 backdrop-blur-md px-2 py-1 rounded-full shadow-sm text-[10px] md:text-[12px] font-bold text-slate-900 flex items-center gap-1 z-20">
+               25-35 min
+            </div>
+          ) : (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] flex items-center justify-center z-20">
+              <span className="bg-slate-900 text-white text-[10px] md:text-[12px] font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-lg">Cerrado</span>
+            </div>
           )}
        </div>
        
        {/* Info Header */}
-       <div className={`flex flex-col items-center md:items-start gap-1 sm:px-1 flex-1 min-w-0 text-center md:text-left w-full ${horizontal ? 'mt-0' : ''}`}>
-          <div className="min-w-0 w-full flex flex-col items-center md:items-start">
-             <div className="flex w-full items-start justify-between gap-2 px-2 md:px-0">
-               <h3 className="font-bold text-[13px] sm:text-[15px] md:text-[17px] text-slate-900 leading-tight group-hover:text-[#1D4ED8] transition-colors truncate">
-                 {res.nombre}
-               </h3>
-               {/* Rating on Desktop */}
-               <div className="hidden md:flex items-center gap-1 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-full text-[11px] font-black text-slate-700 shrink-0">
-                 4.8 <Star size={10} className="fill-yellow-400 text-yellow-500" />
-               </div>
-             </div>
-             
-             <p className={`text-slate-500 text-[10px] sm:text-[12px] font-medium mt-0.5 md:mt-1 truncate w-full px-2 md:px-0 ${costoStr.includes('Gratis') ? 'text-green-600' : ''}`}>
-               {res.categorias?.[0] || 'Restaurante'} • {costoStr} {distanceStr && `(${distanceStr})`}
-             </p>
+       <div className="flex flex-col items-start gap-0.5 sm:px-1 flex-1 min-w-0 w-full mt-1 md:mt-2">
+          <div className="flex w-full items-center justify-between gap-2">
+            <h3 className="font-bold text-[14px] md:text-[16px] text-slate-900 leading-tight group-hover:text-[#1D4ED8] transition-colors truncate">
+              {res.nombre}
+            </h3>
+            <div className="flex items-center gap-1 bg-slate-100/80 px-1.5 py-0.5 rounded-full text-[11px] md:text-[12px] font-bold text-slate-700 shrink-0">
+              4.8 <Star size={10} className="fill-slate-700 text-slate-700" />
+            </div>
           </div>
-          {/* Rating on Mobile */}
-          <div className="md:hidden bg-slate-50 border border-slate-100 flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black text-slate-700 shrink-0 gap-1 mt-0.5">
-            4.8 <Star size={10} className="fill-yellow-400 text-yellow-500" />
-          </div>
+          
+          <p className={`text-slate-500 text-[11px] md:text-[13px] font-medium truncate w-full flex items-center gap-1.5`}>
+            <span>{costoStr}</span>
+            {distanceStr && (
+              <>
+                <span className="text-slate-300">•</span>
+                <span>{distanceStr}</span>
+              </>
+            )}
+            {res.categorias && res.categorias.length > 0 && (
+              <>
+                <span className="text-slate-300">•</span>
+                <span>{res.categorias[0]}</span>
+              </>
+            )}
+          </p>
        </div>
     </Link>
   )
@@ -178,6 +291,50 @@ export function PublicLandingPage() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
   const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
   const navigate = useNavigate()
+
+  const [activeNavTab, setActiveNavTab] = useState('home')
+  const [globalDeliveryType, setGlobalDeliveryType] = useState<'domicilio'|'recoger'>(() => {
+    return (sessionStorage.getItem('est_delivery_type') as any) || 'domicilio';
+  });
+  const [cuponesGlobales, setCuponesGlobales] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchCupones = async () => {
+      const { data } = await supabase
+        .from('cupones_plataforma')
+        .select('*')
+        .eq('activo', true)
+        .order('created_at', { ascending: false });
+      
+      if (data) {
+        const validCupones = data.filter(c => {
+          if (c.fecha_fin && new Date(`${c.fecha_fin}T23:59:59`) < new Date()) return false;
+          if (c.uso_maximo && c.usos_actuales >= c.uso_maximo) return false;
+          return true;
+        });
+        setCuponesGlobales(validCupones);
+      }
+    };
+    fetchCupones();
+  }, []);
+  
+  // Prevenir scroll de la página cuando la tab de ubicación está abierta
+  useEffect(() => {
+    if (activeNavTab === 'location') {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [activeNavTab]);
 
   useEffect(() => {
     const checkOrder = () => {
@@ -578,11 +735,15 @@ export function PublicLandingPage() {
   const displayRestaurants = useMemo(() => {
     let result = [...restaurantes];
 
+    // Helper de normalización
+    const normalize = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
     // Búsqueda de texto
     if (search.trim() !== '') {
+      const searchNormalized = normalize(search);
       result = result.filter(r => 
-        r.nombre.toLowerCase().includes(search.toLowerCase()) || 
-        (r.categorias && r.categorias.some(c => c.toLowerCase().includes(search.toLowerCase())))
+        normalize(r.nombre).includes(searchNormalized) || 
+        (r.categorias && r.categorias.some(c => normalize(c).includes(searchNormalized)))
       );
     }
 
@@ -636,31 +797,53 @@ export function PublicLandingPage() {
         {showOnboarding && <OnboardingFlow onComplete={() => setShowOnboarding(false)} />}
       </AnimatePresence>
       {/* Header Pegajoso Premium (Estilo Delivery App) */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'bg-slate-50'} ${!showHeader ? '-translate-y-full' : 'translate-y-0'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]' : 'bg-slate-50'} ${!showHeader ? '-translate-y-full' : 'translate-y-0'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2 ${activeNavTab === 'location' ? 'max-md:hidden' : ''}`}>
         <div className="max-w-[1400px] mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
            
            {/* Top Row (Address + Action) */}
            <div className="flex justify-between items-center md:w-auto w-full">
               {/* Desktop Logo (Left) */}
-              <div className="hidden md:flex items-center gap-2 mr-4 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+              <div className="hidden md:flex items-center gap-2 mr-2 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
                  <img src="/estrella-circle.png" alt="Estrella Eats" className="w-10 h-10 object-contain" />
                  <span className="text-xl font-black text-slate-900 tracking-tighter hidden lg:block">
                    Estrella<span className="text-[#1D4ED8]">Eats</span>
                  </span>
               </div>
 
+              {/* Delivery Toggle Desktop */}
+              <div className="hidden lg:flex items-center bg-slate-100 rounded-full p-1 mr-4">
+                 <button 
+                   onClick={() => {
+                     setGlobalDeliveryType('domicilio');
+                     sessionStorage.setItem('est_delivery_type', 'domicilio');
+                   }}
+                   className={`px-4 py-1.5 rounded-full text-[13px] font-bold transition-all ${globalDeliveryType === 'domicilio' ? 'bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] text-black' : 'text-slate-500 hover:text-slate-800'}`}
+                 >
+                   Entrega
+                 </button>
+                 <button 
+                   onClick={() => {
+                     setGlobalDeliveryType('recoger');
+                     sessionStorage.setItem('est_delivery_type', 'recoger');
+                   }}
+                   className={`px-4 py-1.5 rounded-full text-[13px] font-bold transition-all ${globalDeliveryType === 'recoger' ? 'bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] text-black' : 'text-slate-500 hover:text-slate-800'}`}
+                 >
+                   Para llevar
+                 </button>
+              </div>
+
               {/* Address Picker Premium */}
               <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity bg-white md:bg-transparent pl-1.5 pr-4 py-1.5 md:p-0 rounded-full md:rounded-none shadow-sm md:shadow-none border border-slate-100 md:border-transparent flex-1 md:flex-none" onClick={() => requestLocation()}>
-                 <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                    <MapPin size={18} strokeWidth={2.5} className="text-[#1D4ED8]"/>
+                 <div className="w-9 h-9 rounded-full bg-slate-100 md:bg-transparent md:w-auto md:h-auto flex items-center justify-center shrink-0">
+                    <MapPin size={18} strokeWidth={2.5} className="text-[#1D4ED8] md:text-slate-800"/>
                  </div>
                  <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-[1px]">Entregar en</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-[1px] md:hidden">Entregar en</span>
                     <div className="flex items-center gap-1">
-                       <span className="font-bold text-slate-800 text-[13px] md:text-[15px] truncate max-w-[180px] md:max-w-[250px] leading-none">
+                       <span className="font-bold text-slate-800 text-[13px] md:text-[15px] md:underline md:underline-offset-4 decoration-2 truncate max-w-[180px] md:max-w-[250px] leading-none">
                          {locationLoading ? "Buscando..." : (userAddress ? userAddress.split(',')[0] : (userLocation ? "Ubicación actual" : "Comitán de Domínguez"))}
                        </span>
-                       {locationLoading ? <Loader2 size={13} className="animate-spin text-[#1D4ED8] shrink-0"/> : <ChevronDown size={14} strokeWidth={3} className="text-slate-800 shrink-0 ml-0.5"/>}
+                       {locationLoading ? <Loader2 size={13} className="animate-spin text-[#1D4ED8] shrink-0"/> : <span className="hidden md:flex text-slate-800 text-[13px] font-bold ml-1">• Ahora <ChevronDown size={14} strokeWidth={3} className="text-slate-800 shrink-0 ml-0.5"/></span>}
                     </div>
                  </div>
               </div>
@@ -732,14 +915,43 @@ export function PublicLandingPage() {
                                </>
                              );
                            })()
-                         ) : (
-                           <>
-                             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-1">
-                               <Bell size={24} className="text-slate-400 opacity-50" />
-                             </div>
-                             <p className="text-[13px] font-bold text-slate-700">No hay notificaciones nuevas</p>
-                             <p className="text-[12px] text-slate-500 leading-relaxed">Aquí te avisaremos sobre el estado de tus pedidos y promociones exclusivas.</p>
-                           </>
+                         ) : cuponesGlobales.length > 0 ? (
+                            <div className="flex flex-col gap-2 w-full text-left">
+                              <p className="text-[13px] font-bold text-slate-700 mb-1 text-center">Promociones para ti</p>
+                              {cuponesGlobales.map(cupon => (
+                                <div 
+                                  key={cupon.id} 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(cupon.codigo);
+                                  }}
+                                  className="bg-orange-50/50 hover:bg-orange-50 transition-colors rounded-xl p-3 border border-orange-100 flex flex-col items-start relative overflow-hidden cursor-pointer group"
+                                >
+                                  <div className="absolute -right-3 -bottom-3 opacity-[0.07] text-orange-600 group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-300">
+                                    <Ticket size={56} />
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mb-1 relative z-10">
+                                    <Ticket size={14} className="text-orange-500" />
+                                    <span className="font-black text-orange-600 tracking-tight text-[13px]">{cupon.codigo}</span>
+                                  </div>
+                                  <p className="text-[12px] font-bold text-slate-700 relative z-10">
+                                    {cupon.tipo === 'porcentaje' ? `${cupon.valor}% de descuento en tu pedido` : 
+                                     cupon.tipo === 'envio_fijo' ? `Costo de envío especial a $${cupon.valor}` : 
+                                     `$${cupon.valor} MXN de descuento en tu pedido`}
+                                  </p>
+                                  <p className="text-[10px] text-slate-500 mt-1 relative z-10 font-medium">
+                                    {cupon.descripcion || 'Toca para copiar este código'}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-1">
+                                <Bell size={24} className="text-slate-400 opacity-50" />
+                              </div>
+                              <p className="text-[13px] font-bold text-slate-700">No hay notificaciones nuevas</p>
+                              <p className="text-[12px] text-slate-500 leading-relaxed">Aquí te avisaremos sobre el estado de tus pedidos y promociones exclusivas.</p>
+                            </>
                          )}
                        </div>
                        <div className="p-3 bg-slate-50 border-t border-slate-100">
@@ -757,7 +969,7 @@ export function PublicLandingPage() {
            </div>
            
            {/* Barra de Búsqueda Premium */}
-           <div className="relative group flex-1 w-full md:max-w-2xl flex items-center gap-2">
+           <div className={`relative group flex-1 w-full md:max-w-2xl flex items-center gap-2 ${activeNavTab === 'search' ? 'hidden' : 'flex'}`}>
               <div className="relative flex-1">
                  <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                    <Search className="text-slate-400 group-focus-within:text-[#1D4ED8] transition-colors" size={18} strokeWidth={2.5} />
@@ -793,18 +1005,54 @@ export function PublicLandingPage() {
               </button>
            </div>
 
-           {/* Desktop Empty Spacer for Balance */}
-           <div className="hidden md:flex w-[200px] justify-end"></div>
+           {/* Desktop Action Buttons (Login, Cart) */}
+           <div className="hidden md:flex items-center gap-3 shrink-0">
+              <button 
+                onClick={() => navigate('/cart')} 
+                className="h-12 px-6 flex items-center gap-2 bg-[#1D4ED8] hover:bg-blue-700 text-white rounded-full font-bold transition-colors shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              >
+                <ShoppingCart size={18} className="fill-white" />
+                <span>Carrito</span>
+              </button>
+           </div>
         </div>
       </header>
 
       <main className="pt-[140px] md:pt-32 max-w-[1400px] mx-auto px-4 md:px-12">
+        <div className="md:grid md:grid-cols-[220px_1fr] md:gap-8 md:mt-4 items-start">
+           
+           {/* Desktop Sidebar */}
+           <div className="hidden md:flex flex-col sticky top-[100px] gap-6 pr-4 max-h-[calc(100vh-120px)] overflow-y-auto pb-10 custom-scrollbar">
+              <div className="flex flex-col gap-1">
+                 <h2 className="text-[18px] font-black tracking-tight mb-2 px-2">Categorías</h2>
+                 <button 
+                   onClick={() => setSelectedCategory(null)}
+                   className={`flex items-center gap-3 w-full p-2.5 rounded-xl font-bold text-[15px] transition-colors ${!selectedCategory ? 'bg-slate-100 text-black' : 'text-slate-600 hover:bg-slate-50'}`}
+                 >
+                   <span className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-sm text-lg">🏠</span>
+                   Inicio
+                 </button>
+                 {activeCategories.map(c => (
+                   <button 
+                     key={c.name}
+                     onClick={() => setSelectedCategory(c.name)}
+                     className={`flex items-center gap-3 w-full p-2.5 rounded-xl font-bold text-[15px] transition-colors ${selectedCategory === c.name ? 'bg-slate-100 text-black' : 'text-slate-600 hover:bg-slate-50'}`}
+                   >
+                     <span className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-sm text-lg">{c.emoji}</span>
+                     {c.name}
+                   </button>
+                 ))}
+              </div>
+           </div>
+
+           {/* Main Content Column */}
+           <div className="w-full min-w-0">
         
         {/* Banner/Hero Space */}
         {heroBanners.length > 0 && (
-          <div className="relative mb-6 w-full h-[160px] sm:h-[200px] md:h-[280px] lg:h-[360px] rounded-[24px] overflow-hidden shadow-lg shadow-blue-900/10">
+          <div className="relative mb-6 w-full rounded-[24px] overflow-hidden shadow-lg shadow-blue-900/10 bg-slate-100">
             <div 
-              className="flex w-full h-full transition-transform duration-700 ease-in-out"
+              className="flex w-full transition-transform duration-700 ease-in-out"
               style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
             >
               {heroBanners.map((banner, idx) => {
@@ -821,17 +1069,22 @@ export function PublicLandingPage() {
                          else navigate(url);
                        }
                     }}
-                    className={`w-full h-full shrink-0 relative bg-cover bg-center ${banner.link_url ? 'cursor-pointer' : ''} ${isDyn ? 'bg-gradient-to-br from-indigo-500 via-purple-600 to-blue-700 p-6 md:p-10 flex items-center justify-center' : ''}`}
-                    style={!isDyn ? { backgroundImage: `url(${banner.imagen_url})` } : {}}
+                    className={`w-full shrink-0 relative flex justify-center ${banner.link_url ? 'cursor-pointer' : ''}`}
                   >
-                     {isDyn && (
-                       <>
+                     {!isDyn ? (
+                       <img 
+                         src={banner.imagen_url} 
+                         alt={banner.titulo || "Promoción"} 
+                         className="w-full h-auto max-h-[200px] md:max-h-[320px] lg:max-h-[360px] object-contain block"
+                       />
+                     ) : (
+                       <div className="w-full aspect-[21/9] bg-gradient-to-br from-indigo-500 via-purple-600 to-blue-700 p-6 md:p-10 flex items-center justify-center relative">
                          <div className={`relative z-10 w-full text-center transition-all duration-700 ${isActive ? 'scale-100 opacity-100' : 'scale-95 opacity-50'}`}>
                            <h2 className="text-white text-xl md:text-3xl font-black mb-1 md:mb-2 leading-tight drop-shadow-md" dangerouslySetInnerHTML={{ __html: banner.titulo.replace(/\n/g, '<br/>') }}></h2>
                            {banner.subtitulo && <p className="text-blue-100 text-[12px] md:text-sm font-medium drop-shadow-md">{banner.subtitulo}</p>}
                          </div>
                          <div className="absolute inset-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay pointer-events-none"></div>
-                       </>
+                       </div>
                      )}
                   </div>
                 );
@@ -852,8 +1105,8 @@ export function PublicLandingPage() {
           </div>
         )}
 
-        {/* Carrusel de Categorías */}
-        <div className="-mx-4 px-4 md:mx-0 md:px-0 mb-6">
+        {/* Carrusel de Categorías (Móvil) */}
+        <div className="md:hidden -mx-4 px-4 mb-6">
           <div className="flex overflow-x-auto gap-2.5 md:gap-4 pb-4 pt-2 no-scrollbar max-w-[1400px] mx-auto">
             {activeCategories.map(c => (
                <button 
@@ -998,7 +1251,12 @@ export function PublicLandingPage() {
             </button>
           </motion.div>
         ) : (
-          <div className="flex flex-col gap-10 mt-4 md:mt-6 pb-12">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="flex flex-col gap-10 mt-4 md:mt-6 pb-12"
+          >
             
             {/* Sección: Favoritos */}
             {favorites.length > 0 && !search && !selectedCategory && activeTab === 'todos' && (
@@ -1007,7 +1265,7 @@ export function PublicLandingPage() {
                 <div className="flex overflow-x-auto gap-4 pb-4 px-2 no-scrollbar snap-x">
                   {displayRestaurants.filter(r => favorites.includes(r.id)).map(res => (
                     <motion.div key={res.id} whileInView={{ opacity: 1, x: 0 }} initial={{ opacity: 0, x: 20 }} viewport={{ once: true }} className="snap-start shrink-0 w-[140px] sm:w-[180px]">
-                      <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} horizontal />
+                      <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} horizontal globalDeliveryType={globalDeliveryType} />
                     </motion.div>
                   ))}
                 </div>
@@ -1021,7 +1279,7 @@ export function PublicLandingPage() {
                 <div className="flex overflow-x-auto gap-4 pb-4 px-2 no-scrollbar snap-x">
                   {displayRestaurants.slice(0, 8).map(res => (
                     <motion.div key={res.id} whileInView={{ opacity: 1, x: 0 }} initial={{ opacity: 0, x: 20 }} viewport={{ once: true }} className="snap-start shrink-0 w-[140px] sm:w-[180px]">
-                      <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} horizontal />
+                      <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} horizontal globalDeliveryType={globalDeliveryType} />
                     </motion.div>
                   ))}
                 </div>
@@ -1042,13 +1300,13 @@ export function PublicLandingPage() {
               >
                 {displayRestaurants.map(res => (
                   <motion.div key={res.id} whileInView={{ opacity: 1, y: 0 }} initial={{ opacity: 0, y: 20 }} viewport={{ once: true, margin: "0px 0px -50px 0px" }}>
-                    <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} />
+                    <RestaurantCard res={res} isFav={favorites.includes(res.id)} toggleFav={toggleFavorite} userLocation={userLocation} estaAbierto={estaAbierto} calculaDistancia={calculaDistancia} globalDeliveryType={globalDeliveryType} />
                   </motion.div>
                 ))}
               </motion.div>
             </section>
 
-          </div>
+          </motion.div>
         )}
 
         {/* Cargar más e Infinite Scroll */}
@@ -1062,6 +1320,8 @@ export function PublicLandingPage() {
             ) : null}
           </div>
         )}
+           </div>
+        </div>
       </main>
 
       {/* Footer Minimalista */}
@@ -1088,6 +1348,94 @@ export function PublicLandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* ── VISTA MAPA (tab Ubicación, solo móvil) ── */}
+      <AnimatePresence>
+        {activeNavTab === 'location' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+            className="md:hidden fixed inset-0 z-30 bg-slate-100 origin-bottom"
+          >
+            {/* Mapa — ocupa TODA la pantalla */}
+            <div className="absolute inset-0">
+              {isGoogleMapsLoaded ? (
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  zoom={14}
+                  center={userLocation || { lat: 16.2516, lng: -92.1332 }}
+                  options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: MAP_STYLES }}
+                >
+                  {restaurantes.filter(r => r.lat && r.lng).map(res => (
+                    <OverlayView key={res.id} position={{ lat: Number(res.lat), lng: Number(res.lng) }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                      <Link to={`/menu/${res.slug || res.id}`} className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center">
+                        <div className="w-9 h-9 rounded-full border-2 border-white shadow-lg overflow-hidden bg-white">
+                          {res.foto_fachada_url
+                            ? <img src={res.foto_fachada_url} className="w-full h-full object-cover" alt={res.nombre} />
+                            : <div className="w-full h-full bg-red-500 flex items-center justify-center"><Store size={13} className="text-white" /></div>
+                          }
+                        </div>
+                        <div className="w-1.5 h-1.5 bg-slate-800 rounded-full mt-0.5 shadow" />
+                      </Link>
+                    </OverlayView>
+                  ))}
+                  {userLocation && (
+                    <OverlayView position={userLocation} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                      <div className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                        <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg" />
+                        <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-40" />
+                      </div>
+                    </OverlayView>
+                  )}
+                </GoogleMap>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center"><Loader2 size={32} className="animate-spin text-slate-400" /></div>
+              )}
+            </div>
+
+            {/* Botón GPS */}
+            <button onClick={() => requestLocation()} className="absolute right-4 top-36 z-10 w-11 h-11 bg-white rounded-full shadow-lg border border-slate-100 flex items-center justify-center active:scale-95 transition-transform">
+              {locationLoading ? <Loader2 size={17} className="animate-spin text-blue-600" /> : <MapPin size={17} className="text-slate-700" />}
+            </button>
+
+            {/* Bottom Sheet draggable */}
+            <MapBottomSheet
+              nearbyRestaurants={(userLocation
+                ? [...restaurantes.filter(r => r.lat && r.lng)].sort((a, b) =>
+                    calculaDistancia(userLocation.lat, userLocation.lng, Number(a.lat), Number(a.lng)) -
+                    calculaDistancia(userLocation.lat, userLocation.lng, Number(b.lat), Number(b.lng))
+                  )
+                : restaurantes
+              ).slice(0, 10)}
+              estaAbierto={estaAbierto}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── VISTA BÚSQUEDA (tab Buscar, solo móvil) ── */}
+      <AnimatePresence>
+        {activeNavTab === 'search' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+            className="md:hidden fixed inset-0 z-30 origin-bottom"
+          >
+            <SearchView restaurantes={restaurantes} estaAbierto={estaAbierto} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom Nav Flotante importado */}
+      <BottomNav 
+        activeNavTab={activeNavTab} 
+        setActiveNavTab={setActiveNavTab} 
+        activeOrderId={activeOrderId} 
+      />
     </div>
   )
 }

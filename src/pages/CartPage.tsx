@@ -161,7 +161,7 @@ export default function CartPage() {
   const [toastMsg, setToastMsg] = useState<{ title: string; message: string; type: 'success'|'error'|'loading' } | null>(null);
   
   const submittingRef = useRef(false);
-  
+  const [isExiting, setIsExiting] = useState(false);
 
   const subtotalInitial = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
   const prevTotalRef = useRef(subtotalInitial);
@@ -956,10 +956,22 @@ export default function CartPage() {
 
   // === ESTADO VACÍO PREMIUM ===
   if (carrito.length === 0) {
+    const handleGoBack = () => {
+      setIsExiting(true);
+      setTimeout(() => {
+        navigate(id === 'global' ? '/' : `/menu/${id}`);
+      }, 250);
+    };
+
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: isExiting ? 0 : 1, scale: isExiting ? 0.98 : 1 }}
+        transition={{ duration: 0.25 }}
+        className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 origin-bottom"
+      >
         <header className="bg-slate-100 px-4 pt-4 pb-3 flex items-center sticky top-0 z-50">
-          <button onClick={() => navigate(`/menu/${id}`)} className="p-2 bg-white rounded-full mr-3 shadow-sm hover:bg-slate-50 transition-colors">
+          <button onClick={handleGoBack} className="p-2 bg-white rounded-full mr-3 shadow-sm hover:bg-slate-50 transition-colors">
             <ChevronLeft size={20} className="text-slate-700" />
           </button>
           <h1 className="text-lg font-black text-slate-800">Carrito de Compras</h1>
@@ -998,7 +1010,7 @@ export default function CartPage() {
             transition={{ delay: 0.3 }}
             className="text-slate-500 mb-10 leading-relaxed text-sm px-4"
           >
-            Aún no has agregado ningún antojo de <span className="font-bold text-slate-700">{restaurante?.nombre || 'este restaurante'}</span>. ¡Explora el menú y date un gusto!
+            Aún no has agregado ningún antojo{id === 'global' ? '.' : ` de ${restaurante?.nombre || 'este restaurante'}.`} ¡Explora {id === 'global' ? 'nuestros restaurantes' : 'el menú'} y date un gusto!
           </motion.p>
           
           <motion.button 
@@ -1007,14 +1019,14 @@ export default function CartPage() {
             transition={{ delay: 0.4 }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => navigate(`/menu/${id}`)}
+            onClick={handleGoBack}
             className="w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-700/25 flex items-center justify-center gap-2 group"
           >
-            Ver el Menú 
+            {id === 'global' ? 'Explorar Restaurantes' : 'Ver el Menú'} 
             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
           </motion.button>
         </main>
-      </div>
+      </motion.div>
     );
   }
 
@@ -1255,19 +1267,26 @@ export default function CartPage() {
               </div>
 
               {/* Tipo de entrega */}
-              <div id="seccion-entrega">
-                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Cómo lo recibes?</span>
-                <div className="flex gap-2">
-                  <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                    <span className="text-xl">🛵</span>
-                    <span className="text-[13.5px]">A Domicilio</span>
-                  </button>
-                  <button onClick={() => setTipoEntrega('tienda')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                    <span className="text-xl">🏪</span>
-                    <span className="text-[13.5px]">En Tienda</span>
-                  </button>
+              {sessionStorage.getItem('est_delivery_type') !== 'recoger' ? (
+                <div id="seccion-entrega">
+                  <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Cómo lo recibes?</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                      <span className="text-xl">🛵</span>
+                      <span className="text-[13.5px]">A Domicilio</span>
+                    </button>
+                    <button onClick={() => setTipoEntrega('tienda')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                      <span className="text-xl">🏪</span>
+                      <span className="text-[13.5px]">En Tienda</span>
+                    </button>
+                  </div>
                 </div>
-
+              ) : (
+                <div id="seccion-entrega" className="mb-2">
+                  <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-1">Recoger en Sucursal</span>
+                  <p className="text-[13px] text-slate-500 font-medium">Pasarás al restaurante por tu pedido.</p>
+                </div>
+              )}
                 <AnimatePresence>
                   {tipoEntrega === 'domicilio' && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
