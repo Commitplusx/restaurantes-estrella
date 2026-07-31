@@ -1008,7 +1008,7 @@ export function PublicLandingPage() {
            {/* Desktop Action Buttons (Login, Cart) */}
            <div className="hidden md:flex items-center gap-3 shrink-0">
               <button 
-                onClick={() => navigate('/cart')} 
+                onClick={() => navigate('/menu/global/carrito')} 
                 className="h-12 px-6 flex items-center gap-2 bg-[#1D4ED8] hover:bg-blue-700 text-white rounded-full font-bold transition-colors shadow-md hover:shadow-lg hover:-translate-y-0.5"
               >
                 <ShoppingCart size={18} className="fill-white" />
@@ -1050,7 +1050,7 @@ export function PublicLandingPage() {
         
         {/* Banner/Hero Space */}
         {heroBanners.length > 0 && (
-          <div className="relative mb-6 w-full rounded-[24px] overflow-hidden shadow-lg shadow-blue-900/10 bg-slate-100">
+          <div className="relative mb-6 w-full rounded-[24px] overflow-hidden">
             <div 
               className="flex w-full transition-transform duration-700 ease-in-out"
               style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
