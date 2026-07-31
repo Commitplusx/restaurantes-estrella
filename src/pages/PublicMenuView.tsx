@@ -702,6 +702,16 @@ export function PublicMenuView() {
         return null
       }
 
+      // 👻 REDIRECCIÓN DE SUCURSAL FANTASMA A MATRIZ
+      // Si el cliente entra a un enlace viejo de una sucursal,
+      // lo enviamos automáticamente al menú principal de la Matriz.
+      if (rest.matriz_id) {
+        if (isMounted && !silently) {
+          navigate(`/menu/${rest.matriz_id}`, { replace: true })
+        }
+        return null
+      }
+
       // Buscar sucursales si es Matriz
       let familia: any[] = []
       if (!rest.matriz_id) {
