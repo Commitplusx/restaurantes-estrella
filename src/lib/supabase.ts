@@ -176,12 +176,16 @@ export async function getMyRestaurante(): Promise<Restaurante | null> {
   if (authError) throw authError
   if (!user) return null
 
-  // Intentar con todos los campos nuevos
-  const { data, error } = await supabase
+  let query = supabase
     .from('restaurantes')
-    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo, mp_access_token, acepta_pago_online')
+    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo, mp_access_token, acepta_pago_online, es_matriz, matriz_id, nombre_sucursal')
     .eq('admin_id', user.id)
-    .maybeSingle()
+    // Damos prioridad a las matrices en caso de que existan varias filas por error
+    .order('es_matriz', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data, error } = await query;
 
   if (data) return data
 
@@ -192,6 +196,8 @@ export async function getMyRestaurante(): Promise<Restaurante | null> {
       .from('restaurantes')
       .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias')
       .eq('admin_id', user.id)
+      .order('es_matriz', { ascending: false, nullsFirst: false })
+      .limit(1)
       .maybeSingle()
     return fallback ?? null
   }

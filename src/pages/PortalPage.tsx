@@ -370,6 +370,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
             onClick={() => setActiveTab('perfil')} 
           />
 
+          {/* Oculto temporalmente
           {!restaurante.matriz_id && (
             <NavButton 
               id="desktop-tour-sucursales"
@@ -377,6 +378,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
               onClick={() => setActiveTab('sucursales')} 
             />
           )}
+          */}
           
           <div className="flex-1" />
 
@@ -497,9 +499,11 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
         <MobileNavBtn id="mobile-tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />
         <MobileNavBtn id="mobile-tour-cupones" active={activeTab === 'cupones'} icon={<Ticket size={22}/>} label="Cupones" onClick={() => setActiveTab('cupones')} />
         <MobileNavBtn id="mobile-tour-perfil" active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
+        {/* Oculto temporalmente
         {!restaurante.matriz_id && (
           <MobileNavBtn id="mobile-tour-sucursales" active={activeTab === 'sucursales'} icon={<Store size={22}/>} label="Sucursales" onClick={() => setActiveTab('sucursales')} />
         )}
+        */}
       </div>
     </div>
   )

@@ -741,19 +741,20 @@ export function PublicMenuView() {
         setCombos(cmbs || [])
         setPromos(validPromos)
         
-        if (familia.length > 0) {
-          setSucursalesFamilia(familia)
-          const savedBranchId = sessionStorage.getItem('est_branch_id')
-          const found = familia.find(f => f.id === savedBranchId)
-          if (found) {
-            setRestaurante(found)
-          } else {
-            // Mostrar menú por defecto; el modal aparecerá al hacer clic en el carrito
-            setRestaurante(rest)
-          }
-        } else {
+        // if (familia.length > 0) {
+        //   setSucursalesFamilia(familia)
+        //   const savedBranchId = sessionStorage.getItem('est_branch_id')
+        //   const found = familia.find(f => f.id === savedBranchId)
+        //   if (found) {
+        //     setRestaurante(found)
+        //   } else {
+        //     // Mostrar menú por defecto; el modal aparecerá al hacer clic en el carrito
+        //     setRestaurante(rest)
+        //   }
+        // } else {
+          sessionStorage.removeItem('est_branch_id'); // Ensure it goes to the Matriz
           setRestaurante(rest)
-        }
+        // }
         
         // Sincronizar el carrito si hay items que se actualizaron en tiempo real
         const prevCart = useCartStore.getState().carrito;

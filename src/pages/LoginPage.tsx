@@ -15,21 +15,25 @@ export function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (loading || success) return
-    if (phone.length < 10) {
-      setError('Ingresa un número válido de 10 dígitos.')
+    
+    // Si no tiene arroba, asumimos que es teléfono y debe tener al menos 10 dígitos
+    if (!phone.includes('@') && phone.replace(/\D/g, '').length < 10) {
+      setError('Ingresa un número válido de 10 dígitos o un correo electrónico.')
       return
     }
     
     setLoading(true)
     setError('')
     
-    // Autocompleta el correo en base al número
-    const email = `aliado_${phone}@app-estrella.shop`
+    // Lógica Híbrida: Si tiene '@', es un correo real. Si no, usamos el formato de teléfono viejo.
+    const emailToUse = phone.includes('@') 
+      ? phone.trim() 
+      : `aliado_${phone.replace(/\D/g, '')}@app-estrella.shop`
     
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: err } = await supabase.auth.signInWithPassword({ email: emailToUse, password })
     if (err) {
       if (err.message === 'Invalid login credentials') {
-        setError('Teléfono o contraseña incorrectos.')
+        setError('Credenciales incorrectas.')
       } else {
         setError('Error al iniciar sesión: ' + err.message)
       }
@@ -112,13 +116,13 @@ export function LoginPage() {
 
           <form onSubmit={handleLogin} className="flex flex-col gap-6">
             <div className="field flex flex-col gap-2">
-              <label className="text-sm font-bold text-zinc-800 uppercase tracking-wider">Número de Teléfono</label>
+              <label className="text-sm font-bold text-zinc-800 uppercase tracking-wider">Correo o Teléfono</label>
               <div className="relative group">
                 <input
-                  type="tel" 
+                  type="text" 
                   value={phone} 
-                  onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="Ej. 963 153 9156" 
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="Ej. aliado@correo.com o 9631539156" 
                   required
                   className="w-full pl-5 pr-5 py-4 bg-zinc-50 border-2 border-zinc-200 rounded-2xl focus:border-[#FF3B2F] focus:bg-white outline-none transition-all font-semibold text-zinc-800 text-lg placeholder:font-medium placeholder:text-zinc-400"
                 />
