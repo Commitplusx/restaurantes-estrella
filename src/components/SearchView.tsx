@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { Search, ChevronRight, Store, Star, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
