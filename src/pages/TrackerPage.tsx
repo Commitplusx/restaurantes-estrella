@@ -139,9 +139,18 @@ export function TrackerPage() {
 
     fetchInitialData();
 
+    // Actualizar datos al volver a abrir/minimizar la app o pestaña
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchInitialData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       if (orderChannel) supabase.removeChannel(orderChannel);
       if (driverChannel) supabase.removeChannel(driverChannel);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [pedidoId]);
 
@@ -287,14 +296,15 @@ export function TrackerPage() {
             options={{
               disableDefaultUI: true,
               zoomControl: true,
-              maxZoom: 14, // Limita el zoom máximo de forma nativa para evitar que fitBounds haga zoom extremo
+              gestureHandling: 'greedy', // Permite hacer zoom con un solo dedo en móviles
+              maxZoom: 18, // Permitimos zoom profundo
               styles: mapStyles
             }}
           >
-            {/* Ruta (Polyline) */}
-            {directions && directions.routes[0]?.overview_path && (
+            {/* Ruta (Polyline) Alta Resolución */}
+            {directions && (
               <Polyline
-                path={directions.routes[0].overview_path}
+                path={directions.routes[0]?.legs?.flatMap(leg => leg.steps.flatMap(step => step.path)) || []}
                 options={{
                   strokeColor: '#3b82f6',
                   strokeWeight: 6,
@@ -313,18 +323,16 @@ export function TrackerPage() {
                   initial={{ scale: 0, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.2 }}
-                  className="absolute -translate-x-1/2 -translate-y-full pb-1"
+                  className="absolute -translate-x-1/2 -translate-y-1/2"
                 >
                   <div className="relative">
-                    <div className="w-12 h-12 bg-white rounded-full shadow-xl border-4 border-orange-500 overflow-hidden flex items-center justify-center relative z-10">
+                    <div className="w-10 h-10 bg-white rounded-full shadow-lg border-[3px] border-orange-500 overflow-hidden flex items-center justify-center relative z-10">
                       {restaurante?.logo_url ? (
                         <img src={restaurante.logo_url} className="w-full h-full object-cover" alt="Restaurante" />
                       ) : (
-                        <Store className="w-6 h-6 text-orange-500" />
+                        <Store className="w-5 h-5 text-orange-500" />
                       )}
                     </div>
-                    {/* Flechita del pin */}
-                    <div className="w-4 h-4 bg-orange-500 absolute -bottom-1.5 left-1/2 -translate-x-1/2 rotate-45 rounded-sm z-0"></div>
                   </div>
                 </motion.div>
               </OverlayView>
@@ -340,14 +348,12 @@ export function TrackerPage() {
                   initial={{ scale: 0, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.4 }}
-                  className="absolute -translate-x-1/2 -translate-y-full pb-1"
+                  className="absolute -translate-x-1/2 -translate-y-1/2"
                 >
                   <div className="relative">
-                    <div className="w-12 h-12 bg-emerald-500 rounded-full shadow-xl border-4 border-white flex items-center justify-center relative z-10">
-                      <Home className="w-6 h-6 text-white" />
+                    <div className="w-10 h-10 bg-emerald-500 rounded-full shadow-lg border-[3px] border-white flex items-center justify-center relative z-10">
+                      <Home className="w-5 h-5 text-white" />
                     </div>
-                    {/* Flechita del pin */}
-                    <div className="w-4 h-4 bg-white absolute -bottom-1.5 left-1/2 -translate-x-1/2 rotate-45 rounded-sm z-0 shadow-sm"></div>
                   </div>
                 </motion.div>
               </OverlayView>
@@ -366,8 +372,8 @@ export function TrackerPage() {
                   className="absolute -translate-x-1/2 -translate-y-1/2"
                 >
                   <div className="relative">
-                    <div className="w-14 h-14 bg-slate-800 rounded-full shadow-2xl border-4 border-white flex items-center justify-center z-10 relative">
-                      <Bike className="w-7 h-7 text-white" />
+                    <div className="w-12 h-12 bg-slate-800 rounded-full shadow-2xl border-[3px] border-white flex items-center justify-center z-10 relative">
+                      <Bike className="w-6 h-6 text-white" />
                     </div>
                     {/* Efecto de pulso para la moto */}
                     <div className="absolute inset-0 bg-slate-800 rounded-full animate-ping opacity-20 z-0"></div>
