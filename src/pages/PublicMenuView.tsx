@@ -1363,13 +1363,19 @@ export function PublicMenuView() {
             </div>
             
             <a 
-              href={restaurante.maps_url || (restaurante.direccion?.startsWith('http') ? restaurante.direccion : (restaurante.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurante.direccion.replace('GPS: ', ''))}` : '#'))} 
+              href={(() => {
+                if (restaurante.lat && restaurante.lng) return `https://www.google.com/maps/search/?api=1&query=${restaurante.lat},${restaurante.lng}`;
+                if (restaurante.maps_url) return restaurante.maps_url;
+                if (restaurante.direccion?.startsWith('http')) return restaurante.direccion;
+                if (restaurante.direccion) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurante.direccion.replace('GPS: ', ''))}`;
+                return '#';
+              })()}
               target="_blank" 
               rel="noopener noreferrer" 
-              className={`flex items-center gap-1.5 transition-colors ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-600 hover:text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
+              className={`flex items-center gap-1.5 transition-colors ${(restaurante.lat && restaurante.lng) || restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-600 hover:text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
             >
-              <MapPin size={16} className={restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-500' : 'text-slate-400'} /> 
-              <span className={`line-clamp-1 max-w-[200px] font-medium ${restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'underline decoration-blue-200 underline-offset-2' : ''}`}>
+              <MapPin size={16} className={(restaurante.lat && restaurante.lng) || restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-500' : 'text-slate-400'} /> 
+              <span className={`line-clamp-1 max-w-[200px] font-medium ${(restaurante.lat && restaurante.lng) || restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'underline decoration-blue-200 underline-offset-2' : ''}`}>
                 {restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'Ver ubicación en el mapa' : (restaurante.direccion || 'Comitán')}
               </span>
             </a>

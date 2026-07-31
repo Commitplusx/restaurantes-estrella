@@ -428,8 +428,7 @@ export function PublicLandingPage() {
     })
   }
 
-
-  const PAGE_SIZE = 8
+  const PAGE_SIZE = 100
 
   useEffect(() => {
     const handleScroll = () => {
@@ -497,18 +496,7 @@ export function PublicLandingPage() {
   async function loadRestaurants(pageIndex: number) {
     try {
       if (pageIndex === 0) {
-        try {
-          const cached = sessionStorage.getItem('cache_restaurantes')
-          if (cached) {
-            setRestaurantes(JSON.parse(cached))
-            setLoading(false)
-          } else {
-            setLoading(true)
-          }
-        } catch (e) {
-          sessionStorage.removeItem('cache_restaurantes')
-          setLoading(true)
-        }
+        setLoading(true)
       } else {
         setLoadingMore(true)
       }
@@ -540,13 +528,10 @@ export function PublicLandingPage() {
         if (finalData.length < PAGE_SIZE) setHasMore(false)
         if (pageIndex === 0) {
           setRestaurantes(finalData)
-          sessionStorage.setItem('cache_restaurantes', JSON.stringify(finalData))
         } else {
           setRestaurantes(prev => {
             const newIds = finalData!.map(d => d.id)
-            const combined = [...prev.filter(p => !newIds.includes(p.id)), ...finalData!]
-            sessionStorage.setItem('cache_restaurantes', JSON.stringify(combined))
-            return combined
+            return [...prev.filter(p => !newIds.includes(p.id)), ...finalData!]
           })
         }
       }
