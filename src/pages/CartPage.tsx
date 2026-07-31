@@ -1267,26 +1267,27 @@ export default function CartPage() {
               </div>
 
               {/* Tipo de entrega */}
-              {sessionStorage.getItem('est_delivery_type') !== 'recoger' ? (
-                <div id="seccion-entrega">
-                  <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Cómo lo recibes?</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                      <span className="text-xl">🛵</span>
-                      <span className="text-[13.5px]">A Domicilio</span>
-                    </button>
-                    <button onClick={() => setTipoEntrega('tienda')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                      <span className="text-xl">🏪</span>
-                      <span className="text-[13.5px]">En Tienda</span>
-                    </button>
+              <div id="seccion-entrega">
+                {sessionStorage.getItem('est_delivery_type') !== 'recoger' ? (
+                  <div>
+                    <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Cómo lo recibes?</span>
+                    <div className="flex gap-2 mb-4">
+                      <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                        <span className="text-xl">🛵</span>
+                        <span className="text-[13.5px]">A Domicilio</span>
+                      </button>
+                      <button onClick={() => setTipoEntrega('tienda')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                        <span className="text-xl">🏪</span>
+                        <span className="text-[13.5px]">En Tienda</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div id="seccion-entrega" className="mb-2">
-                  <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-1">Recoger en Sucursal</span>
-                  <p className="text-[13px] text-slate-500 font-medium">Pasarás al restaurante por tu pedido.</p>
-                </div>
-              )}
+                ) : (
+                  <div className="mb-4">
+                    <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-1">Recoger en Sucursal</span>
+                    <p className="text-[13px] text-slate-500 font-medium">Pasarás al restaurante por tu pedido.</p>
+                  </div>
+                )}
                 <AnimatePresence>
                   {tipoEntrega === 'domicilio' && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
