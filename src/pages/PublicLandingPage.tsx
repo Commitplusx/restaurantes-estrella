@@ -15,6 +15,7 @@ import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
 const MAP_STYLES = UBER_EATS_MAP_STYLE;
 
 interface Restaurante {
+  id: string
   nombre: string
   telefono: string
   direccion?: string
