@@ -801,6 +801,26 @@ export default function CartPage() {
     if (!restaurante || carrito.length === 0) return;
     
     setProcesando(true);
+
+    // Bloqueo estricto: Consultar en la base de datos si ya tiene un pedido activo
+    const telLimpio = clienteTel.replace(/\D/g, '');
+    if (telLimpio) {
+      const { data: pedidosActivos } = await supabase
+        .from('pedidos')
+        .select('id, estado')
+        .eq('cliente_tel', telLimpio)
+        .in('estado', ['pendiente', 'preparando', 'listo_para_recoger', 'en_camino', 'asignado'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (pedidosActivos && pedidosActivos.length > 0) {
+        showToast('Pedido en curso', 'Ya tienes un pedido activo. Espera a que termine para pedir de nuevo.', 'error');
+        setProcesando(false);
+        // Restaurar caché si lo había borrado
+        localStorage.setItem('est_active_order', pedidosActivos[0].id);
+        return;
+      }
+    }
     // SOFT-CHECK: Consultar la base de datos justo antes de pagar
     console.log("Iniciando soft-check. Restaurante ID:", restaurante.id);
     const { data: restData, error: restError } = await supabase.from('restaurantes').select('*').eq('id', restaurante.id).single();
