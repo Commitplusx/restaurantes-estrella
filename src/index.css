@@ -7,10 +7,20 @@
 @layer base {
   html, body {
     touch-action: manipulation;
+    /* Elimina el cuadro azul/gris al tocar botones en móviles */
+    -webkit-tap-highlight-color: transparent;
+    /* Evita el "efecto liga" al scrollear hasta los bordes en iOS/Android */
+    overscroll-behavior-y: none;
   }
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Evitar que se seleccione el texto de botones e imágenes por error al dar toques rápidos */
+button, img, a, .card, .no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
 
 :root {
   --brand:       #f97316;

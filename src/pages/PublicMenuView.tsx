@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useCartStore } from '../store/useCartStore'
+import { useHaptics } from '../hooks/useHaptics'
 import { supabase } from '../lib/supabase'
 // import * as h3 from 'h3-js' (movido al hook)
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
@@ -229,6 +230,7 @@ const SucursalAddress = ({ sucursal }: { sucursal: Restaurante }) => {
 };
 
 export function PublicMenuView() {
+  const { vibrateLight, vibrateSuccess } = useHaptics();
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -928,6 +930,8 @@ export function PublicMenuView() {
   */
 
   const addToCart = (product: CartItem & { foto_url?: string }) => {
+    vibrateSuccess();
+
     if (restaurante && !estaAbierto(restaurante)) {
       setShowClosedToast(true)
       setTimeout(() => setShowClosedToast(false), 3500)
@@ -965,6 +969,7 @@ export function PublicMenuView() {
   }
 
   const removeFromCart = (cartItemId: string) => {
+    vibrateLight();
     // Bugfix: Evitar fraude con cupones. Si quita cosas, podría evadir el monto mínimo.
     /*
     if (cuponValido) {
@@ -1760,7 +1765,7 @@ export function PublicMenuView() {
                       </h2>
                     </div>
                     <button
-                      onClick={() => setSelectedItemDetail(null)}
+                      onClick={() => { vibrateLight(); setSelectedItemDetail(null); }}
                       className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 flex items-center justify-center transition-colors shrink-0 mt-1"
                     >
                       <X className="w-5 h-5" />
@@ -1805,6 +1810,7 @@ export function PublicMenuView() {
                           setSelectedItemForOptions({ ...selectedItemDetail, __tipo: selectedItemDetail.cartItemTipo })
                           setSelectedOptionsState({})
                         } else {
+                          vibrateSuccess();
                           addToCart(cartItem)
                         }
                         
@@ -1860,6 +1866,7 @@ export function PublicMenuView() {
             exit={{ y: 100, opacity: 0 }}
             transition={{ type: "spring", bounce: 0.4 }}
             className="fixed bottom-6 left-0 right-0 flex justify-center z-40 pointer-events-none sm:bottom-10 sm:right-10 sm:left-auto sm:justify-end"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <motion.button 
               whileTap={{ scale: 0.9 }}
