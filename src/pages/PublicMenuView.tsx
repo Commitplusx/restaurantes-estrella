@@ -33,26 +33,9 @@ import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
 
-const PREMIUM_MAP_STYLE = [
-  { "elementType": "geometry", "stylers": [{"color": "#f5f5f5"}] },
-  { "elementType": "labels.icon", "stylers": [{"visibility": "off"}] },
-  { "elementType": "labels.text.fill", "stylers": [{"color": "#616161"}] },
-  { "elementType": "labels.text.stroke", "stylers": [{"color": "#f5f5f5"}] },
-  { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{"color": "#bdbdbd"}] },
-  { "featureType": "poi", "elementType": "geometry", "stylers": [{"color": "#eeeeee"}] },
-  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{"color": "#757575"}] },
-  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{"color": "#e5e5e5"}] },
-  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{"color": "#9e9e9e"}] },
-  { "featureType": "road", "elementType": "geometry", "stylers": [{"color": "#ffffff"}] },
-  { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{"color": "#757575"}] },
-  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#dadada"}] },
-  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{"color": "#616161"}] },
-  { "featureType": "road.local", "elementType": "labels.text.fill", "stylers": [{"color": "#9e9e9e"}] },
-  { "featureType": "transit.line", "elementType": "geometry", "stylers": [{"color": "#e5e5e5"}] },
-  { "featureType": "transit.station", "elementType": "geometry", "stylers": [{"color": "#eeeeee"}] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{"color": "#c9c9c9"}] },
-  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{"color": "#9e9e9e"}] }
-];
+import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
+
+const PREMIUM_MAP_STYLE = UBER_EATS_MAP_STYLE;
 
 const EMOJI_MAP: Record<string, string> = {
   'Hamburguesas': '🍔',
@@ -234,6 +217,7 @@ export function PublicMenuView() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const fromSearch = location.state?.fromSearch;
   
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
   const [restaurantePausado, setRestaurantePausado] = useState(false)
@@ -1280,6 +1264,7 @@ export function PublicMenuView() {
       <header className={`fixed top-0 left-0 right-0 z-50 py-3 px-4 md:px-10 flex items-center gap-3 transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm' : 'bg-transparent'}`}>
         <Link
           to="/"
+          state={fromSearch ? { activeNavTab: 'search' } : undefined}
           className={`p-2.5 rounded-full transition-all shrink-0 ${isScrolled ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-black/20 backdrop-blur-md text-white hover:bg-black/30'}`}
         >
           <ChevronLeft size={20} />

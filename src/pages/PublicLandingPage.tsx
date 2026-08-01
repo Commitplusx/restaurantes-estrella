@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
 import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLoadScript, GoogleMap, OverlayView } from '@react-google-maps/api';
 import { OnboardingFlow } from '../components/OnboardingFlow';
@@ -10,18 +10,11 @@ import { BottomNav } from '../components/BottomNav';
 import { SearchView } from '../components/SearchView';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
+import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
 
-const MAP_STYLES = [
-  { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#dadada' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9c9c9' }] },
-];
+const MAP_STYLES = UBER_EATS_MAP_STYLE;
+
 interface Restaurante {
-  id: string
   nombre: string
   telefono: string
   direccion?: string
@@ -338,8 +331,70 @@ export function PublicLandingPage() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
   const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  // Navigation & UI State
+  const [activeNavTab, setActiveNavTab] = useState(location.state?.activeNavTab || 'home')
+  
+  // Ref para el mapa de Google (usamos state para forzar re-render cuando cargue)
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
 
-  const [activeNavTab, setActiveNavTab] = useState('home')
+  // Efecto para ajustar el zoom del mapa y mostrar todos los restaurantes
+  useEffect(() => {
+    if (!mapInstance || !window.google || !isGoogleMapsLoaded) return;
+    if (activeNavTab !== 'location') return; // SOLO ajustar cuando el mapa es visible (display: block)
+    
+    console.log('[MAPA] Iniciando cálculo de límites...');
+    
+    // Validar si el mapa tiene tamaño físico real en la pantalla
+    const mapDiv = mapInstance.getDiv();
+    console.log('[MAPA] Dimensiones físicas del contenedor:', mapDiv.clientWidth, 'x', mapDiv.clientHeight);
+    if (mapDiv.clientWidth === 0 || mapDiv.clientHeight === 0) {
+      console.warn('[MAPA] El contenedor mide 0x0, fitBounds no funcionará.');
+    }
+
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasPoints = false;
+
+    if (userLocation) {
+      bounds.extend(userLocation);
+      hasPoints = true;
+    }
+    
+    const restaurantesConCoords = restaurantes.filter(r => r.lat && r.lng);
+    restaurantesConCoords.forEach(res => {
+      bounds.extend({ lat: Number(res.lat), lng: Number(res.lng) });
+      hasPoints = true;
+    });
+
+    console.log('[MAPA] Puntos a encuadrar:', restaurantesConCoords.length, 'Restaurantes, User:', !!userLocation);
+
+    if (hasPoints) {
+      setTimeout(() => {
+        // Si hay varios puntos (usuario + restaurantes, o multiples restaurantes)
+        if (restaurantesConCoords.length > 1 || (restaurantesConCoords.length === 1 && userLocation)) {
+          console.log('[MAPA] Ejecutando fitBounds con límites:', bounds.toJSON());
+          mapInstance.fitBounds(bounds, { bottom: 250, top: 20, left: 20, right: 20 });
+        } else if (restaurantesConCoords.length === 1) {
+          console.log('[MAPA] Ejecutando panTo y setZoom(13) para 1 solo restaurante');
+          // Si SOLO hay un restaurante en todo el mapa
+          mapInstance.panTo({ lat: Number(restaurantesConCoords[0].lat), lng: Number(restaurantesConCoords[0].lng) });
+          mapInstance.setZoom(13); // Zoom 13 es un poco más alejado para ver más de la ciudad
+        } else if (userLocation) {
+          console.log('[MAPA] Ejecutando panTo(user) y setZoom(14) para 1 solo usuario');
+          // Si SOLO está el usuario
+          mapInstance.panTo(userLocation);
+          mapInstance.setZoom(14);
+        }
+        
+        // Comprobar zoom final un momento después
+        setTimeout(() => {
+          console.log('[MAPA] Zoom resultante después de aplicar comandos:', mapInstance.getZoom());
+        }, 500);
+
+      }, 300);
+    }
+  }, [restaurantes, userLocation, activeNavTab, isGoogleMapsLoaded, mapInstance]);
   const [globalDeliveryType, setGlobalDeliveryType] = useState<'domicilio'|'recoger'>(() => {
     return (sessionStorage.getItem('est_delivery_type') as any) || 'domicilio';
   });
@@ -1369,9 +1424,12 @@ export function PublicLandingPage() {
               {isGoogleMapsLoaded ? (
                 <GoogleMap
                   mapContainerStyle={{ width: '100%', height: '100%' }}
-                  zoom={14}
-                  center={userLocation || DEFAULT_CENTER}
                   options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: MAP_STYLES }}
+                  onLoad={(map) => {
+                    map.setZoom(14);
+                    map.setCenter(userLocation || DEFAULT_CENTER);
+                    setMapInstance(map);
+                  }}
                 >
                   {restaurantes.filter(r => r.lat && r.lng).map(res => (
                     <OverlayView key={res.id} position={{ lat: Number(res.lat), lng: Number(res.lng) }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -1430,7 +1488,7 @@ export function PublicLandingPage() {
             transition={{ duration: 0.2 }}
             className="md:hidden fixed inset-0 z-30 origin-bottom"
           >
-            <SearchView restaurantes={restaurantes} estaAbierto={estaAbierto} />
+            <SearchView restaurantes={restaurantes} estaAbierto={estaAbierto} activeCategories={activeCategories} />
           </motion.div>
         )}
       </AnimatePresence>

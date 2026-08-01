@@ -43,14 +43,9 @@ interface Restaurante {
 }
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
+import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
 
-const PREMIUM_MAP_STYLE = [
-  { "featureType": "all", "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
-  { "featureType": "poi.business", "stylers": [{ "visibility": "off" }] },
-  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
-  { "featureType": "road.arterial", "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] }
-];
+const PREMIUM_MAP_STYLE = UBER_EATS_MAP_STYLE;
 
 const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string, className?: string }) => {
   const [loaded, setLoaded] = useState(false);
