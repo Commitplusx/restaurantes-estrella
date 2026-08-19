@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Loader2, Phone, MessageCircle, Navigation, MapPin, Store, Home, Bike, ChevronDown, CheckCircle, Clock, ChevronUp } from 'lucide-react';
+import { Loader2, Phone, MessageCircle, Navigation, MapPin, Store, Home, Bike, ChevronDown, CheckCircle, Clock, ChevronUp, Package } from 'lucide-react';
 import { useJsApiLoader, GoogleMap, OverlayView, Polyline } from '@react-google-maps/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLottie } from 'lottie-react';
@@ -94,8 +94,8 @@ export function TrackerPage() {
       if (orderData) {
         setPedido(orderData);
         
-        // Fetch restaurante
-        if (orderData.restaurante) {
+        // Solo buscar restaurante si NO es mandadito
+        if (orderData.restaurante && orderData.tipo_pedido !== 'mandadito') {
           const { data: restData } = await supabase
             .from('restaurantes')
             .select('*')
@@ -158,17 +158,38 @@ export function TrackerPage() {
   // Coordenadas base
   const defaultCenter = useMemo(() => ({ lat: 16.2516, lng: -92.1332 }), []); // Comitán por defecto
   
-  const restaurantLocation = useMemo(() => restaurante?.lat && restaurante?.lng 
-    ? { lat: Number(restaurante.lat), lng: Number(restaurante.lng) } 
-    : null, [restaurante?.lat, restaurante?.lng]);
+  // Para mandaditos: el pin de "origen" es pedido.lat/lng (donde el repartidor recoge el paquete).
+  // Para restaurantes: es la ubicación del restaurante.
+  const restaurantLocation = useMemo(() => {
+    const isMandadito = pedido?.tipo_pedido === 'mandadito';
+    if (isMandadito) {
+      return pedido?.lat && pedido?.lng
+        ? { lat: Number(pedido.lat), lng: Number(pedido.lng) }
+        : null;
+    }
+    return restaurante?.lat && restaurante?.lng 
+      ? { lat: Number(restaurante.lat), lng: Number(restaurante.lng) } 
+      : null;
+  }, [pedido?.tipo_pedido, pedido?.lat, pedido?.lng, restaurante?.lat, restaurante?.lng]);
   
   const driverLocation = useMemo(() => repartidor?.lat && repartidor?.lng
     ? { lat: Number(repartidor.lat), lng: Number(repartidor.lng) }
     : null, [repartidor?.lat, repartidor?.lng]);
 
-  const clientLocation = useMemo(() => pedido?.lat && pedido?.lng
-    ? { lat: Number(pedido.lat), lng: Number(pedido.lng) }
-    : null, [pedido?.lat, pedido?.lng]);
+  // Para mandaditos: el pin de destino (cliente) es lat_entrega/lng_entrega.
+  // Para restaurantes: es el lat/lng del pedido (dirección de entrega al cliente).
+  const clientLocation = useMemo(() => {
+    const isMandadito = pedido?.tipo_pedido === 'mandadito';
+    if (isMandadito) {
+      return pedido?.lat_entrega && pedido?.lng_entrega
+        ? { lat: Number(pedido.lat_entrega), lng: Number(pedido.lng_entrega) }
+        : null;
+    }
+    return pedido?.lat && pedido?.lng
+      ? { lat: Number(pedido.lat), lng: Number(pedido.lng) }
+      : null;
+  }, [pedido?.tipo_pedido, pedido?.lat, pedido?.lng, pedido?.lat_entrega, pedido?.lng_entrega]);
+
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
@@ -245,7 +266,16 @@ export function TrackerPage() {
 
   const mapStyles = UBER_EATS_MAP_STYLE;
 
+  // ── Detectar tipo de pedido ───────────────────────────────────────────────
+  const esMandadito = pedido?.tipo_pedido === 'mandadito';
+
+  // Limpiar descripción para mandaditos multi-parada (eliminar JSON embebido de paradas)
+  const descripcionLimpia = esMandadito
+    ? (pedido?.descripcion || '').split('[DETALLES/PARADAS]')[0].trim()
+    : pedido?.descripcion;
+
   let currentStep = 1;
+
   if (pedido?.estado === 'entregado') currentStep = 4;
   else if (pedido?.estado === 'en_camino') currentStep = 3;
   else if (pedido?.estado && pedido?.estado !== 'cancelado') currentStep = 2;
@@ -300,7 +330,7 @@ export function TrackerPage() {
               />
             )}
 
-            {/* Marcador Restaurante */}
+            {/* Marcador Origen: Restaurante (normal) o Punto de Recogida (mandadito) */}
             {restaurantLocation && (
               <OverlayView
                 position={restaurantLocation}
@@ -313,8 +343,10 @@ export function TrackerPage() {
                   className="absolute -translate-x-1/2 -translate-y-1/2"
                 >
                   <div className="relative">
-                    <div className="w-10 h-10 bg-white rounded-full shadow-lg border-[3px] border-orange-500 overflow-hidden flex items-center justify-center relative z-10">
-                      {restaurante?.logo_url ? (
+                    <div className={`w-10 h-10 bg-white rounded-full shadow-lg border-[3px] ${esMandadito ? 'border-violet-500' : 'border-orange-500'} overflow-hidden flex items-center justify-center relative z-10`}>
+                      {esMandadito ? (
+                        <Package className="w-5 h-5 text-violet-500" />
+                      ) : restaurante?.logo_url ? (
                         <img src={restaurante.logo_url} className="w-full h-full object-cover" alt="Restaurante" />
                       ) : (
                         <Store className="w-5 h-5 text-orange-500" />
@@ -421,10 +453,12 @@ export function TrackerPage() {
           
           <div className="flex items-center justify-between mb-6 md:mt-2">
             <div className="flex items-center gap-4">
+              {/* Icono principal: adaptado según tipo de pedido y estado */}
               <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-md ${
                 pedido?.estado === 'en_camino' ? 'bg-blue-600 text-white shadow-blue-500/20' : 
                 pedido?.estado === 'entregado' ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 
                 pedido?.estado === 'cancelado' ? 'bg-red-500 text-white shadow-red-500/20' :
+                esMandadito ? 'bg-violet-600 text-white shadow-violet-500/20' :
                 'bg-slate-100 border border-slate-200'
               }`}>
                 {pedido?.estado === 'en_camino' ? (
@@ -433,6 +467,8 @@ export function TrackerPage() {
                   <MapPin className="w-6 h-6" />
                 ) : pedido?.estado === 'cancelado' ? (
                   <Navigation className="w-6 h-6" />
+                ) : esMandadito ? (
+                  <Package className="w-6 h-6" />
                 ) : restaurante?.logo_url ? (
                   <img src={restaurante.logo_url} className="w-full h-full object-cover rounded-full" />
                 ) : (
@@ -440,16 +476,30 @@ export function TrackerPage() {
                 )}
               </div>
               <div>
+                {/* Título principal: diferenciado para mandaditos */}
                 <h2 className="text-lg font-black text-slate-800 leading-tight line-clamp-1 uppercase">
-                  {pedido?.estado === 'en_camino' ? 'TU ORDEN VA EN CAMINO' : 
-                   pedido?.estado === 'entregado' ? 'PEDIDO ENTREGADO' : 
-                   pedido?.estado === 'cancelado' ? 'PEDIDO CANCELADO' : pedido?.restaurante}
+                  {pedido?.estado === 'en_camino'
+                    ? (esMandadito ? '🛵 TU PAQUETE VA EN CAMINO' : 'TU ORDEN VA EN CAMINO')
+                    : pedido?.estado === 'entregado'
+                    ? (esMandadito ? '📦 ¡PAQUETE ENTREGADO!' : 'PEDIDO ENTREGADO')
+                    : pedido?.estado === 'cancelado'
+                    ? 'PEDIDO CANCELADO'
+                    : esMandadito
+                    ? '📦 ENVÍO EN PROCESO'
+                    : pedido?.restaurante}
                 </h2>
                 <div className="flex items-center gap-2 mt-1">
+                  {/* Sub-texto: diferenciado para mandaditos */}
                   <p className="text-[12px] font-bold text-slate-400">
-                    {pedido?.estado === 'en_camino' ? 'Nos vemos pronto' : 
-                     pedido?.estado === 'entregado' ? '¡Disfruta tu comida!' : 
-                     pedido?.estado === 'cancelado' ? 'Este viaje terminó' : 'Está preparando tu pedido'}
+                    {pedido?.estado === 'en_camino'
+                      ? (esMandadito ? 'Tu mensajero lleva el paquete' : 'Nos vemos pronto')
+                      : pedido?.estado === 'entregado'
+                      ? (esMandadito ? '¡Entregado con éxito!' : '¡Disfruta tu comida!')
+                      : pedido?.estado === 'cancelado'
+                      ? 'Este viaje terminó'
+                      : esMandadito
+                      ? (repartidor ? 'Mensajero asignado' : 'Buscando mensajero...')
+                      : 'Está preparando tu pedido'}
                   </p>
                   
                   {pedido?.estado === 'en_camino' && eta && (
@@ -462,13 +512,21 @@ export function TrackerPage() {
               </div>
             </div>
             
-            {/* Lottie Animation next to header when preparing */}
-            {pedido?.estado !== 'cancelado' && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
+            {/* Animación de cocina: solo para pedidos de restaurante en preparación */}
+            {!esMandadito && pedido?.estado !== 'cancelado' && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
               <div className="w-16 h-16 shrink-0 mr-1">
                 <CookingAnimation />
               </div>
             )}
+
+            {/* Para mandaditos esperando mensajero: icono pulsante */}
+            {esMandadito && pedido?.estado !== 'cancelado' && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
+              <div className="w-16 h-16 shrink-0 mr-1 flex items-center justify-center">
+                <span className="text-4xl animate-bounce">📦</span>
+              </div>
+            )}
           </div>
+
 
           {/* Timeline Progress */}
           {pedido?.estado !== 'cancelado' && (
@@ -496,9 +554,12 @@ export function TrackerPage() {
                   </div>
                 ))}
               </div>
+              {/* Etiquetas del timeline: "Recogiendo" para mandaditos, "Preparando" para restaurantes */}
               <div className="flex justify-between mt-2 px-1">
                 <span className={`text-[10px] font-bold ${currentStep >= 1 ? 'text-emerald-600' : 'text-slate-400'}`}>Recibido</span>
-                <span className={`text-[10px] font-bold ${currentStep >= 2 ? 'text-emerald-600' : 'text-slate-400'}`}>Preparando</span>
+                <span className={`text-[10px] font-bold ${currentStep >= 2 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {esMandadito ? 'Recogiendo' : 'Preparando'}
+                </span>
                 <span className={`text-[10px] font-bold ${currentStep >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>En camino</span>
                 <span className={`text-[10px] font-bold ${currentStep >= 4 ? 'text-emerald-600' : 'text-slate-400'}`}>Entregado</span>
               </div>
@@ -513,7 +574,9 @@ export function TrackerPage() {
               onClick={() => setShowDetails(!showDetails)}
               className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
             >
-              <span className="text-sm font-bold text-slate-700">Ver detalles del pedido</span>
+              <span className="text-sm font-bold text-slate-700">
+                {esMandadito ? 'Ver detalles del envío' : 'Ver detalles del pedido'}
+              </span>
               {showDetails ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
             </button>
             <AnimatePresence>
@@ -524,8 +587,9 @@ export function TrackerPage() {
                   exit={{ height: 0, opacity: 0 }}
                   className="px-4 pb-4 overflow-hidden"
                 >
+                  {/* descripcionLimpia: para mandaditos elimina el JSON de paradas embebido */}
                   <div className="pt-3 border-t border-slate-100 text-sm text-slate-600 whitespace-pre-wrap font-medium">
-                    {pedido?.descripcion || 'No hay detalles disponibles.'}
+                    {descripcionLimpia || 'No hay detalles disponibles.'}
                   </div>
                 </motion.div>
               )}
@@ -534,18 +598,23 @@ export function TrackerPage() {
           
           {repartidor && (
              <div className="mt-6 md:mt-8 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Tu Repartidor</h4>
+               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                 {esMandadito ? 'Tu Mensajero' : 'Tu Repartidor'}
+               </h4>
                <div className="flex items-center gap-3">
                  <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
                     <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${repartidor.nombre}&backgroundColor=1e293b`} className="w-full h-full" />
                  </div>
                  <div>
                    <p className="font-black text-slate-800 leading-tight">{repartidor.nombre}</p>
-                   <p className="text-[11px] font-bold text-slate-400 mt-0.5">ASIGNADO A TU ORDEN</p>
+                   <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+                     {esMandadito ? 'MENSAJERO ASIGNADO' : 'ASIGNADO A TU ORDEN'}
+                   </p>
                  </div>
                </div>
              </div>
           )}
+
 
         </div>
 
