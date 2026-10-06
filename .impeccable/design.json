@@ -1,0 +1,383 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T16:56:09.097Z",
+  "title": "Design System: Estrella Eats — inicio público",
+  "extensions": {
+    "colorMeta": {
+      "eats-paper": {
+        "role": "neutral",
+        "displayName": "Blanco del inicio",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(26% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(49% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(72% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "eats-ink": {
+        "role": "neutral",
+        "displayName": "Tinta oscura",
+        "tonalRamp": [
+          "oklch(15% 0.0038 286.10)",
+          "oklch(26% 0.0038 286.10)",
+          "oklch(38% 0.0038 286.10)",
+          "oklch(49% 0.0038 286.10)",
+          "oklch(61% 0.0038 286.10)",
+          "oklch(72% 0.0038 286.10)",
+          "oklch(84% 0.0038 286.10)",
+          "oklch(95% 0.0038 286.10)"
+        ]
+      },
+      "eats-orange": {
+        "role": "primary",
+        "displayName": "Naranja Estrella",
+        "tonalRamp": [
+          "oklch(15% 0.1993 35.14)",
+          "oklch(26% 0.1993 35.14)",
+          "oklch(38% 0.1993 35.14)",
+          "oklch(49% 0.1993 35.14)",
+          "oklch(61% 0.1993 35.14)",
+          "oklch(72% 0.1993 35.14)",
+          "oklch(84% 0.1993 35.14)",
+          "oklch(95% 0.1993 35.14)"
+        ]
+      },
+      "eats-line": {
+        "role": "neutral",
+        "displayName": "Divisor claro",
+        "tonalRamp": [
+          "oklch(15% 0.0067 286.27)",
+          "oklch(26% 0.0067 286.27)",
+          "oklch(38% 0.0067 286.27)",
+          "oklch(49% 0.0067 286.27)",
+          "oklch(61% 0.0067 286.27)",
+          "oklch(72% 0.0067 286.27)",
+          "oklch(84% 0.0067 286.27)",
+          "oklch(95% 0.0067 286.27)"
+        ]
+      },
+      "cool-surface": {
+        "role": "neutral",
+        "displayName": "Gris frío de superficie",
+        "tonalRamp": [
+          "oklch(15% 0.0027 286.35)",
+          "oklch(26% 0.0027 286.35)",
+          "oklch(38% 0.0027 286.35)",
+          "oklch(49% 0.0027 286.35)",
+          "oklch(61% 0.0027 286.35)",
+          "oklch(72% 0.0027 286.35)",
+          "oklch(84% 0.0027 286.35)",
+          "oklch(95% 0.0027 286.35)"
+        ]
+      },
+      "secondary-text": {
+        "role": "neutral",
+        "displayName": "Texto secundario",
+        "tonalRamp": [
+          "oklch(15% 0.0049 286.20)",
+          "oklch(26% 0.0049 286.20)",
+          "oklch(38% 0.0049 286.20)",
+          "oklch(49% 0.0049 286.20)",
+          "oklch(61% 0.0049 286.20)",
+          "oklch(72% 0.0049 286.20)",
+          "oklch(84% 0.0049 286.20)",
+          "oklch(95% 0.0049 286.20)"
+        ]
+      },
+      "muted-text": {
+        "role": "neutral",
+        "displayName": "Texto discreto",
+        "tonalRamp": [
+          "oklch(15% 0.0077 286.14)",
+          "oklch(26% 0.0077 286.14)",
+          "oklch(38% 0.0077 286.14)",
+          "oklch(49% 0.0077 286.14)",
+          "oklch(61% 0.0077 286.14)",
+          "oklch(72% 0.0077 286.14)",
+          "oklch(84% 0.0077 286.14)",
+          "oklch(95% 0.0077 286.14)"
+        ]
+      },
+      "control-surface": {
+        "role": "neutral",
+        "displayName": "Gris de control",
+        "tonalRamp": [
+          "oklch(15% 0.0027 286.35)",
+          "oklch(26% 0.0027 286.35)",
+          "oklch(38% 0.0027 286.35)",
+          "oklch(49% 0.0027 286.35)",
+          "oklch(61% 0.0027 286.35)",
+          "oklch(72% 0.0027 286.35)",
+          "oklch(84% 0.0027 286.35)",
+          "oklch(95% 0.0027 286.35)"
+        ]
+      },
+      "interactive-border": {
+        "role": "neutral",
+        "displayName": "Borde interactivo",
+        "tonalRamp": [
+          "oklch(15% 0.0068 286.26)",
+          "oklch(26% 0.0068 286.26)",
+          "oklch(38% 0.0068 286.26)",
+          "oklch(49% 0.0068 286.26)",
+          "oklch(61% 0.0068 286.26)",
+          "oklch(72% 0.0068 286.26)",
+          "oklch(84% 0.0068 286.26)",
+          "oklch(95% 0.0068 286.26)"
+        ]
+      },
+      "interaction-orange": {
+        "role": "primary",
+        "displayName": "Naranja de interacción",
+        "tonalRamp": [
+          "oklch(15% 0.1748 34.25)",
+          "oklch(26% 0.1748 34.25)",
+          "oklch(38% 0.1748 34.25)",
+          "oklch(49% 0.1748 34.25)",
+          "oklch(61% 0.1748 34.25)",
+          "oklch(72% 0.1748 34.25)",
+          "oklch(84% 0.1748 34.25)",
+          "oklch(95% 0.1748 34.25)"
+        ]
+      },
+      "ink-hover": {
+        "role": "neutral",
+        "displayName": "Tinta de hover",
+        "tonalRamp": [
+          "oklch(15% 0.0034 286.22)",
+          "oklch(26% 0.0034 286.22)",
+          "oklch(38% 0.0034 286.22)",
+          "oklch(49% 0.0034 286.22)",
+          "oklch(61% 0.0034 286.22)",
+          "oklch(72% 0.0034 286.22)",
+          "oklch(84% 0.0034 286.22)",
+          "oklch(95% 0.0034 286.22)"
+        ]
+      },
+      "selected-category-surface": {
+        "role": "neutral",
+        "displayName": "Fondo de categoría elegida",
+        "tonalRamp": [
+          "oklch(15% 0.0202 53.26)",
+          "oklch(26% 0.0202 53.26)",
+          "oklch(38% 0.0202 53.26)",
+          "oklch(49% 0.0202 53.26)",
+          "oklch(61% 0.0202 53.26)",
+          "oklch(72% 0.0202 53.26)",
+          "oklch(84% 0.0202 53.26)",
+          "oklch(95% 0.0202 53.26)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display-phone": {
+        "displayName": "Título de teléfono",
+        "purpose": "Hero existente solo en el inicio."
+      },
+      "display-tablet": {
+        "displayName": "Título de tablet",
+        "purpose": "Hero del inicio entre 640px y 1023px."
+      },
+      "display-desktop": {
+        "displayName": "Título de escritorio",
+        "purpose": "Hero del inicio desde 1024px; variante compacta en DESIGN.md."
+      },
+      "body-phone": {
+        "displayName": "Descripción móvil",
+        "purpose": "Texto de apoyo del hero de la home."
+      },
+      "body-desktop": {
+        "displayName": "Descripción de escritorio",
+        "purpose": "Texto de apoyo del hero de la home."
+      },
+      "title-phone": {
+        "displayName": "Título de sección móvil",
+        "purpose": "Categorías y catálogo en teléfono."
+      },
+      "action": {
+        "displayName": "Acción",
+        "purpose": "CTA del hero."
+      },
+      "search-phone": {
+        "displayName": "Búsqueda móvil",
+        "purpose": "Input de la cabecera de home."
+      },
+      "mode-label": {
+        "displayName": "Modalidad",
+        "purpose": "Selector domicilio/recogida."
+      }
+    },
+    "shadows": [
+      {
+        "name": "caption-phone",
+        "value": "0 6px 18px #00000014",
+        "purpose": "Panel de pie de foto de la home móvil."
+      },
+      {
+        "name": "caption-desktop",
+        "value": "0 12px 30px #0000000f",
+        "purpose": "Panel de pie de foto de la home de escritorio."
+      },
+      {
+        "name": "dock-phone",
+        "value": "0 6px 24px #0000001a",
+        "purpose": "BottomNav solamente dentro del inicio."
+      }
+    ],
+    "motion": [
+      {
+        "name": "carousel-slide",
+        "value": "transform 500ms cubic-bezier(.22,1,.36,1)",
+        "purpose": "Track de la home en movimiento normal; desactivado en reducido."
+      },
+      {
+        "name": "banner-reveal",
+        "value": "600ms cubic-bezier(.16,1,.3,1)",
+        "purpose": "Clip-path inset(0 8% 0 0) a inset(0), solo banner activo en modo normal."
+      },
+      {
+        "name": "banner-crossfade-reduced",
+        "value": "opacity 360ms cubic-bezier(.4,0,.2,1)",
+        "purpose": "Diapositivas completas apiladas en grid con fila minmax(0,1fr) y min-height:0 para respetar ventana220px teléfono/380px tablet y caption12px dentro del marco. Outgoing1 a0 e incoming0 a1 simultáneamente. Sin transform del track; inactivas inert y sin pointer events; autoplay reducido desactivado."
+      },
+      {
+        "name": "catalog-scroll",
+        "value": "800ms cubic-bezier(.4,0,.2,1)",
+        "purpose": "Framer Motion anima scrollY con margen CSS y límites del documento; foco preventScroll al terminar. Rueda, touch, pointer, todas las teclas, resize, pestaña oculta, desmontaje y repetición detienen el recorrido."
+      },
+      {
+        "name": "catalog-scroll-reduced",
+        "value": "450ms cubic-bezier(.4,0,.2,1)",
+        "purpose": "Navegación manual animada que el usuario pidió expresamente, más corta bajo reduced motion. Foco solo al finalizar o inmediatamente si ya está en el destino. No cambia preferencias de sistema/navegador; se retiró arrival-opacity."
+      },
+      {
+        "name": "dock-return",
+        "value": "transform 280ms cubic-bezier(.16,1,.3,1), opacity 180ms ease-out, visibility 280ms",
+        "purpose": "BottomNav reaparece al subir en la home; transición desactivada en reducido."
+      },
+      {
+        "name": "dock-exit",
+        "value": "180ms",
+        "purpose": "Salida del BottomNav de home al bajar; transition-duration del estado oculto."
+      },
+      {
+        "name": "banner-autoplay",
+        "value": "6000ms",
+        "purpose": "Intervalo en modo normal; desactivado al pausar, fuera del viewport, pestaña oculta o movimiento reducido."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-phone",
+        "value": "360px"
+      },
+      {
+        "name": "tablet-hero",
+        "value": "640px"
+      },
+      {
+        "name": "desktop-list-and-dock-cutoff",
+        "value": "768px"
+      },
+      {
+        "name": "desktop-hero",
+        "value": "1024px"
+      },
+      {
+        "name": "wide-desktop",
+        "value": "1200px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ver restaurantes — teléfono",
+      "kind": "button",
+      "refersTo": "button-primary-phone",
+      "description": "Muestra visual estática del CTA real de home; React anima scrollY 800ms normal/450ms reducido, cancelable por entrada, con foco al completar. La muestra no simula navegación ni éxito.",
+      "html": "<button class=\"ds-home-cta\" type=\"button\">Ver restaurantes<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
+      "css": ".ds-home-cta{display:inline-flex;align-items:center;justify-content:space-between;gap:20px;min-height:48px;padding:12px 17px;border:0;border-radius:9px;background:#1d1d1f;color:#ffffff;font-family:Outfit,sans-serif;font-size:14px;font-weight:600;cursor:pointer}.ds-home-cta:hover,.ds-home-cta:active{background:#3a3a3c}.ds-home-cta:focus-visible{outline:3px solid #bd3818;outline-offset:3px}"
+    },
+    {
+      "name": "Búsqueda — teléfono",
+      "kind": "input",
+      "refersTo": "search-phone",
+      "description": "Campo de la cabecera de home; sin dependencias de Tailwind ni React en esta muestra.",
+      "html": "<label class=\"ds-home-search\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"10.5\" cy=\"10.5\" r=\"7.5\"/><path d=\"m16 16 5 5\"/></svg><input type=\"search\" aria-label=\"Buscar restaurantes o comida\" placeholder=\"Buscar comida o restaurantes\"></label>",
+      "css": ".ds-home-search{display:flex;align-items:center;gap:9px;min-height:48px;padding:0 12px;border:1px solid #d2d2d7;border-radius:10px;background:#ffffff;color:#515154}.ds-home-search input{width:100%;min-width:0;padding:12px 0;border:0;background:transparent;color:#1d1d1f;font:16px Outfit,sans-serif;caret-color:#bd3818}.ds-home-search input::placeholder{color:#6e6e73}.ds-home-search input:focus{outline:none}.ds-home-search:focus-within{outline:2px solid #bd3818;outline-offset:2px}.ds-home-search:hover{border-color:#d2d2d7}"
+    },
+    {
+      "name": "Modalidad — teléfono",
+      "kind": "custom",
+      "refersTo": "mode-selected",
+      "description": "Selector existente en home; aria-pressed representa el estado de muestra.",
+      "html": "<div class=\"ds-home-mode\" role=\"group\" aria-label=\"Modalidad del pedido\"><button type=\"button\" aria-pressed=\"true\">A domicilio</button><button type=\"button\" aria-pressed=\"false\">Para llevar</button></div>",
+      "css": ".ds-home-mode{width:176px;display:flex;padding:3px;border-radius:9px;background:#f0f0f2}.ds-home-mode button{flex:1;min-height:44px;padding:0 9px;border:0;border-radius:6px;background:transparent;color:#515154;white-space:nowrap;font:600 12px Outfit,sans-serif;cursor:pointer}.ds-home-mode button[aria-pressed=true]{background:#1d1d1f;color:#ffffff}.ds-home-mode button:hover{color:#1d1d1f}.ds-home-mode button[aria-pressed=true]:hover{color:#ffffff}.ds-home-mode button:focus-visible{outline:3px solid #bd3818;outline-offset:3px}"
+    },
+    {
+      "name": "Categoría Inicio — teléfono",
+      "kind": "chip",
+      "refersTo": "category-phone",
+      "description": "Categoría de home con un SVG; las fotos de categoría reales no se duplican en documentación.",
+      "html": "<button class=\"ds-home-category\" type=\"button\" aria-pressed=\"true\"><span class=\"ds-home-category-tile\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z\"/><path d=\"M9 21v-8h6v8\"/></svg></span><span>Inicio</span></button>",
+      "css": ".ds-home-category{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:68px;padding:0;border:0;background:transparent;color:#515154;font:500 12px Outfit,sans-serif;cursor:pointer}.ds-home-category-tile{display:grid;place-items:center;width:64px;height:64px;border:1px solid #e8e8ed;border-radius:16px;background:#ffffff;color:#bd3818}.ds-home-category[aria-pressed=true]{color:#a92f10;font-weight:700}.ds-home-category[aria-pressed=true] .ds-home-category-tile{outline:2px solid #bd3818;outline-offset:2px;background:#fff0e7}.ds-home-category:focus-visible{outline:3px solid #bd3818;outline-offset:3px}.ds-home-category:hover .ds-home-category-tile{border-color:#bd3818}"
+    },
+    {
+      "name": "Tarjeta de restaurante — teléfono",
+      "kind": "card",
+      "refersTo": "restaurant-phone",
+      "description": "Estructura existente de home con nombre/metadatos de muestra; la zona neutra representa una foto y no crea un activo.",
+      "html": "<div class=\"ds-home-card\"><a href=\"#ds-menu\" class=\"ds-home-card-link\"><span class=\"ds-home-card-photo\" aria-hidden=\"true\"></span><span class=\"ds-home-card-info\"><strong>Nombre del restaurante</strong><span>Categoría</span><small>Modalidad del pedido</small></span></a><button type=\"button\" aria-label=\"Agregar a favoritos\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z\"/></svg></button></div>",
+      "css": ".ds-home-card{display:flex;align-items:center;gap:13px;padding:12px;border:1px solid #e8e8ed;border-radius:14px;background:#ffffff;color:#1d1d1f;font-family:Outfit,sans-serif}.ds-home-card-link{display:flex;align-items:center;gap:13px;flex:1;min-width:0;color:inherit;text-decoration:none}.ds-home-card-photo{flex-shrink:0;width:88px;height:94px;border-radius:9px;background:#f5f5f7}.ds-home-card-info{display:flex;flex-direction:column;gap:5px;min-width:0}.ds-home-card-info strong{font-size:16px;font-weight:700;line-height:1.2}.ds-home-card-info>span{color:#515154;font-size:13px}.ds-home-card-info small{color:#515154;font-size:12px;line-height:1.4}.ds-home-card button{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;padding:0;border:0;background:transparent;color:#6e6e73;cursor:pointer}.ds-home-card button svg{width:19px;height:19px}.ds-home-card-link:focus-visible,.ds-home-card button:focus-visible{outline:3px solid #bd3818;outline-offset:3px}.ds-home-card:hover{box-shadow:0 8px 40px rgba(0,0,0,.12)}.ds-home-card button:hover{color:#515154}"
+    },
+    {
+      "name": "BottomNav — inicio móvil",
+      "kind": "nav",
+      "refersTo": "navigation-phone",
+      "description": "Muestra estática del dock de home. Sus iconos son SVG; dirección de scroll y animación interna se ejecutan en la aplicación.",
+      "html": "<nav class=\"ds-home-dock\" aria-label=\"Navegación principal\"><button type=\"button\" aria-label=\"Inicio\" aria-current=\"page\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z\"/><path d=\"M9 21v-8h6v8\"/></svg><span></span></button><button type=\"button\" aria-label=\"Ubicación\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/></svg></button><button type=\"button\" aria-label=\"Buscar\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"10.5\" cy=\"10.5\" r=\"7.5\"/><path d=\"m16 16 5 5\"/></svg></button><button type=\"button\" aria-label=\"Carrito\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2 3h3l3 13h11l3-9H6\"/><circle cx=\"9\" cy=\"21\" r=\"1\"/><circle cx=\"19\" cy=\"21\" r=\"1\"/></svg></button></nav>",
+      "css": ".ds-home-dock{display:flex;align-items:center;justify-content:center;gap:12px;width:max-content;padding:4px 12px;border-radius:9999px;background:#ffffff;box-shadow:0 6px 24px #0000001a}.ds-home-dock button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:48px;height:48px;border:0;background:transparent;color:#6e6e73;cursor:pointer}.ds-home-dock button[aria-current=page]{color:#bd3818}.ds-home-dock button[aria-current=page] span{width:16px;height:4px;border-radius:9999px;background:#bd3818}.ds-home-dock button:hover{color:#515154}.ds-home-dock button:focus-visible{outline:3px solid #bd3818;outline-offset:3px}"
+    },
+    {
+      "name": "Flechas de banner — teléfono y tablet",
+      "kind": "custom",
+      "refersTo": "carousel-control",
+      "description": "Controles manuales de home: el estado real cambia la diapositiva completa con slide/reveal normal y crossfade simultáneo 360ms reducido. Esta muestra documenta flechas y sus estados; no duplica arte ni ejecuta el carrusel React.",
+      "html": "<div class=\"ds-home-carousel-controls\"><button type=\"button\" aria-label=\"Banner anterior\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m15 18-6-6 6-6\"/></svg></button><button type=\"button\" aria-label=\"Banner siguiente\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button></div>",
+      "css": ".ds-home-carousel-controls{display:flex;align-items:center}.ds-home-carousel-controls button{display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:8px;background:transparent;color:#515154;cursor:pointer}.ds-home-carousel-controls button svg{width:18px;height:18px}.ds-home-carousel-controls button:hover,.ds-home-carousel-controls button:active{background:#f0f0f2}.ds-home-carousel-controls button:focus-visible{outline:3px solid #bd3818;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Estrella Eats sobre blanco",
+    "overview": "Este documento captura la paleta blanca que el usuario aprobó para `src/pages/PublicLandingPage.tsx` y los patrones existentes que la acompañan. La referencia Apple-like describe el color y la claridad de las superficies. La composición, Outfit, fotografía, activos de Estrella y acento naranja siguen siendo los del inicio.\n\n**Alcance normativo: únicamente el inicio público.** Estos tokens no autorizan restilizar menús, checkout, beneficios, paneles ni otras rutas. Antes de esta tarea no existían DESIGN.md ni su sidecar; no se reconstruyó ni auditó un sistema visual global. Este archivo registra el cambio de paleta aprobado para una superficie existente, no una nueva identidad de toda la aplicación.",
+    "keyCharacteristics": [
+      "Blanco y gris frío para las superficies del inicio.",
+      "Outfit y naranja Estrella conservados.",
+      "Fotografía y banners existentes, sin recolorear su contenido.",
+      "Controles oscuros y estados visibles; texto directo en español."
+    ],
+    "rules": [
+      {
+        "name": "Home Scope",
+        "body": "Aplicar estos colores solo dentro del inicio público; cualquier ampliación a otras rutas requiere su propio alcance aprobado.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "**Do** conservar Outfit, fotografía, marca y naranja Estrella al refinar esta home.",
+      "**Do** usar blanco y gris frío en las superficies aprobadas del inicio.",
+      "**Do** preservar foco visible, estados de selección y controles manuales del carrusel.",
+      "**Do** mantener las diferencias reales entre los cortes del hero, catálogo y navegación."
+    ],
+    "donts": [
+      "**Don't** aplicar este documento como sistema global de menús, checkout u otras rutas.",
+      "**Don't** recolorear fotos, sellos o banners para forzarlos a la paleta de UI.",
+      "**Don't** convertir muestras documentales en calificaciones, tiempos o promesas comerciales verificadas.",
+      "**Don't** eliminar alternativas manuales o ignorar reduced motion."
+    ]
+  }
+}

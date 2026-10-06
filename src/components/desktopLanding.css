@@ -1,0 +1,291 @@
+/* The home shares its visual identity; menus and checkout keep their own styles. */
+.eats-desktop-header, .eats-desktop-hero { display: none; }
+.eats-home-legacy-header { display: none; }
+.eats-header-search > button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; }
+.eats-header-search input::-webkit-search-cancel-button { display: none; }
+.eats-header-location { text-align: left; }
+
+@media (max-width: 1023px) {
+  .eats-landing { --eats-paper: #ffffff; --eats-ink: #1d1d1f; --eats-orange: #ea4e25; --eats-line: #e8e8ed; background: var(--eats-paper); color: var(--eats-ink); padding-bottom: 0; }
+  .eats-landing ::selection { background: #f7d7c6; color: var(--eats-ink); }
+  .eats-landing :is(button, a, input):focus-visible { outline: 3px solid #bd3818; outline-offset: 3px; }
+  .eats-desktop-header { display: block; position: sticky; top: 0; z-index: 40; background: var(--eats-paper); border-bottom: 1px solid var(--eats-line); padding-top: env(safe-area-inset-top, 0px); }
+  .eats-desktop-header-inner { display: grid; grid-template-columns: minmax(0, 1fr) 44px 44px; align-items: center; gap: 10px 8px; max-width: 960px; margin: auto; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); }
+  .eats-wordmark { display: flex; align-items: center; gap: 7px; font-size: 23px; font-weight: 800; letter-spacing: -.03em; min-width: 0; min-height: 44px; }
+  .eats-wordmark img { width: 34px; height: 34px; object-fit: contain; }
+  .eats-wordmark-accent, .eats-wordmark-dot { color: var(--eats-orange); }
+  .eats-header-benefits, .eats-header-cart { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; }
+  .eats-header-benefits { grid-column: 2; grid-row: 1; color: #515154; }
+  .eats-header-cart { grid-column: 3; grid-row: 1; background: var(--eats-ink); color: white; }
+  .eats-header-benefits > span, .eats-header-cart > span { display: none; }
+  .eats-header-location { display: flex; align-items: center; gap: 5px; grid-row: 2; grid-column: 1 / -1; width: calc(100% - 182px); min-width: 0; min-height: 44px; font-size: 12px; line-height: 1.3; color: #515154; }
+  .eats-header-location > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eats-header-location small { display: block; font-size: 10px; color: #515154; margin-bottom: 3px; }
+  .eats-header-location svg { flex-shrink: 0; color: #bd3818; }
+  .eats-delivery-switch { grid-row: 2; grid-column: 1 / -1; justify-self: end; width: 176px; display: flex; padding: 3px; border-radius: 9px; background: #f0f0f2; }
+  .eats-delivery-switch button { flex: 1; min-height: 44px; padding: 0 9px; border-radius: 6px; color: #515154; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .eats-delivery-switch button[aria-pressed="true"] { background: var(--eats-ink); color: white; }
+  .eats-header-search { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 48px; padding: 0 12px; border: 1px solid #d2d2d7; border-radius: 10px; background: #ffffff; color: #515154; }
+  .eats-header-search > svg { flex-shrink: 0; }
+  .eats-header-search input { width: 100%; min-width: 0; padding: 12px 0; background: transparent; border: 0; border-radius: 0; font-size: 16px; color: var(--eats-ink); caret-color: #bd3818; box-shadow: none; }
+  .eats-header-search input::placeholder { color: #6e6e73; }
+  .eats-header-search input:focus { outline: none; box-shadow: none; }
+  .eats-header-search:focus-within { outline: 2px solid #bd3818; outline-offset: 2px; }
+  .eats-landing .eats-landing-main { padding: 26px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px)); max-width: 960px; }
+  .eats-landing-main > div { margin-top: 0; }
+  .eats-desktop-hero { display: grid; gap: 22px; margin-bottom: 38px; }
+  .eats-eyebrow { display: none; }
+  .eats-hero-copy h1 { position: relative; width: fit-content; max-width: 100%; font-size: clamp(46px, 13vw, 64px); line-height: .98; font-weight: 800; letter-spacing: -.035em; }
+  .eats-hero-copy h1 > span { color: var(--eats-orange); }
+  .eats-title-star { position: absolute; right: -42px; bottom: 12px; width: 30px; height: 30px; color: var(--eats-orange); transform: rotate(12deg); }
+  .eats-hero-copy > p { margin-top: 17px; max-width: 36ch; font-size: 15px; line-height: 1.5; color: #515154; }
+  .eats-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; margin-top: 20px; }
+  .eats-explore-button { display: inline-flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 48px; padding: 12px 17px; border-radius: 9px; background: #c83b17; color: white; font-size: 14px; font-weight: 600; }
+  .eats-explore-button:active { background: #a92f10; }
+  .eats-hero-benefits { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
+  .eats-hero-footnote { display: flex; gap: 8px; align-items: center; margin-top: 16px; max-width: 37ch; color: #515154; font-size: 12px; line-height: 1.4; }
+  .eats-hero-footnote svg { flex-shrink: 0; }
+  .eats-hero-visual { position: relative; min-width: 0; height: clamp(220px, 64vw, 320px); margin: 8px 0 0; }
+  .eats-hero-visual:has(.eats-mobile-carousel) { height: auto; }
+  .eats-mobile-carousel { width: 100%; min-width: 0; min-height: 270px; }
+  .eats-carousel-window { height: 220px; border-radius: 14px 14px 48px 14px; overflow: hidden; touch-action: pan-y; background: #ffffff; }
+  .eats-carousel-track { display: flex; height: 100%; transition: transform 500ms cubic-bezier(.22,1,.36,1); }
+  .eats-carousel-slide { position: relative; flex: 0 0 100%; min-width: 0; height: 100%; }
+  .eats-carousel-slide > a { display: block; width: 100%; height: 100%; }
+  .eats-carousel-slide img { width: 100%; height: 100%; object-fit: contain; }
+  .eats-carousel-slide img.eats-carousel-table { object-fit: cover; object-position: 50% 53%; }
+  .eats-carousel-slide .eats-photo-caption { bottom: 12px; }
+  .eats-carousel-message { height: 100%; padding: 24px; display: flex; flex-direction: column; justify-content: center; gap: 12px; background: #f5f5f7; color: #1d1d1f; }
+  .eats-carousel-message strong { font-size: clamp(22px, 5vw, 32px); line-height: 1.1; white-space: pre-line; }
+  .eats-carousel-message p { font-size: 14px; line-height: 1.4; }
+  .eats-carousel-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; }
+  .eats-carousel-pagination, .eats-carousel-buttons { display: flex; align-items: center; }
+  .eats-carousel-controls button { display: grid; place-items: center; width: 44px; height: 44px; color: #515154; border-radius: 8px; }
+  .eats-carousel-controls button:active { background: #f0f0f2; }
+  .eats-carousel-buttons { margin-left: auto; }
+  .eats-carousel-pagination button { width: 44px; min-height: 44px; }
+  .eats-carousel-pagination button > span { width: 6px; height: 6px; border-radius: 50%; background: #6e6e73; }
+  .eats-carousel-pagination button[aria-pressed="true"] > span { width: 18px; border-radius: 4px; background: #bd3818; }
+  .eats-hero-photo { width: 100%; height: 100%; object-fit: cover; object-position: 50% 53%; border-radius: 14px 14px 58px 14px; background: #df6c3d; }
+  .eats-photo-caption { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: end; gap: 22px; padding: 12px 15px; background: #ffffff; border-radius: 8px; box-shadow: 0 6px 18px #00000014; }
+  .eats-photo-caption > span { display: none; }
+  .eats-photo-caption strong { font-size: 20px; font-weight: 700; line-height: 1.05; letter-spacing: -.02em; }
+  .eats-photo-caption > svg { color: var(--eats-orange); width: 18px; }
+  .eats-local-seal { position: absolute; top: -12px; right: -6px; width: 76px; height: 76px; border-radius: 50%; background: #f7e5bc; color: #624324; transform: rotate(12deg); }
+  .eats-local-seal svg { width: 100%; height: 100%; }
+  .eats-local-seal text { font-family: 'Outfit', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 1.4px; }
+  .eats-local-seal > span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 30px; color: var(--eats-orange); }
+  .eats-home-banners { margin-bottom: 28px; border-radius: 12px; }
+  .eats-landing[data-catalog-filtered="true"] .eats-desktop-hero,
+  .eats-landing[data-catalog-filtered="true"] .eats-home-banners { display: none; }
+  .eats-landing .eats-desktop-categories { border-top: 1px solid var(--eats-line); padding-top: 24px; margin: 24px 0; scroll-margin-top: 210px; }
+  .eats-category-heading { align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .eats-category-heading h2 { font-size: 21px; font-weight: 700; letter-spacing: -.025em; }
+  .eats-category-heading > span { display: none; }
+  .eats-landing .eats-category-strip { gap: 14px; padding: 3px 4px 12px; scroll-snap-type: x proximity; }
+  .eats-category-strip > button { min-width: 68px; gap: 9px; }
+  .eats-category-strip > button > div { width: 64px; height: 64px; border-radius: 16px; background: #ffffff; border: 1px solid var(--eats-line); box-shadow: none; transform: none; }
+  .eats-category-strip > button[aria-pressed="true"] > div { outline: 2px solid #bd3818; outline-offset: 2px; background: #fff0e7; }
+  .eats-category-strip > button > span { font-size: 12px; color: #515154; font-weight: 500; }
+  .eats-category-strip > button[aria-pressed="true"] > span { color: #a92f10; font-weight: 700; }
+  .eats-category-strip > button svg { color: #bd3818; }
+  .eats-mobile-restaurants { gap: 32px; }
+  .eats-mobile-restaurants h2 { font-size: 21px; font-weight: 700; color: var(--eats-ink); letter-spacing: -.025em; white-space: normal; }
+  .eats-mobile-restaurant-card { padding: 12px; gap: 13px; border-radius: 14px; border: 1px solid var(--eats-line); background: #ffffff; box-shadow: none; }
+  .eats-mobile-restaurant-card > div:first-child { width: 88px; height: 94px; border-radius: 9px; }
+  .eats-mobile-card-info h3 { white-space: normal; font-size: 16px; color: var(--eats-ink); line-height: 1.2; }
+  .eats-mobile-card-info > p { color: #515154; font-size: 13px; }
+  .eats-mobile-card-status { color: #515154; font-size: 12px; line-height: 1.4; }
+  .eats-mobile-card-favorite { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; }
+  .eats-mobile-card-favorite svg { width: 19px; height: 19px; color: #6e6e73; }
+  .eats-mobile-row-card { border-radius: 14px; border-color: var(--eats-line); background: #ffffff; box-shadow: none; }
+  .eats-landing .eats-landing-footer { background: #f5f5f7; padding: 32px 24px calc(108px + env(safe-area-inset-bottom, 0px)); margin-top: 16px; }
+  .eats-landing-footer p { color: #6e6e73; }
+  .eats-landing-footer a { color: #515154; }
+  .eats-landing > nav { bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 0); opacity: 1; transition: transform 280ms cubic-bezier(.16,1,.3,1), opacity 180ms ease-out, visibility 280ms; }
+  .eats-landing > nav[data-hidden="true"] { transform: translate(-50%, calc(100% + 32px + env(safe-area-inset-bottom, 0px))); opacity: 0; visibility: hidden; pointer-events: none; transition-duration: 180ms; }
+  .eats-landing > nav > div { background: #ffffff; border: 0; box-shadow: 0 6px 24px #0000001a; }
+  .eats-landing > nav .text-blue-600 { color: #bd3818; }
+  .eats-landing > nav .bg-blue-600 { background: #bd3818; }
+  .eats-landing > nav .text-slate-400 { color: #6e6e73; }
+  .eats-landing :is(.eats-desktop-offers, .eats-mobile-row-card) .text-slate-400 { color: #6e6e73; }
+  .eats-landing > div.pointer-events-none { display: none; }
+  .eats-landing-footer :is(.text-slate-600, .text-slate-500) { color: #6e6e73; }
+}
+
+@media (max-width: 639px) {
+  /* Benefits remain directly available in the header; avoid a duplicate CTA row. */
+  .eats-hero-actions .eats-hero-benefits { display: none; }
+  .eats-hero-visual { height: 220px; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .eats-desktop-header-inner { grid-template-columns: 1fr auto auto auto; padding-inline: 28px; }
+  .eats-header-location { grid-row: 1; grid-column: 2; width: auto; max-width: 180px; }
+  .eats-header-benefits { grid-column: 3; }
+  .eats-header-cart { grid-column: 4; }
+  .eats-header-search { grid-column: 1 / 3; grid-row: 2; }
+  .eats-delivery-switch { grid-column: 3 / 5; }
+  .eats-landing .eats-landing-main { padding: 32px 28px 12px; }
+  .eats-desktop-hero { grid-template-columns: 1fr 1fr; align-items: center; gap: 28px; }
+  .eats-hero-copy h1 { font-size: clamp(50px, 7.4vw, 72px); }
+  .eats-title-star { display: none; }
+  .eats-hero-visual { height: 430px; margin: 0; }
+  .eats-carousel-window { height: 380px; }
+  .eats-mobile-carousel { min-height: 430px; }
+  .eats-hero-copy > p br { display: none; }
+  .eats-hero-actions { gap: 8px; }
+  .eats-landing .eats-desktop-categories { scroll-margin-top: 160px; }
+}
+
+@media (max-width: 1023px) and (max-height: 500px) {
+  .eats-desktop-header { position: relative; }
+  .eats-landing .eats-desktop-categories { scroll-margin-top: 16px; }
+}
+
+@media (max-width: 359px) {
+  .eats-wordmark { font-size: 21px; gap: 4px; }
+  .eats-wordmark img { width: 30px; height: 30px; }
+  .eats-landing .eats-landing-main { padding-inline: 16px; }
+  .eats-hero-copy h1 { font-size: 46px; }
+  .eats-title-star { right: -36px; width: 25px; }
+  .eats-mobile-restaurant-card > div:first-child { width: 72px; height: 88px; }
+}
+
+@media (min-width: 1024px) {
+  .eats-landing { --eats-paper: #ffffff; --eats-ink: #1d1d1f; --eats-orange: #ea4e25; --eats-line: #e8e8ed; background: var(--eats-paper); color: var(--eats-ink); padding-bottom: 0; }
+  .eats-landing :is(button, a, input):focus-visible { outline: 3px solid #ea4e25; outline-offset: 5px; }
+  .eats-landing .eats-legacy-header { display: none; }
+  .eats-desktop-header { display: block; position: fixed; inset: 0 0 auto; z-index: 50; background: #fffffff5; backdrop-filter: blur(14px); border-bottom: 1px solid var(--eats-line); }
+  .eats-desktop-header-inner { max-width: 1440px; margin: auto; padding: 19px 48px; display: flex; align-items: center; gap: 24px; min-height: 84px; }
+  .eats-wordmark { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; font-size: 24px; font-weight: 800; letter-spacing: -1.2px; }
+  .eats-wordmark img { object-fit: contain; }
+  .eats-wordmark-accent, .eats-wordmark-dot { color: var(--eats-orange); }
+  .eats-header-location { display: flex; align-items: center; gap: 9px; padding-left: 22px; border-left: 1px solid var(--eats-line); font-size: 12px; line-height: 1.3; max-width: 195px; }
+  .eats-header-location span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .eats-header-location svg { flex-shrink: 0; color: var(--eats-orange); }
+  .eats-header-location small { display: block; color: #6e6e73; font-size: 10px; margin-bottom: 4px; }
+  .eats-delivery-switch { display: flex; background: #f0f0f2; padding: 4px; border-radius: 9px; flex-shrink: 0; }
+  .eats-delivery-switch button { padding: 8px 12px; color: #6e6e73; font-size: 12px; font-weight: 600; border-radius: 6px; white-space: nowrap; }
+  .eats-delivery-switch button[aria-pressed="true"] { background: var(--eats-ink); color: white; }
+  .eats-header-search { min-width: 100px; display: flex; align-items: center; gap: 10px; flex: 1; background: #fff; border: 1px solid var(--eats-line); border-radius: 9px; padding: 0 13px; color: #6e6e73; }
+  .eats-header-search input { width: 100%; min-width: 0; border: 0; border-radius: 0; padding: 11px 0; background: transparent; box-shadow: none; font-size: 13px; }
+  .eats-header-search input:focus { box-shadow: none; outline: none; }
+  .eats-header-search:focus-within { outline: 2px solid var(--eats-orange); }
+  .eats-header-benefits, .eats-header-cart { display: flex; align-items: center; gap: 7px; flex-shrink: 0; font-size: 13px; font-weight: 600; }
+  .eats-header-benefits:hover { color: var(--eats-orange); }
+  .eats-header-cart { padding: 12px 16px; color: white; background: var(--eats-orange); border-radius: 9px; }
+  .eats-header-cart:hover { background: #c93c17; }
+  .eats-landing .eats-landing-main { max-width: 1440px; padding: 120px 48px 32px; }
+  .eats-desktop-hero { display: grid; grid-template-columns: 1.03fr 1fr; min-height: 510px; margin-bottom: 48px; gap: 42px; }
+  .eats-hero-copy { padding: 27px 0 12px; position: relative; }
+  .eats-eyebrow { display: flex; align-items: center; gap: 9px; font-size: 10px; font-weight: 700; letter-spacing: 2.2px; margin-bottom: 27px; }
+  .eats-eyebrow span { width: 7px; height: 7px; background: var(--eats-orange); border-radius: 50%; }
+  .eats-hero-copy h1 { font-size: clamp(64px, 6.2vw, 94px); line-height: .98; font-weight: 800; letter-spacing: -5px; position: relative; width: max-content; }
+  .eats-hero-copy h1 > span { color: var(--eats-orange); }
+  .eats-title-star { position: absolute; right: -78px; bottom: 18px; width: 54px; height: 54px; color: var(--eats-orange); transform: rotate(12deg); }
+  .eats-hero-copy > p { margin-top: 26px; font-size: 16px; line-height: 1.6; color: #6e6e73; }
+  .eats-hero-actions { display: flex; align-items: center; gap: 24px; margin-top: 27px; }
+  .eats-explore-button { display: inline-flex; align-items: center; justify-content: space-between; gap: 24px; padding: 17px 20px; border-radius: 9px; background: var(--eats-orange); color: white; font-size: 14px; font-weight: 600; transition: background .2s, transform .2s; }
+  .eats-explore-button:hover { background: #cf3d18; transform: translateY(-2px); }
+  .eats-hero-benefits { display: inline-flex; align-items: center; gap: 9px; font-size: 12px; text-decoration: underline; text-underline-offset: 5px; white-space: nowrap; }
+  .eats-hero-benefits:hover { color: var(--eats-orange); }
+  .eats-hero-footnote { display: flex; align-items: center; gap: 9px; margin-top: 31px; color: #6e6e73; font-size: 11px; }
+  .eats-hero-visual { position: relative; margin: 0 0 0 15px; min-width: 0; min-height: 510px; }
+  .eats-hero-photo { position: absolute; width: 100%; height: 100%; object-fit: cover; object-position: 50% 45%; border-radius: 18px 18px 100px 18px; background: #df6c3d; }
+  .eats-photo-caption { position: absolute; bottom: 24px; left: -30px; display: grid; grid-template-columns: 1fr auto; column-gap: 36px; padding: 23px 26px; background: #ffffff; border: 1px solid #e8e8ed; box-shadow: 0 12px 30px #0000000f; border-radius: 8px; transform: rotate(-3deg); }
+  .eats-photo-caption > span { grid-column: 1 / -1; color: #6e6e73; font-size: 8px; letter-spacing: 1.7px; font-weight: 700; margin-bottom: 8px; }
+  .eats-photo-caption strong { font-size: 25px; line-height: 1.12; font-weight: 700; letter-spacing: -.6px; }
+  .eats-photo-caption > svg { align-self: end; color: var(--eats-orange); }
+  .eats-local-seal { position: absolute; right: -15px; top: -20px; width: 104px; height: 104px; border-radius: 50%; background: #f7e5bc; color: #624324; box-shadow: 0 4px 14px #3c261312; transform: rotate(12deg); }
+  .eats-local-seal svg { width: 100%; height: 100%; }
+  .eats-local-seal text { font-family: 'Outfit', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 1.4px; }
+  .eats-local-seal > span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 42px; color: var(--eats-orange); }
+  .eats-landing .eats-desktop-categories { margin: 0 0 30px; border-top: 1px solid var(--eats-line); padding-top: 25px; scroll-margin-top: 110px; }
+  .eats-category-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 22px; }
+  .eats-category-heading h2 { font-size: 23px; font-weight: 700; letter-spacing: -.7px; }
+  .eats-category-heading span { font-size: 11px; color: #6e6e73; }
+  .eats-landing .eats-category-strip { gap: 20px; padding: 0 2px 16px; }
+  .eats-landing .eats-category-strip > button { min-width: 92px; gap: 10px; }
+  .eats-landing .eats-category-strip > button > div { width: 79px; height: 79px; border-radius: 18px; box-shadow: none; border: 1px solid #e8e8ed; background: #ffffff; }
+  .eats-landing .eats-category-strip > button[aria-pressed="true"] > div { border: 2px solid var(--eats-orange); background: #fff0e7; }
+  .eats-landing .eats-category-strip > button > span { font-size: 12px; color: #6e6e73; font-weight: 500; }
+  .eats-landing .eats-category-strip > button[aria-pressed="true"] > span { color: var(--eats-orange); font-weight: 700; }
+  .eats-category-home svg { width: 25px; height: 25px; color: var(--eats-orange); }
+  .eats-desktop-list { gap: 45px; margin-top: 16px; }
+  .eats-section-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 22px; }
+  .eats-section-head h2 { font-size: 27px; letter-spacing: -.8px; font-weight: 700; color: var(--eats-ink); }
+  .eats-section-head p { color: #6e6e73; font-size: 12px; margin-top: 5px; }
+  .eats-section-head > span { font-size: 11px; color: #6e6e73; padding: 7px 12px; border: 1px solid var(--eats-line); border-radius: 30px; }
+  .eats-card-grid { gap: 26px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .eats-restaurant-card { border: 1px solid var(--eats-line); border-radius: 13px; background: #ffffff; overflow: hidden; position: relative; transition: border-color .2s, transform .2s; }
+  .eats-restaurant-card:hover { border-color: #d2d2d7; transform: translateY(-3px); }
+  .eats-restaurant-link { display: block; }
+  .eats-restaurant-photo { border-radius: 0; aspect-ratio: 16 / 9; background: #f5f5f7; }
+  .eats-restaurant-image { transition: transform .3s; }
+  .eats-restaurant-link:hover .eats-restaurant-image { transform: scale(1.035); }
+  .eats-restaurant-info { padding: 17px 18px; }
+  .eats-restaurant-info h3 { font-size: 17px; color: var(--eats-ink); font-weight: 650; letter-spacing: -.3px; white-space: normal; }
+  .eats-restaurant-category { color: #6e6e73; font-size: 12px; margin-top: 6px; }
+  .eats-restaurant-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #e8e8ed; margin-top: 14px; padding-top: 12px; font-size: 11px; color: #6e6e73; }
+  .eats-open-status { display: flex; align-items: center; gap: 5px; color: #497655; }
+  .eats-open-status::before { content: ''; width: 5px; height: 5px; background: currentColor; border-radius: 50%; }
+  .eats-closed-status { color: #6e6e73; }
+  .eats-favorite { position: absolute; top: 12px; right: 12px; width: 33px; height: 33px; border: 1px solid #fff5; border-radius: 50%; background: #ffffff; display: grid; place-items: center; z-index: 2; }
+  .eats-favorite:hover { background: #ffe4d8; }
+  .eats-row-cards { gap: 23px; padding: 2px 0 4px; }
+  .eats-row-card { width: calc((100% - 46px) / 3); }
+  .eats-row-controls button { border: 1px solid var(--eats-line); background: transparent; width: 34px; height: 34px; }
+  .eats-row-controls button:hover { background: #f0f0f2; }
+  .eats-landing .eats-landing-footer { background: #f5f5f7; padding: 44px 48px; margin-top: 24px; }
+  .eats-landing-footer > div { max-width: 1344px; }
+  .eats-landing-footer p { color: #6e6e73; }
+  .eats-landing-footer a { color: #515154; }
+  .eats-landing-footer a:hover { color: #fff4e6; }
+  .eats-landing .eats-desktop-offers { border-bottom: 1px solid var(--eats-line); margin-bottom: 25px; padding-bottom: 20px; }
+}
+
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .eats-desktop-header-inner { gap: 17px; padding-inline: 32px; }
+  .eats-header-location { display: none; }
+  .eats-landing .eats-landing-main { padding-inline: 32px; }
+  .eats-desktop-hero { gap: 25px; min-height: 460px; }
+  .eats-hero-visual { min-height: 460px; }
+  .eats-hero-copy h1 { font-size: 70px; letter-spacing: -3px; }
+  .eats-title-star { right: -60px; width: 40px; height: 40px; }
+  .eats-hero-actions { gap: 16px; }
+  .eats-explore-button { padding-inline: 16px; gap: 15px; font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) and (min-width: 1024px) {
+  .eats-landing :is(.eats-explore-button, .eats-restaurant-card, .eats-restaurant-image) { transition: none; }
+}
+
+@media (prefers-reduced-motion: reduce) and (max-width: 1023px) {
+  .eats-landing :is(button, a, img, .eats-category-strip) { transition: none; scroll-behavior: auto; }
+  .eats-carousel-track { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); transition: none; }
+  .eats-carousel-slide { grid-area: 1 / 1; min-height: 0; opacity: 0; pointer-events: none; transition: opacity 360ms cubic-bezier(.4,0,.2,1); }
+  .eats-carousel-slide[data-active="true"] { opacity: 1; pointer-events: auto; z-index: 1; }
+  .eats-landing > nav { transition: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) and (max-width: 1023px) {
+  .eats-carousel-slide[data-active="true"] > :is(img, a, .eats-carousel-message) { animation: eats-banner-reveal 600ms cubic-bezier(.16,1,.3,1); }
+}
+@keyframes eats-banner-reveal {
+  from { clip-path: inset(0 8% 0 0); }
+  to { clip-path: inset(0); }
+}
+
+
+/* White home palette: keep the composition and Estrella orange as the accent. */
+.eats-landing .eats-landing-footer { color: #1d1d1f; }
+.eats-landing-footer .text-white { color: #1d1d1f; }
+.eats-landing-footer a:hover { color: #1d1d1f; }
+.eats-landing .eats-explore-button,
+.eats-landing .eats-header-cart { background: var(--eats-ink); color: #fff; }
+.eats-landing .eats-explore-button:is(:hover, :active),
+.eats-landing .eats-header-cart:hover { background: #3a3a3c; }
+@media (max-width: 1023px) {
+  .eats-landing-footer a { display: inline-flex; align-items: center; min-height: 44px; }
+}

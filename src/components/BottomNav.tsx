@@ -7,9 +7,10 @@ interface BottomNavProps {
   activeNavTab: string;
   setActiveNavTab: (tab: string) => void;
   activeOrderId: string | null;
+  hidden?: boolean;
 }
 
-export function BottomNav({ activeNavTab, setActiveNavTab, activeOrderId }: BottomNavProps) {
+export function BottomNav({ activeNavTab, setActiveNavTab, activeOrderId, hidden = false }: BottomNavProps) {
   const navigate = useNavigate();
   const { vibrateLight } = useHaptics();
 
@@ -26,7 +27,8 @@ export function BottomNav({ activeNavTab, setActiveNavTab, activeOrderId }: Bott
       <div className="md:hidden fixed bottom-0 left-0 w-full h-32 bg-gradient-to-t from-slate-50 via-slate-50/80 to-transparent pointer-events-none z-40"></div>
 
       {/* Ultra-premium floating dock (Slimmer Width) */}
-      <nav className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-max z-50">
+      <nav data-bottom-nav data-hidden={hidden} aria-label="Navegación principal" aria-hidden={hidden} inert={hidden}
+        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-max z-50">
         <div className="bg-white/90 backdrop-blur-2xl rounded-full p-1 px-3 flex items-center gap-3 justify-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/60">
           {navItems.map((item) => {
             const Icon = item.icon;
