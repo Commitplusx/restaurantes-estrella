@@ -6,6 +6,7 @@ import { useHaptics } from '../hooks/useHaptics'
 import { supabase } from '../lib/supabase'
 // import * as h3 from 'h3-js' (movido al hook)
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
+import { availableOptionGroups, validateOptionSelection, type OpcionItem } from '../lib/menuOptions'
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation'
 import {
   Store,
@@ -87,6 +88,7 @@ export type OpcionSeleccionada = {
   grupo_id: string;
   grupo: string;
   precio_extra: number;
+  menu_item_id?: string;
 }
 
 export type CartItem = {
@@ -256,6 +258,7 @@ export function PublicMenuView() {
 
   // Wizard de opciones — paso actual
   const [optionsStep, setOptionsStep] = useState(0)
+  const optionsAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Estado del carrito y drawer (Global via Zustand)
   const carrito = useCartStore(state => state.carrito as { item: CartItem & { foto_url?: string }, cantidad: number }[])
@@ -487,7 +490,11 @@ export function PublicMenuView() {
   type OptionableItem = (MenuItem | MenuCombo | MenuPromocion) & { __tipo: 'item' | 'combo' | 'promo', nombre?: string, precio?: number }
   const [selectedItemForOptions, setSelectedItemForOptions] = useState<OptionableItem | null>(null)
   // Resetear el paso del wizard cuando cambia el item seleccionado
-  useEffect(() => { setOptionsStep(0) }, [selectedItemForOptions])
+  useEffect(() => { setOptionsStep(0); setSelectedOptionsState({}) }, [selectedItemForOptions])
+  useEffect(() => () => {
+    if (optionsAdvanceTimer.current !== null) clearTimeout(optionsAdvanceTimer.current);
+    optionsAdvanceTimer.current = null;
+  }, [selectedItemForOptions, optionsStep])
 
   useEffect(() => {
     const fetchEta = async () => {
@@ -1894,7 +1901,7 @@ export function PublicMenuView() {
       {/* MODAL DE OPCIONES — WIZARD PASO A PASO */}
       <AnimatePresence>
         {selectedItemForOptions && (() => {
-          const grupos = selectedItemForOptions.opciones || [];
+          const grupos = availableOptionGroups(selectedItemForOptions.opciones || [], items, restaurante?.id || '');
           const totalSteps = grupos.length;
           const grupo = grupos[optionsStep];
           const seleccionados = grupo ? (selectedOptionsState[grupo.titulo] || {}) : {};
@@ -1902,13 +1909,14 @@ export function PublicMenuView() {
           const isLastStep = optionsStep === totalSteps - 1;
           const isFirstStep = optionsStep === 0;
 
-          const handleToggle = (opc: any) => {
+          const handleToggle = (opc: OpcionItem) => {
             if (!grupo) return;
             const isRadio = grupo.maximo_selecciones === 1;
+            if (optionsAdvanceTimer.current !== null) clearTimeout(optionsAdvanceTimer.current);
             // Auto-avance FUERA del updater para evitar doble llamada en StrictMode
             if (isRadio && !isLastStep) {
               // Usamos optionsStep directo para evitar que múltiples taps rápidos salten pasos (race condition)
-              setTimeout(() => setOptionsStep(optionsStep + 1), 200);
+              optionsAdvanceTimer.current = setTimeout(() => setOptionsStep(optionsStep + 1), 200);
             }
             setSelectedOptionsState(prev => {
               const groupState = { ...(prev[grupo.titulo] || {}) };
@@ -1928,6 +1936,7 @@ export function PublicMenuView() {
           };
 
           const handleNext = () => {
+            if (optionsAdvanceTimer.current !== null) clearTimeout(optionsAdvanceTimer.current);
             if (grupo?.requerido && countSelected === 0) {
               // Shake sin toast
               const btn = document.getElementById('wizard-next-btn');
@@ -1944,11 +1953,13 @@ export function PublicMenuView() {
               return;
             }
             if (isLastStep) {
+              const selectionError = validateOptionSelection(grupos, selectedOptionsState);
+              if (selectionError) { showToast('Revisa la selección', selectionError, 'error'); return }
               // Agregar al carrito
               let precioExtra = 0;
               const opcionesSel: OpcionSeleccionada[] = [];
-              grupos.forEach((g: any) => {
-                g.opciones.forEach((o: any) => {
+              grupos.forEach(g => {
+                g.opciones.forEach(o => {
                   if (selectedOptionsState[g.titulo]?.[o.nombre]) {
                     precioExtra += (o.precio_extra || 0);
                     opcionesSel.push({ 
@@ -1956,12 +1967,13 @@ export function PublicMenuView() {
                       grupo: g.titulo, 
                       opcion_id: o.id || o.nombre, 
                       opcion: o.nombre, 
-                      precio_extra: o.precio_extra || 0 
+                      precio_extra: o.precio_extra || 0,
+                      ...(o.menu_item_id ? { menu_item_id: o.menu_item_id } : {}),
                     });
                   }
                 });
               });
-              const hashId = selectedItemForOptions.id + '_' + opcionesSel.map((o: any) => o.opcion).sort().join('_');
+              const hashId = selectedItemForOptions.id + '_' + opcionesSel.map(o => `${o.grupo}:${o.menu_item_id || o.opcion}`).sort().join('_');
               const itemToAdd: CartItem = {
                 id: selectedItemForOptions.id,
                 cartItemId: hashId,
@@ -1983,8 +1995,8 @@ export function PublicMenuView() {
           };
 
           // Precio total acumulado hasta el paso actual
-           const precioActual = (selectedItemForOptions?.precio || 0) + grupos.reduce((sum: number, g: any) => {
-          return sum + g.opciones.reduce((s2: number, o: any) => {
+           const precioActual = (selectedItemForOptions?.precio || 0) + grupos.reduce((sum, g) => {
+          return sum + g.opciones.reduce((s2, o) => {
          return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? (o.precio_extra || 0) : 0);
          }, 0);
          }, 0); 
@@ -2105,10 +2117,11 @@ export function PublicMenuView() {
                         transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
                         className="px-5 py-5"
                       >
-                        {grupo.opciones.every((o: any) => !o.precio_extra || o.precio_extra === 0) ? (
+                        {grupo.opciones.length === 0 && <p role="alert" className="py-4 text-sm text-slate-700">Los productos de este grupo no están disponibles ahora. Elige otra promoción.</p>}
+                        {grupo.opciones.every(o => !o.precio_extra || o.precio_extra === 0) ? (
                           // ── Chips compactos (sin precio extra) ──
                           <div className="flex flex-wrap gap-2.5">
-                            {grupo.opciones.map((opc: any, oIdx: number) => {
+                            {grupo.opciones.map((opc, oIdx) => {
                               const isSelected = !!seleccionados[opc.nombre];
                               return (
                                 <motion.button
@@ -2117,7 +2130,8 @@ export function PublicMenuView() {
                                   onClick={() => handleToggle(opc)}
                                   whileTap={{ scale: 0.93 }}
                                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                  style={{ minHeight: '42px' }}
+                                  style={{ minHeight: '44px' }}
+                                  aria-pressed={isSelected}
                                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-semibold
                                     select-none whitespace-nowrap border-2
                                     transition-colors duration-200
@@ -2143,7 +2157,7 @@ export function PublicMenuView() {
                         ) : (
                           // ── Lista detallada (con precio extra) ──
                           <div className="space-y-1.5">
-                            {grupo.opciones.map((opc: any, oIdx: number) => {
+                            {grupo.opciones.map((opc, oIdx) => {
                               const isSelected = !!seleccionados[opc.nombre];
                               return (
                                 <motion.button
@@ -2153,6 +2167,7 @@ export function PublicMenuView() {
                                   whileTap={{ scale: 0.98 }}
                                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                                   style={{ minHeight: '56px' }}
+                                  aria-pressed={isSelected}
                                   className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl select-none border-2
                                     transition-colors duration-200
                                     ${isSelected

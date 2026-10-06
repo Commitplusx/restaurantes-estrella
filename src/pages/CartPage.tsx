@@ -29,6 +29,7 @@ interface OpcionSeleccionada {
   grupo_id: string;
   grupo: string;
   precio_extra: number;
+  menu_item_id?: string;
 }
 
 interface Restaurante {
@@ -767,6 +768,7 @@ export default function CartPage() {
 
     return {
       cliente_tel: clienteTel.replace(/\D/g, ''),
+      items: carrito,
       cliente_nombre: clienteNombre.trim(),
       restaurante: restaurante?.nombre || '',
       restaurante_id: restaurante?.id || null,

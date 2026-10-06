@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag, Settings2 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
 import { OpcionesEditor } from '../../components/OpcionesEditor'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuPromocion } from '../../lib/supabase'
+import { parseMenuOptionProducts, validateOptionGroups, type MenuOptionProduct } from '../../lib/menuOptions'
 
 const DIAS_SEMANA = [
   { id: 'lun', label: 'Lun' },
@@ -16,9 +17,17 @@ const DIAS_SEMANA = [
   { id: 'dom', label: 'Dom' },
 ]
 
+interface PromotionCatalog {
+  restaurantId: string;
+  promotions: MenuPromocion[];
+  products: MenuOptionProduct[];
+}
+
 export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
   const [promos, setPromos] = useState<MenuPromocion[]>([])
   const [loading, setLoading] = useState(true)
+  const [menuProducts, setMenuProducts] = useState<MenuOptionProduct[]>([])
+  const [loadedRestaurantId, setLoadedRestaurantId] = useState('')
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -47,26 +56,48 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     setUploadingImage(false)
   }
 
-  useEffect(() => {
-    loadData()
+  const loadData = useCallback(async (): Promise<PromotionCatalog> => {
+    const [promotions, menu] = await Promise.all([
+      supabase.from('menu_promociones').select('*').eq('restaurante_id', restaurante.id).order('created_at', { ascending: false }).limit(100),
+      supabase.from('menu_items').select('id,restaurante_id,nombre,precio,disponible').eq('restaurante_id', restaurante.id).order('nombre').limit(500),
+    ])
+    if (promotions.error || menu.error) {
+      throw new Error('No se pudieron cargar las promociones y el menú. Recarga antes de editar.')
+    }
+    const rawMenu: unknown = menu.data
+    return { restaurantId: restaurante.id, promotions: promotions.data || [], products: parseMenuOptionProducts(rawMenu, restaurante.id) }
   }, [restaurante.id])
+
+  const applyCatalog = useCallback((catalog: PromotionCatalog) => {
+    setPromos(catalog.promotions)
+    setMenuProducts(catalog.products)
+    setLoadedRestaurantId(catalog.restaurantId)
+    setLoading(false)
+  }, [])
+
+  const reportLoadError = useCallback((error: unknown) => {
+    setPromos([])
+    setMenuProducts([])
+    setLoadedRestaurantId(restaurante.id)
+    setLoading(false)
+    setErrorModal(error instanceof Error ? error.message : 'No se pudo leer el menú.')
+  }, [restaurante.id])
+
+  useEffect(() => {
+    let active = true
+    void loadData().then(catalog => { if (active) applyCatalog(catalog) }).catch(error => { if (active) reportLoadError(error) })
+    return () => { active = false }
+  }, [loadData, applyCatalog, reportLoadError])
 
   useEffect(() => {
     const channel = supabase
       .channel(`admin:promos:${restaurante.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_promociones', filter: `restaurante_id=eq.${restaurante.id}` }, () => {
-        loadData()
+        void loadData().then(applyCatalog).catch(reportLoadError)
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [restaurante.id])
-
-  async function loadData() {
-    setLoading(true)
-    const { data } = await supabase.from('menu_promociones').select('*').eq('restaurante_id', restaurante.id).order('created_at', { ascending: false })
-    setPromos(data || [])
-    setLoading(false)
-  }
+  }, [restaurante.id, loadData, applyCatalog, reportLoadError])
 
   const handleOpenModal = (item?: MenuPromocion) => {
     if (item) {
@@ -79,44 +110,45 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving || uploadingImage) return
     setSaving(true)
-    
-    // Validar grupos de opciones
-    const opciones = editingItem.opciones || []
-    for (let g = 0; g < opciones.length; g++) {
-      const grupo = opciones[g]
-      if (!grupo.titulo?.trim()) {
-        setErrorModal(`El Grupo de Opciones #${g + 1} no tiene nombre. Ponle un nombre o elimínalo.`)
-        setSaving(false)
-        return
+    try {
+      const options = editingItem.opciones || []
+      const linkedIds = [...new Set(options.flatMap(group => group.opciones.flatMap(option => option.menu_item_id ? [option.menu_item_id] : [])))]
+      let currentProducts = menuProducts
+      if (linkedIds.length) {
+        const { data, error } = await supabase.from('menu_items').select('id,restaurante_id,nombre,precio,disponible').eq('restaurante_id', restaurante.id).in('id', linkedIds)
+        if (error) throw new Error('No se pudieron verificar los productos. Intenta guardar de nuevo.')
+        const rawProducts: unknown = data
+        currentProducts = parseMenuOptionProducts(rawProducts, restaurante.id)
       }
-      if (grupo.opciones.length === 0) {
-        setErrorModal(`El grupo "${grupo.titulo}" no tiene ninguna opción. Agrega al menos una o elimina el grupo.`)
-        setSaving(false)
-        return
+      const validation = validateOptionGroups(options, currentProducts, restaurante.id)
+      if (validation) throw new Error(validation)
+      if (!editingItem.titulo?.trim()) throw new Error('Escribe el título de la promoción.')
+      if (typeof editingItem.precio_especial !== 'number' || !Number.isFinite(editingItem.precio_especial) || editingItem.precio_especial < 0) throw new Error('Escribe un precio válido para la promoción.')
+      const days = editingItem.dias_aplicacion ?? DIAS_SEMANA.map(day => day.id)
+      if (!days.length || days.some(day => !DIAS_SEMANA.some(allowed => allowed.id === day))) throw new Error('Selecciona los días en que aplica la promoción.')
+      const payload = {
+        restaurante_id: restaurante.id,
+        titulo: editingItem.titulo.trim(),
+        descripcion: editingItem.descripcion?.trim() || null,
+        precio_especial: editingItem.precio_especial,
+        foto_url: editingItem.foto_url || null,
+        fecha_fin: editingItem.fecha_fin || null,
+        activa: editingItem.activa ?? true,
+        aplica_subsidio: editingItem.aplica_subsidio ?? false,
+        dias_aplicacion: days,
+        opciones: options,
       }
-      for (let o = 0; o < grupo.opciones.length; o++) {
-        if (!grupo.opciones[o].nombre?.trim()) {
-          setErrorModal(`Una opción del grupo "${grupo.titulo}" no tiene nombre. Rellénala o elimínala.`)
-          setSaving(false)
-          return
-        }
-      }
-    }
-
-    const payload = { ...editingItem, restaurante_id: restaurante.id }
-    
-    if (payload.id) {
-      const { error } = await supabase.from('menu_promociones').update(payload).eq('id', payload.id)
-      if (error) { setErrorModal('Error al guardar: ' + error.message); setSaving(false); return }
-    } else {
-      const { error } = await supabase.from('menu_promociones').insert(payload)
-      if (error) { setErrorModal('Error al crear: ' + error.message); setSaving(false); return }
-    }
-    
-    await loadData()
-    setSaving(false)
-    setIsModalOpen(false)
+      const result = editingItem.id
+        ? await supabase.from('menu_promociones').update(payload).eq('id', editingItem.id).eq('restaurante_id', restaurante.id).select('id').single()
+        : await supabase.from('menu_promociones').insert(payload).select('id').single()
+      if (result.error) throw new Error('No se guardó la promoción: ' + result.error.message)
+      setIsModalOpen(false)
+      applyCatalog(await loadData())
+    } catch (error: unknown) {
+      setErrorModal(error instanceof Error ? error.message : 'No se pudo guardar la promoción.')
+    } finally { setSaving(false) }
   }
 
   const handleDelete = async (id: string) => {
@@ -127,11 +159,11 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     if (!itemToDelete) return
     const idToDelete = itemToDelete
     setItemToDelete(null) // hide modal early
-    const { error } = await supabase.from('menu_promociones').delete().eq('id', idToDelete)
+    const { error } = await supabase.from('menu_promociones').delete().eq('id', idToDelete).eq('restaurante_id', restaurante.id)
     if (error) {
       setErrorModal('Error al eliminar: ' + error.message)
     }
-    await loadData()
+    void loadData().then(applyCatalog).catch(reportLoadError)
   }
 
   const toggleActiva = async (item: MenuPromocion) => {
@@ -139,7 +171,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     // Optimistic UI
     setPromos(promos.map(i => i.id === item.id ? { ...i, activa: newVal } : i))
     
-    const { error } = await supabase.from('menu_promociones').update({ activa: newVal }).eq('id', item.id)
+    const { error } = await supabase.from('menu_promociones').update({ activa: newVal }).eq('id', item.id).eq('restaurante_id', restaurante.id)
     if (error) {
       // Rollback
       setPromos(promos.map(i => i.id === item.id ? { ...i, activa: item.activa } : i))
@@ -147,7 +179,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
     }
   }
 
-  if (loading) return <div className="text-muted text-center py-10">Cargando promociones...</div>
+  if (loading || loadedRestaurantId !== restaurante.id) return <div className="text-muted text-center py-10">Cargando promociones...</div>
 
   return (
     <div className="pb-24">
@@ -211,14 +243,14 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
               
               <div className="flex sm:flex-col items-center sm:items-end justify-between border-t border-slate-100 sm:border-0 pt-4 sm:pt-0 mt-4 sm:mt-0 sm:pl-4 sm:border-l shrink-0">
                 <label className="toggle">
-                  <input type="checkbox" checked={promo.activa} onChange={() => toggleActiva(promo)} />
+                  <input type="checkbox" aria-label={`Activar ${promo.titulo}`} checked={promo.activa} onChange={() => toggleActiva(promo)} />
                   <span className="toggle-slider"></span>
                 </label>
                 <div className="flex flex-row gap-1">
-                  <button className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleOpenModal(promo)}>
+                  <button aria-label={`Editar ${promo.titulo}`} className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleOpenModal(promo)}>
                     <Edit2 size={16} />
                   </button>
-                  <button className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleDelete(promo.id)}>
+                  <button aria-label={`Eliminar ${promo.titulo}`} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleDelete(promo.id)}>
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -242,6 +274,8 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
             opciones={editingItem.opciones || []}
             onChange={(ops) => setEditingItem({ ...editingItem, opciones: ops })}
             onClose={() => setIsEditingOptions(false)}
+            menuProducts={menuProducts}
+            restaurantId={restaurante.id}
           />
         ) : (
         <form onSubmit={handleSave} className="flex flex-col gap-5">
@@ -316,7 +350,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h3 className="font-black text-slate-800">Opciones y Extras</h3>
-                <p className="text-xs text-slate-500 mt-1">Configura Variantes o Extras para esta promoción.</p>
+                <p className="text-sm text-slate-600 mt-1">Elige productos de tu menú para cada grupo o agrega extras con costo.</p>
               </div>
             </div>
             
@@ -363,7 +397,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
             </div>
           </div>
 
-          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving || editingItem.dias_aplicacion?.length === 0}>
+          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving || uploadingImage || editingItem.dias_aplicacion?.length === 0}>
             {saving ? (
               <>
                 <Loader2 size={20} className="animate-spin" />

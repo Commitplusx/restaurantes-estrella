@@ -69,17 +69,8 @@ export interface MenuCategoria {
   activa: boolean
 }
 
-export interface OpcionItem {
-  nombre: string
-  precio_extra: number
-}
-
-export interface OpcionGrupo {
-  titulo: string
-  requerido: boolean
-  maximo_selecciones: number
-  opciones: OpcionItem[]
-}
+import type { OpcionGrupo } from './menuOptions'
+export type { OpcionItem, OpcionGrupo } from './menuOptions'
 
 export interface MenuItem {
   id: string
@@ -124,7 +115,7 @@ export interface MenuPromocion {
   activa: boolean
   aplica_subsidio?: boolean
   dias_aplicacion?: string[]
-  opciones?: any[]
+  opciones?: OpcionGrupo[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -176,7 +167,7 @@ export async function getMyRestaurante(): Promise<Restaurante | null> {
   if (authError) throw authError
   if (!user) return null
 
-  let query = supabase
+  const query = supabase
     .from('restaurantes')
     .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo, mp_access_token, acepta_pago_online, es_matriz, matriz_id, nombre_sucursal')
     .eq('admin_id', user.id)

@@ -1,30 +1,24 @@
 import { useState } from 'react'
-import { Plus, Trash2, X, ChevronLeft, Settings2 } from 'lucide-react'
+import { Plus, Trash2, X, ChevronLeft, Settings2, Search, Link2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-interface Opcion {
-  nombre: string
-  precio_extra: number
-}
-
-interface GrupoOpciones {
-  titulo: string
-  requerido: boolean
-  maximo_selecciones: number
-  opciones: Opcion[]
-}
+import { optionFromMenu, validateOptionGroups, type MenuOptionProduct, type OpcionGrupo } from '../lib/menuOptions'
 
 interface OpcionesEditorProps {
-  opciones: GrupoOpciones[]
-  onChange: (opciones: GrupoOpciones[]) => void
+  opciones: OpcionGrupo[]
+  onChange: (opciones: OpcionGrupo[]) => void
   onClose: () => void
+  menuProducts?: MenuOptionProduct[]
+  restaurantId?: string
 }
 
-export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorProps) {
+export function OpcionesEditor({ opciones, onChange, onClose, menuProducts, restaurantId }: OpcionesEditorProps) {
   const [editingGroupIndex, setEditingGroupIndex] = useState<number | 'new' | null>(null)
+  const [menuSearch, setMenuSearch] = useState('')
+  const [groupError, setGroupError] = useState<string | null>(null)
   
   // Local state for the group currently being edited
-  const [currentGroup, setCurrentGroup] = useState<GrupoOpciones>({
+  const [currentGroup, setCurrentGroup] = useState<OpcionGrupo>({
     titulo: '',
     requerido: false,
     maximo_selecciones: 1,
@@ -32,6 +26,8 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
   })
 
   const openNewGroup = () => {
+    setGroupError(null)
+    setMenuSearch('')
     setCurrentGroup({
       titulo: '',
       requerido: false,
@@ -42,8 +38,9 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
   }
 
   const openEditGroup = (index: number) => {
-    // Make a deep copy to avoid mutating the original until saved
-    setCurrentGroup(JSON.parse(JSON.stringify(opciones[index])))
+    setGroupError(null)
+    setMenuSearch('')
+    setCurrentGroup({ ...opciones[index], opciones: opciones[index].opciones.map(option => ({ ...option })) })
     setEditingGroupIndex(index)
   }
 
@@ -60,6 +57,11 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
     const cleanedGroup = {
       ...currentGroup,
       opciones: currentGroup.opciones.filter(op => op.nombre.trim() !== '')
+    }
+    const validation = validateOptionGroups([cleanedGroup], menuProducts, restaurantId)
+    if (validation) { setGroupError(validation); return }
+    if (opciones.some((group, index) => index !== editingGroupIndex && group.titulo.trim() === cleanedGroup.titulo.trim())) {
+      setGroupError('Usa un nombre distinto para cada grupo.'); return
     }
 
     const newOps = [...opciones]
@@ -144,6 +146,25 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
           </div>
 
           <div className="border-t border-slate-100 pt-6">
+            {menuProducts && <details className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <summary className="min-h-11 cursor-pointer font-bold text-slate-800 flex items-center gap-2"><Link2 size={18} /> Elegir productos del menú</summary>
+              <p className="text-sm text-slate-600 mt-2 mb-3">Marca los productos que entran en este grupo. Se incluyen sin costo adicional; puedes ajustar el extra abajo.</p>
+              <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 mb-3">
+                <Search size={18} aria-hidden="true" />
+                <input aria-label="Buscar productos del menú" type="search" className="min-w-0 w-full py-3 bg-transparent text-base outline-none" placeholder="Buscar por nombre" value={menuSearch} onChange={event => setMenuSearch(event.target.value)} />
+              </label>
+              <div className="max-h-64 overflow-y-auto space-y-1">
+                {menuProducts.filter(product => product.nombre.toLocaleLowerCase('es').includes(menuSearch.toLocaleLowerCase('es'))).map(product => {
+                  const checked = currentGroup.opciones.some(option => option.menu_item_id === product.id)
+                  return <label key={product.id} className="flex items-center gap-3 min-h-12 p-2 rounded-lg hover:bg-white cursor-pointer">
+                    <input type="checkbox" className="w-5 h-5 accent-blue-600 shrink-0" checked={checked} onChange={() => setCurrentGroup(group => ({ ...group, opciones: checked ? group.opciones.filter(option => option.menu_item_id !== product.id) : [...group.opciones, optionFromMenu(product)] }))} />
+                    <span className="flex-1 min-w-0 text-sm text-slate-800">{product.nombre}{!product.disponible && <span className="block text-xs text-slate-600">No disponible ahora</span>}</span>
+                    <span className="text-sm text-slate-600">${product.precio.toFixed(2)}</span>
+                  </label>
+                })}
+                {!menuProducts.some(product => product.nombre.toLocaleLowerCase('es').includes(menuSearch.toLocaleLowerCase('es'))) && <p className="py-4 text-sm text-slate-600">No hay productos con ese nombre.</p>}
+              </div>
+            </details>}
             <div className="flex items-center justify-between mb-4">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Opciones disponibles</label>
               <button 
@@ -176,6 +197,8 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
                         placeholder="Ej. Mango Habanero" 
                         className="w-full px-3 py-2 border-none bg-transparent rounded-lg text-sm font-semibold outline-none focus:bg-slate-50 focus:ring-2 focus:ring-blue-100 transition-all" 
                         value={opc.nombre} 
+                        readOnly={Boolean(opc.menu_item_id)}
+                        aria-label={opc.menu_item_id ? `Producto del menú: ${opc.nombre}` : `Nombre de opción ${oIndex + 1}`}
                         onChange={e => {
                           const newOps = [...currentGroup.opciones];
                           newOps[oIndex].nombre = e.target.value;
@@ -192,6 +215,7 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
                         placeholder="0.00" 
                         className="w-16 border-none bg-transparent text-sm font-bold text-slate-800 outline-none text-right" 
                         value={opc.precio_extra || ''} 
+                        aria-label={`Costo adicional de ${opc.nombre || `opción ${oIndex + 1}`}`}
                         onChange={e => {
                           const newOps = [...currentGroup.opciones];
                           newOps[oIndex].precio_extra = parseFloat(e.target.value) || 0;
@@ -201,6 +225,7 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
                     </div>
                     <button 
                       type="button" 
+                      aria-label={`Eliminar opción ${opc.nombre || oIndex + 1}`}
                       onClick={() => {
                         const newOps = [...currentGroup.opciones];
                         newOps.splice(oIndex, 1);
@@ -236,7 +261,8 @@ export function OpcionesEditor({ opciones, onChange, onClose }: OpcionesEditorPr
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-100 mt-auto shrink-0 flex gap-3 bg-white">
+        <div className="pt-4 border-t border-slate-100 mt-auto shrink-0 flex flex-wrap gap-3 bg-white">
+          {groupError && <p role="alert" className="basis-full text-sm text-red-700">{groupError}</p>}
           <button 
             type="button"
             onClick={() => setEditingGroupIndex(null)}
