@@ -20,6 +20,7 @@ export function useDeliveryCalculation(ubicacionGPS: UbicacionGPS | null, tipoEn
       if (tipoEntrega !== 'domicilio' || !ubicacionGPS) {
         setCostoEnvioBase(0);
         setFueraDeCobertura(false);
+        setCalculandoEnvio(false);
         return;
       }
 
@@ -28,12 +29,10 @@ export function useDeliveryCalculation(ubicacionGPS: UbicacionGPS | null, tipoEn
       try {
         const hexIndex = h3.latLngToCell(ubicacionGPS.lat, ubicacionGPS.lng, 10);
         
-        // Artificial delay for UX
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
+
         if (!isMounted) return;
 
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('h3_zonas')
           .select('precio, nombre')
           .eq('h3_index', hexIndex)
@@ -41,15 +40,18 @@ export function useDeliveryCalculation(ubicacionGPS: UbicacionGPS | null, tipoEn
           
         if (!isMounted) return;
 
-        if (data && data.precio !== undefined) {
-          setCostoEnvioBase(data.precio);
+        if (error) throw error;
+        if (data && Number.isFinite(Number(data.precio)) && Number(data.precio) >= 0) {
+          setCostoEnvioBase(Number(data.precio));
         } else {
           setCostoEnvioBase(0);
           setFueraDeCobertura(true);
         }
       } catch (err) {
         if (!isMounted) return;
-        console.error("Error calculando envío H3:", err);
+        setCostoEnvioBase(0);
+        setFueraDeCobertura(true);
+        console.error("delivery_quote_failed", err instanceof Error ? err.name : "request_failed");
       } finally {
         if (isMounted) {
           setCalculandoEnvio(false);

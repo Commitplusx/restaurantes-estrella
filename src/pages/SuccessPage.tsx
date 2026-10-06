@@ -1,218 +1,113 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CheckCircle2, Loader2, AlertCircle, ShoppingBag, Truck, User, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { OrderProgressBar } from '../components/OrderProgressBar';
+import { receiptState, acceptedDriver, parseOrderReceipt } from '../utils/orderState';
+import type { OrderReceipt } from '../utils/orderState';
 
 export function SuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const pedidoId = searchParams.get('pedido');
   const orderId = searchParams.get('order_id');
-  const successParam = searchParams.get('success');
-  const paymentStatus = searchParams.get('payment_status');
-  const statusParam = searchParams.get('status');
-  
-  const isSuccess = successParam === 'true' || paymentStatus === 'paid' || statusParam === 'approved';
-
   const [status, setStatus] = useState<'loading' | 'validating' | 'success' | 'error'>('loading');
-  const [pedido, setPedido] = useState<any>(null);
+  const [pedido, setPedido] = useState<OrderReceipt | null>(null);
   const [repartidorInfo, setRepartidorInfo] = useState<{ nombre: string; alias?: string } | null>(null);
   const [repartidorRecienAsignado, setRepartidorRecienAsignado] = useState(false);
-  // Ref to avoid stale closure bugs in async callbacks (BUG 1 fix)
-  const resolvedRef = useRef(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const confettiFiredRef = useRef(false);
-  const pollIntervalRef = useRef<any>(null);
-  const repartidorFetchedRef = useRef(false);
-
-  const fetchRepartidor = useCallback(async (repartidorId: string) => {
-    if (repartidorFetchedRef.current || !repartidorId) return;
-    repartidorFetchedRef.current = true;
-    const { data } = await supabase
-      .from('repartidores')
-      .select('nombre, alias')
-      .or(`user_id.eq.${repartidorId},id.eq.${repartidorId}`) // Busca tanto por UID como por PK directo
-      .maybeSingle();
-    if (data) {
-      setRepartidorInfo(data);
-      setRepartidorRecienAsignado(true);
-      setTimeout(() => setRepartidorRecienAsignado(false), 5000);
-    }
-  }, []);
 
   useEffect(() => {
-    if (!pedidoId && !orderId) {
+    const reference = pedidoId || orderId;
+    if (!reference || !/^(?:[A-Z0-9]{6}|[0-9a-f-]{36})$/i.test(reference)) {
       setStatus('error');
       return;
     }
-
-    // Reset refs on each mount (BUG 1 + 8 fix)
-    resolvedRef.current = false;
+    let disposed = false;
+    let fetching = false;
+    let failedReads = 0;
+    let resolved = false;
+    let driverId: string | null = null;
+    let driverRequest = 0;
+    let driverTimer: ReturnType<typeof setTimeout> | undefined;
+    setStatus('loading');
+    setPedido(null);
+    setRepartidorInfo(null);
     confettiFiredRef.current = false;
-    let checkChannel: any = null;
-    let timeoutId: any = null;
 
-    const fireOnce = () => {
-      if (!confettiFiredRef.current) {
+    const apply = (order: OrderReceipt) => {
+      if (disposed) return;
+      setPedido(order);
+      const state = receiptState(order);
+      resolved = state === 'success';
+      setStatus(state);
+      if (resolved && !['cancelado', 'rechazado'].includes(order.estado) && !confettiFiredRef.current) {
         confettiFiredRef.current = true;
         fireConfetti();
       }
+      if (['entregado', 'cancelado', 'rechazado'].includes(order.estado)) localStorage.removeItem('est_active_order');
+      else if (resolved) localStorage.setItem('est_active_order', order.id);
+      const nextDriver = acceptedDriver(order);
+      if (nextDriver === driverId) return;
+      driverId = nextDriver;
+      const request = ++driverRequest;
+      setRepartidorInfo(null);
+      setRepartidorRecienAsignado(false);
+      if (!nextDriver) return;
+      void supabase.from('repartidores').select('nombre, alias').eq('user_id', nextDriver).maybeSingle().then(({data, error}) => {
+        if (disposed || request !== driverRequest) return;
+        if (error || !data) { driverId = null; return; }
+        setRepartidorInfo(data);
+        setRepartidorRecienAsignado(true);
+        if (driverTimer) clearTimeout(driverTimer);
+        driverTimer = setTimeout(() => { if (!disposed) setRepartidorRecienAsignado(false); }, 5000);
+      });
     };
 
-    const resolveSuccess = (newPedido: any) => {
-      if (resolvedRef.current) return;
-      resolvedRef.current = true;
-      // Clear poll if running (BUG 1 fix)
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-      setStatus('success');
-      setPedido(newPedido);
-      fireOnce();
-      sessionStorage.removeItem('est_carrito');
-      sessionStorage.removeItem('est_checkoutstep');
-      sessionStorage.removeItem('est_tipoentrega');
-      
-      // Guardar el pedido en localStorage para el Floating Tracker
-      if (newPedido && !['entregado', 'cancelado', 'rechazado'].includes(newPedido.estado)) {
-        localStorage.setItem('est_active_order', newPedido.id);
-      } else {
-        localStorage.removeItem('est_active_order');
-      }
-    };
-
-    const RESOLVED_STATES = ['pendiente', 'pagado', 'asignado', 'recibido', 'preparando', 'en_camino', 'entregado', 'en_cocina', 'listo_para_recoger'];
-
-      const fetchPedido = async (retries = 3) => {
+    const read = async () => {
+      if (disposed || fetching) return;
+      fetching = true;
       try {
-        let query = supabase.from('pedidos').select('*');
-        if (pedidoId) {
-          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pedidoId);
-          if (isUUID) {
-            query = query.eq('id', pedidoId);
-          } else {
-            query = query.eq('wb_message_id', pedidoId);
-          }
-        } else if (orderId) {
-          query = query.eq('id', orderId);  // orderId viene de la URL cuando se usa flujo de pago externo
-        }
-        
-        const { data: pedidoData, error } = await query.single();
-        console.log("SuccessPage DEBUG - ID buscado:", pedidoId || orderId);
-        console.log("SuccessPage DEBUG - Resultado query:", pedidoData, "Error:", error);
-
-        if (error || !pedidoData) {
-          if (retries > 0) {
-            setTimeout(() => fetchPedido(retries - 1), 2000);
-            return;
-          }
-          setStatus('error');
-          return;
-        }
-
-        setPedido(pedidoData);
-        
-        // BUG FIX: Si ya tiene repartidor al cargar la página, traer sus datos
-        if (pedidoData.repartidor_id && !repartidorFetchedRef.current) {
-          fetchRepartidor(pedidoData.repartidor_id);
-        }
-
-        if (RESOLVED_STATES.includes(pedidoData.estado)) {
-          // Ya estaba confirmado, configuramos el canal de progreso continuo
-          resolveSuccess(pedidoData);
-        } else {
-          // Esperando confirmación de pago
-          setStatus('validating');
-          
-          // Fallback manual cada 3 segundos
-          pollIntervalRef.current = setInterval(async () => {
-            const { data: refreshData } = await supabase
-              .from('pedidos')
-              .select('*')
-              .eq('id', pedidoData.id)
-              .single();
-            if (refreshData) {
-              setPedido(refreshData); // Siempre actualizamos el estado
-              if (RESOLVED_STATES.includes(refreshData.estado)) {
-                resolveSuccess(refreshData);
-              }
-            }
-          }, 3000);
-          
-          // Timeout de 15 segundos para el fallback
-          timeoutId = setTimeout(() => {
-            if (!resolvedRef.current) {
-              if (pollIntervalRef.current) {
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
-              }
-              // Si pasaron 8 segundos y no llegó el webhook, pero la URL dice que pagó, 
-              // forzamos el éxito para no dejar al usuario atascado.
-              if (isSuccess) {
-                resolveSuccess(pedidoData);
-              } else {
-                setStatus('error');
-              }
-            }
-          }, 8000);
-        }
-
-        // UNIFICADO: Un solo canal de realtime que siempre actualiza la UI
-        checkChannel = supabase.channel(`pedido-updates-${pedidoData.id}-${Date.now()}`)
-          .on(
-            'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoData.id}` },
-            (payload) => {
-              const newData = payload.new;
-              setPedido((prev: any) => prev ? { ...prev, ...newData } : newData);
-
-              // Si acaba de asignarse un repartidor, hacer fetch de sus datos
-              if (newData.repartidor_id && !repartidorFetchedRef.current) {
-                fetchRepartidor(newData.repartidor_id);
-              }
-              
-              if (['entregado', 'cancelado', 'rechazado'].includes(newData.estado)) {
-                localStorage.removeItem('est_active_order');
-              } else {
-                localStorage.setItem('est_active_order', newData.id);
-              }
-
-              if (RESOLVED_STATES.includes(newData.estado)) {
-                resolveSuccess(newData);
-              }
-            }
-          )
-          .subscribe();
-
-      } catch (err) {
-        if (retries > 0) {
-          setTimeout(() => fetchPedido(retries - 1), 2000);
-          return;
-        }
-        setStatus('error');
-      }
+        const field = reference.length === 36 ? 'id' : 'wb_message_id';
+        const {data, error} = await supabase.from('pedidos').select('*').eq(field, reference).single<unknown>();
+        if (disposed) return;
+        if (error || !data) throw new Error('No se pudo consultar el pedido.');
+        failedReads = 0;
+        apply(parseOrderReceipt(data));
+      } catch {
+        if (!disposed && ++failedReads >= 3) setStatus('error');
+      } finally { fetching = false; }
     };
-
-    fetchPedido();
-
+    void read();
+    const poll = setInterval(() => { if (failedReads < 3) void read(); }, 5000);
+    const confirmationTimeout = setTimeout(() => {
+      if (!disposed && !resolved) setStatus('error');
+    }, 30000);
+    const channel = supabase.channel('receipt-' + reference)
+      .on('postgres_changes', {event: 'UPDATE', schema: 'public', table: 'pedidos', filter: (reference.length === 36 ? 'id' : 'wb_message_id') + '=eq.' + reference}, () => { void read(); })
+      .subscribe();
+    const resume = () => { if (document.visibilityState === 'visible') { failedReads = 0; void read(); } };
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('online', resume);
     return () => {
-      if (checkChannel) supabase.removeChannel(checkChannel);
-      if (timeoutId) clearTimeout(timeoutId);
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      disposed = true;
+      clearInterval(poll);
+      clearTimeout(confirmationTimeout);
+      if (driverTimer) clearTimeout(driverTimer);
+      document.removeEventListener('visibilitychange', resume);
+      window.removeEventListener('online', resume);
+      void supabase.removeChannel(channel);
     };
-  }, [pedidoId, orderId, isSuccess, fetchRepartidor]);
+  }, [pedidoId, orderId, reloadKey]);
 
   /** Genera el número corto de orden: EST-XXXXX
    *  Misma lógica que generarNumeroOrden() en utils.ts y PedidosView.
    *  Fuente de verdad: últimos 5 caracteres del UUID sin guiones.
    */
-  const getShortTicket = (pedidoRef: any | null) => {
+  const getShortTicket = (pedidoRef: OrderReceipt | null) => {
     if (!pedidoRef) return 'EST-00000';
     if (pedidoRef.wb_message_id) return '#' + pedidoRef.wb_message_id;
     return 'EST-' + pedidoRef.id.replace(/-/g, '').slice(-5).toUpperCase();
@@ -277,7 +172,7 @@ export function SuccessPage() {
               className="bg-white rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] p-10 w-full flex flex-col items-center text-center border border-slate-100 max-w-md mx-auto"
             >
               <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6 overflow-hidden">
-                {isSuccess ? (
+                {status === 'validating' ? (
                   <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
                 ) : (
                   <motion.div
@@ -289,10 +184,10 @@ export function SuccessPage() {
                 )}
               </div>
               <h2 className="text-2xl font-black text-slate-800 mb-2">
-                {isSuccess ? 'Validando Pago' : 'Cargando tu recibo'}
+                {status === 'validating' ? 'Esperando confirmación' : 'Cargando tu recibo'}
               </h2>
               <p className="text-slate-500 font-medium">
-                {isSuccess ? 'Estamos confirmando tu depósito con el banco. Por favor no cierres esta ventana.' : 'Estamos obteniendo los detalles de tu envío...'}
+                {status === 'validating' ? 'Tu pago todavía no está confirmado por el servidor.' : 'Estamos obteniendo los detalles de tu envío...'}
               </p>
             </motion.div>
           ) : status === 'error' ? (
@@ -306,8 +201,9 @@ export function SuccessPage() {
                 <div className="absolute inset-0 bg-red-500/10"></div>
                 <AlertCircle className="w-10 h-10 text-red-500 relative z-10" />
               </div>
-              <h2 className="text-2xl font-black text-slate-800 mb-2">Pago no encontrado</h2>
-              <p className="text-slate-500 mb-8 font-medium">Hubo un problema validando el ticket de tu compra. Si ya se descontó el saldo, por favor contacta al restaurante.</p>
+              <h2 className="text-2xl font-black text-slate-800 mb-2">No pudimos confirmar tu pedido</h2>
+              <p className="text-slate-500 mb-8 font-medium">No hagas otro pedido todavía. Vuelve a consultar para comprobar si se registró.</p>
+              <button onClick={() => setReloadKey(key => key + 1)} className="w-full py-4 mb-3 bg-blue-700 text-white font-bold rounded-[20px]">Volver a consultar</button>
               <button 
                 onClick={() => navigate('/')}
                 className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-[20px] transition-colors"
@@ -475,10 +371,10 @@ export function SuccessPage() {
                       <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Cliente</span>
                       <span className="text-slate-800 font-bold text-sm truncate">{pedido?.cliente_nombre}</span>
                     </div>
-                    {pedido?.notas && (
+                    {pedido?.metodo_pago && (
                       <div className="flex flex-col col-span-2">
                         <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Método de Pago / Notas</span>
-                        <span className="text-slate-800 font-bold text-sm capitalize">{pedido.notas}</span>
+                        <span className="text-slate-800 font-bold text-sm capitalize">{pedido.metodo_pago}</span>
                       </div>
                     )}
                   </div>
