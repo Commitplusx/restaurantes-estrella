@@ -1921,7 +1921,7 @@ export function PublicMenuView() {
             setSelectedOptionsState(prev => {
               const groupState = { ...(prev[grupo.titulo] || {}) };
               if (isRadio) {
-                return { ...prev, [grupo.titulo]: { [opc.nombre]: true } };
+                return { ...prev, [grupo.titulo]: !grupo.requerido && groupState[opc.nombre] ? {} : { [opc.nombre]: true } };
               } else {
                 const already = !!groupState[opc.nombre];
                 if (already) {
@@ -2044,7 +2044,7 @@ export function PublicMenuView() {
                         </p>
                       )}
                       {grupo?.maximo_selecciones === 1 && (
-                        <p className="text-[13px] text-slate-400 mt-1">Elige 1 opción</p>
+                        <p className="text-[13px] text-slate-600 mt-1">{grupo.requerido ? 'Elige 1 opción' : 'Opcional: elige 1 o continúa sin extras.'}</p>
                       )}
                     </div>
                     <button
