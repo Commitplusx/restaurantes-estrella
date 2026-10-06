@@ -50,6 +50,7 @@ function ActionButton({ onClick, children, className, loadingText = "Cargando...
 export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight }: { restaurante: Restaurante, highlightedPedidoId?: string | null, onClearHighlight?: () => void }) {
   const [pedidos, setPedidos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [kitchenError, setKitchenError] = useState<string | null>(null)
   const [pedidoToPrepare, setPedidoToPrepare] = useState<any>(null)
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'denied'
@@ -320,56 +321,37 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   }
 
   const updateEstado = async (id: string, nuevoEstado: string, tiempoMinutos?: number) => {
-    console.log(`[updateEstado] INICIANDO - ID: ${id} | Nuevo: ${nuevoEstado} | Tiempo: ${tiempoMinutos}`)
-    // Guardar estado previo para rollback
-    const pedidoActual = pedidos.find(p => p.id === id);
-    const estadoPrevio = pedidoActual?.estado_cocina
-    console.log(`[updateEstado] Estado previo guardado: ${estadoPrevio}`)
+    setKitchenError(null);
     try {
-      // Actualización optimista del UI
-      setPedidos((prev) =>
-        prev.map((p) => (
-          p.id === id 
-            ? { 
-                ...p, 
-                estado_cocina: nuevoEstado, 
-                ...(nuevoEstado === 'en_cocina' ? { estado: 'buscando_repartidor' } : {}) 
-              } 
-            : p
-        ))
-      )
-      
-      const updateData: any = { estado_cocina: nuevoEstado }
-      if (tiempoMinutos) {
-        updateData.tiempo_preparacion_minutos = tiempoMinutos
-      }
-      // Cuando el restaurante acepta y manda a cocina, activar la búsqueda de repartidor
+      const current = pedidos.find(order => order.id === id);
+      if (!current || !['en_cocina','listo_para_recoger','entregado'].includes(nuevoEstado)) throw new Error('Vuelve a consultar el pedido antes de cambiarlo.');
+      const expected = current.estado_cocina ?? null;
+      if ((nuevoEstado === 'en_cocina' && expected !== null && expected !== 'pendiente')
+        || (nuevoEstado === 'listo_para_recoger' && expected !== 'en_cocina')
+        || (nuevoEstado === 'entregado' && (expected !== 'listo_para_recoger' || current.tipo_pedido !== 'tienda'))) throw new Error('El pedido ya cambió de etapa. Actualiza la vista.');
       if (nuevoEstado === 'en_cocina') {
-        updateData.estado = 'buscando_repartidor'
+        if (!Number.isInteger(tiempoMinutos) || !tiempoMinutos || tiempoMinutos < 1 || tiempoMinutos > 180) throw new Error('Elige un tiempo de preparación entre 1 y 180 minutos.');
       }
-      
-      console.log(`[updateEstado] Objeto a enviar a Supabase:`, updateData)
-      const { error, data } = await supabase.from('pedidos').update(updateData).eq('id', id).select()
-      
-      if (error) {
-        console.error(`[updateEstado] ERROR SUPABASE UPDATE:`, JSON.stringify(error, null, 2))
-        throw error
-      }
-      console.log(`[updateEstado] EXITO SUPABASE:`, data)
-
-      // NOTA: Si cambia de estado en cocina, el Webhook de BD ahora detectará
-      // el UPDATE y disparará automáticamente 'notificar-whatsapp' y 'asignar-repartidor'.
-      setPedidoToPrepare(null)
-    } catch (e) {
-      console.error('Error actualizando estado, revirtiendo:', e)
-      // Rollback: restaurar el estado previo en el UI
-      if (estadoPrevio) {
-        setPedidos((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, estado_cocina: estadoPrevio } : p))
-        )
-      }
+      const {data: result, error} = await supabase.rpc('cambiar_estado_cocina', {
+        p_pedido_id: id, p_estado_nuevo: nuevoEstado, p_estado_esperado: expected, p_minutos: tiempoMinutos ?? null,
+      }).returns<unknown>();
+      const raw = result && typeof result === 'object' && !Array.isArray(result) && 'pedido' in result ? result.pedido : null;
+      if (error || !raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('No se guardó el cambio en cocina. Vuelve a consultar el pedido.');
+      const data = raw as Record<string, unknown>;
+      if (data.id !== id || data.estado_cocina !== nuevoEstado || typeof data.estado !== 'string' || typeof data.updated_at !== 'string') throw new Error('No se confirmó el cambio en cocina. Vuelve a consultar el pedido.');
+      const updatedAt = Date.parse(data.updated_at);
+      if (!Number.isFinite(updatedAt)) throw new Error('No se confirmó la fecha del cambio en cocina.');
+      setPedidos(previous => previous.map(order => {
+        if (order.id !== id) return order;
+        if (order.updated_at && Date.parse(order.updated_at) > updatedAt) return order;
+        return {...order, ...data};
+      }));
+      setPedidoToPrepare(null);
+    } catch (error: unknown) {
+      setKitchenError(error instanceof Error ? error.message : 'No se pudo actualizar el pedido.');
+      console.error('kitchen_update_failed');
     }
-  }
+  };
 
   // Ahora las columnas se filtran reaccionando también al estado del repartidor (Global)
   const pedidosActivos = pedidos.filter(p => p.estado !== 'cancelado')
@@ -385,6 +367,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
+      {kitchenError && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-800">{kitchenError}</p>}
       {/* Audio oculto */}
       <audio id="alarm-audio" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
 
@@ -462,14 +445,14 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
         >
           <AnimatePresence>
             {listos.map(p => {
-              const driverCerca = p.estado === 'asignado' || p.estado === 'buscando_repartidor'
+              const pickup = p.tipo_pedido === 'tienda';
               return (
                 <PedidoCard
                   key={p.id}
                   pedido={p}
-                  actionLabel={driverCerca ? 'Entregar' : 'Cerrar'}
+                  actionLabel={pickup ? 'Entregado al cliente' : 'Esperando recogida del repartidor'}
                   actionColor="bg-slate-700 hover:bg-slate-800"
-                  onAction={() => updateEstado(p.id, 'entregado')}
+                  onAction={pickup ? () => updateEstado(p.id, 'entregado') : undefined}
                 />
               )
             })}
@@ -483,7 +466,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
       <BottomSheet isOpen={!!pedidoToPrepare} onClose={() => setPedidoToPrepare(null)} title="¿Cuánto tiempo tardará?">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-slate-500 leading-relaxed">
-            Elige el tiempo estimado de preparación. El cliente recibirá una notificación y asignaremos un repartidor.
+            Elige el tiempo estimado de preparación. El cliente recibirá el aviso; los pedidos a domicilio buscarán repartidor.
           </p>
           <div className="grid grid-cols-3 gap-2">
             {[15, 20, 25, 35, 45, 60].map(mins => (
@@ -529,7 +512,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
   pedido: any
   actionLabel: string
   actionColor: string
-  onAction: () => void
+  onAction?: () => Promise<void> | void
   isHighlighted?: boolean
 }) {
   let items: any[] = []
@@ -668,7 +651,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
 
       {/* ── Botón acción ── */}
       <div className="px-3 pb-3 pt-1">
-        <ActionButton
+        {onAction ? <ActionButton
           onClick={onAction}
           className={`w-full py-2.5 rounded-xl font-bold text-[13px] text-white shadow-sm hover:shadow transition-all active:scale-[0.98] ${
             actionColor.includes('orange') 
@@ -680,7 +663,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
           loadingText="Procesando..."
         >
           {actionLabel}
-        </ActionButton>
+        </ActionButton> : <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-center text-xs font-semibold text-slate-600">{actionLabel}. La recogida se confirma en la app.</p>}
       </div>
     </motion.div>
   )
