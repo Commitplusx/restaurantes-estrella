@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useLoadScript, GoogleMap } from '@react-google-maps/api';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
+import { ACTIVE_ORDER_STATES } from '../utils/orderState';
 
 // Interfaces
 interface CartItem {
@@ -122,7 +123,7 @@ export default function CartPage() {
   const cuponValido = useCartStore(state => state.cuponValido);
   const setCuponValido = useCartStore(state => state.setCuponValido);
   
-  const metodoPago = useCartStore(state => state.metodoPago);
+  const metodoPago = 'efectivo';
   const setMetodoPago = useCartStore(state => state.setMetodoPago);
 
   const [pinError, setPinError] = useState(false);
@@ -142,6 +143,7 @@ export default function CartPage() {
   const [buscandoGPS, setBuscandoGPS] = useState(false);
   const [draftUbicacion, setDraftUbicacion] = useState<{lat: number, lng: number} | null>(null);
   const [draftDireccion, setDraftDireccion] = useState('');
+  const mapSelectionRef = useRef('');
   
   const [cuponPlataformaIdManual, setCuponPlataformaIdManual] = useState<string | null>(null);
   const [validandoCupon, setValidandoCupon] = useState(false);
@@ -151,6 +153,9 @@ export default function CartPage() {
   const [procesando, setProcesando] = useState(false);
   
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpChallenge, setOtpChallenge] = useState<string | null>(null);
+  const pendingCheckoutRef = useRef<{payload: ReturnType<typeof generarPayloadPedido>; carrito: {item: CartItem; cantidad: number}[]} | null>(null);
+  useEffect(() => { setMetodoPago('efectivo'); }, [setMetodoPago]);
   const [otpCode, setOtpCode] = useState('');
   const [verificandoOtp, setVerificandoOtp] = useState(false);
   
@@ -173,6 +178,7 @@ export default function CartPage() {
   // VIP
   const [usarBeneficioNormal, setUsarBeneficioNormal] = useState(false);
   const [usarSaldoVip, setUsarSaldoVip] = useState(false);
+  const saldoVipHabilitado = false;
   const [montoSaldoVip, setMontoSaldoVip] = useState('');
   const [pinVip, setPinVip] = useState('');
   const [pinSeguridad, setPinSeguridad] = useState('');
@@ -477,17 +483,21 @@ export default function CartPage() {
       if (center) {
         const lat = center.lat();
         const lng = center.lng();
+        const selection = lat.toFixed(7) + ',' + lng.toFixed(7);
+        if (mapSelectionRef.current === selection) return;
+        mapSelectionRef.current = selection;
         setDraftUbicacion({ lat, lng });
         
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+          if (mapSelectionRef.current !== selection) return;
           if (status === 'OK' && results && results.length > 0 && results[0]) {
             let route = '';
             let streetNumber = '';
             let neighborhood = '';
 
             // Buscar en todos los componentes para priorizar calle, número y colonia
-            results[0].address_components.forEach((comp: any) => {
+            results[0].address_components.forEach((comp: google.maps.GeocoderAddressComponent) => {
               if (comp.types.includes('route')) route = comp.short_name;
               if (comp.types.includes('street_number')) streetNumber = comp.long_name;
               if (comp.types.includes('sublocality') || comp.types.includes('neighborhood')) neighborhood = comp.long_name;
@@ -666,7 +676,7 @@ export default function CartPage() {
   // Solo aplicar el beneficio de envío gratis si ya establecieron su ubicación (para no arruinar la sorpresa en el resumen)
   const isFreeDelivery = usarBeneficioNormal && datosCliente && !datosCliente.es_vip && ubicacionGPS !== null && tipoEntrega === 'domicilio';
   
-  const tarifaBaseEnvio = datosCliente?.es_vip ? (datosCliente.puntos < 26 ? 10 : 7) : costoEnvioBase;
+  const tarifaBaseEnvio = tipoEntrega === 'tienda' ? 0 : datosCliente?.es_vip ? (datosCliente.puntos < 26 ? 10 : 7) : costoEnvioBase;
   const costoEnvioCalculado = tarifaBaseEnvio > 0 ? Math.max(0, tarifaBaseEnvio - bolsaSubsidio) : 0;
   const costoEnvio = isFreeDelivery ? 0 : costoEnvioCalculado;
   const descuentoVip = (usarSaldoVip && datosCliente?.es_vip && pinAutorizado) ? Math.max(0, parseFloat(montoSaldoVip || '0')) : 0;
@@ -677,6 +687,9 @@ export default function CartPage() {
   let costoEnvioFinal = (cuponValido && costoEnvioFijoOverride !== null && costoEnvioFijoOverride < costoEnvio) 
     ? costoEnvioFijoOverride 
     : costoEnvio;
+  const entregaConfirmada = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && Boolean(ubicacionGPS) && !fueraDeCobertura && !calculandoEnvio);
+  const textoEnvio = !ubicacionGPS ? 'Por confirmar' : calculandoEnvio ? 'Calculando...' : fueraDeCobertura ? 'No disponible'
+    : costoEnvioFinal === 0 ? 'Gratis' : `$${costoEnvioFinal.toFixed(2)}`;
 
   const descuentoAplicable = (subtotal + costoEnvioFinal) > 0 ? Math.min(descuentoTotal + descuentoVip, subtotal + costoEnvioFinal) : 0;
   const rawTotal = Math.max(0, subtotal + costoEnvioFinal - descuentoAplicable);
@@ -762,7 +775,8 @@ export default function CartPage() {
     const pedidoCompleto = pedidoDetalles + detallesEntregaStr + notasPagoStr;
     
     if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = crypto.randomUUID();
+      idempotencyKeyRef.current = sessionStorage.getItem('est_checkout_id') || crypto.randomUUID();
+      sessionStorage.setItem('est_checkout_id', idempotencyKeyRef.current);
       ticketIdRef.current = Math.random().toString(36).substring(2, 8).toUpperCase();
     }
 
@@ -779,10 +793,11 @@ export default function CartPage() {
       referencias_entrega: tipoEntrega === 'domicilio' && direccionReferencias.trim() ? direccionReferencias.trim() : null,
       lat: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lat : null,
       lng: tipoEntrega === 'domicilio' && ubicacionGPS ? ubicacionGPS.lng : null,
-      estado: metodoPago === 'en_linea' ? 'pendiente_pago' : 'pendiente',
+      estado: 'pendiente',
       estado_cocina: 'pendiente',
       metodo_pago: metodoPago,
       total: total,
+      monto_efectivo: Number(montoEfectivo || total),
       precio_entrega: costoEnvioCalculado, // El pago real que recibirá el repartidor (incluso si costoEnvioFinal es 0 para el cliente)
       tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
       pin_seguridad: pinSeguridad,
@@ -799,178 +814,74 @@ export default function CartPage() {
     };
   };
 
-  const handlePedir = async () => {
-    if (!restaurante || carrito.length === 0) return;
-    
-    setProcesando(true);
-
-    // Bloqueo estricto: Consultar en la base de datos si ya tiene un pedido activo
-    const telLimpio = clienteTel.replace(/\D/g, '');
-    if (telLimpio) {
-      const { data: pedidosActivos } = await supabase
-        .from('pedidos')
-        .select('id, estado')
-        .eq('cliente_tel', telLimpio)
-        .in('estado', ['pendiente', 'preparando', 'listo_para_recoger', 'en_camino', 'asignado'])
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (pedidosActivos && pedidosActivos.length > 0) {
-        showToast('Pedido en curso', 'Ya tienes un pedido activo. Espera a que termine para pedir de nuevo.', 'error');
-        setProcesando(false);
-        // Restaurar caché si lo había borrado
-        localStorage.setItem('est_active_order', pedidosActivos[0].id);
-        return;
-      }
-    }
-    // SOFT-CHECK: Consultar la base de datos justo antes de pagar
-    console.log("Iniciando soft-check. Restaurante ID:", restaurante.id);
-    const { data: restData, error: restError } = await supabase.from('restaurantes').select('*').eq('id', restaurante.id).single();
-    if (restError) {
-      console.error('Error EXACTO soft-check restaurante:', JSON.stringify(restError, null, 2));
-    }
-    
-    if (restData) {
-      // Re-evaluar lógica de horarios o simplemente `activo`. Si el dashboard lo apaga, activo = false.
-      if (!restData.activo) {
-        showToast('Restaurante Cerrado', 'Lo sentimos, el restaurante acaba de pausar sus pedidos.', 'error');
-        setProcesando(false);
-        return;
-      }
-    }
-
-    const isReturningCustomer = !!datosCliente;
-    if (!isReturningCustomer && metodoPago === 'efectivo') {
-      try {
-        setProcesando(true);
-        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp';
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        console.log("POST request to:", edgeUrl);
-        const res = await fetch(edgeUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ action: 'request-client-otp', telefono: clienteTel.replace(/\D/g, '') })
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.error("Error OTP response:", res.status, errData);
-          throw new Error('No se pudo enviar el OTP');
-        }
-        setShowOtpModal(true);
-        setProcesando(false);
-      } catch (err: any) {
-        console.error("Error OTP exception:", err);
-        showToast('Error', 'No pudimos enviarte el código a WhatsApp. Intenta de nuevo o paga en línea.', 'error');
-        setProcesando(false);
-      }
-      return;
-    }
-    
-    await procesarOrden();
+  const checkoutRequest = async (body: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const res = await fetch(import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + import.meta.env.VITE_SUPABASE_ANON_KEY},
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
+    });
+    const raw: unknown = await res.json();
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Respuesta inválida. Vuelve a consultar.');
+    const data = raw as Record<string, unknown>;
+    if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'No pudimos completar la solicitud.');
+    return data;
   };
 
-  const procesarOrden = async () => {
-    if (submittingRef.current) return;
+  const handlePedir = async () => {
+    if (!restaurante || !carrito.length || submittingRef.current) return;
     submittingRef.current = true;
     setProcesando(true);
-    
-    const payload = generarPayloadPedido();
-    let pedidoCreadoId = '';
-    
     try {
-      const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp';
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      console.log("POST request (direct-order) to:", edgeUrl, payload);
-      const res = await fetch(edgeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-        body: JSON.stringify({ 
-          action: 'direct-order', 
-          payload, 
-          carrito 
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Error EXACTO procesarOrden API:", res.status, data);
-        throw new Error(data.error || 'Error al crear pedido');
-      }
-      pedidoCreadoId = data.pedido?.wb_message_id || 'desconocido';
-    } catch (err: any) {    
-      console.error('Error EXACTO insertando en supabase:', err);
-      if (err.details) console.error('Detalles:', err.details);
-      
-      alert(`Hubo un problema registrando el pedido: ${err.message}. Intenta nuevamente.`);
-      submittingRef.current = false;
-      setProcesando(false);
-      return;
-    }
-
-    if (metodoPago === 'en_linea') {
-      try {
-        const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/mercadopago-checkout';
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        const res = await fetch(edgeUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({
-            pedidoId: pedidoCreadoId,
-            items: carrito,
-            costo_envio: costoEnvioFinal,
-            descuento: descuentoTotal,
-            total: total,
-            originUrl: window.location.origin,
-            returnUrl: window.location.href
-          })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error Mercado Pago');
-        
-        if (data.url) {
-          window.location.href = data.url;
-          return;
-        }
-      } catch (err: any) {
-        showToast('Error', err.message || 'No se pudo generar el pago', 'error');
-        submittingRef.current = false;
-        setProcesando(false);
+      const phone = clienteTel.replace(/\D/g, '');
+      if (!/^\d{10}$/.test(phone)) throw new Error('Escribe un teléfono de 10 dígitos.');
+      const {data: active, error} = await supabase.from('pedidos').select('id, estado')
+        .in('cliente_tel', [phone, '52' + phone, '521' + phone]).in('estado', [...ACTIVE_ORDER_STATES]).order('created_at', {ascending: false}).limit(1);
+      if (error) throw new Error('No pudimos comprobar si ya tienes un pedido. Intenta de nuevo.');
+      if (active?.length) {
+        localStorage.setItem('est_active_order', active[0].id);
+        sessionStorage.removeItem('est_checkout_id');
+        idempotencyKeyRef.current = null;
+        navigate('/success?pedido=' + active[0].id);
         return;
       }
-    } else {
-      _clearCart();
-      sessionStorage.clear();
-      navigate(`/success?pedido=${pedidoCreadoId}&success=true`);
+      if (tipoEntrega === 'domicilio' && (!ubicacionGPS || fueraDeCobertura || calculandoEnvio)) throw new Error('Confirma una ubicación dentro de la cobertura y espera la cotización.');
+      const payload = generarPayloadPedido();
+      pendingCheckoutRef.current = {payload, carrito: structuredClone(carrito)};
+      const data = await checkoutRequest({action: 'request-client-otp', telefono: phone, idempotency_key: payload.idempotency_key});
+      if (typeof data.challenge_id !== 'string') throw new Error('No se recibió una verificación válida.');
+      setOtpChallenge(data.challenge_id);
+      setOtpCode('');
+      setShowOtpModal(true);
+    } catch (error: unknown) {
+      showToast('No pudimos continuar', error instanceof Error ? error.message : 'Intenta de nuevo.', 'error');
+    } finally {
+      submittingRef.current = false;
+      setProcesando(false);
     }
   };
 
   const handleVerifyOtp = async () => {
-    if (otpCode.length < 4) return;
+    const pending = pendingCheckoutRef.current;
+    if (!/^\d{6}$/.test(otpCode) || !pending || !otpChallenge || submittingRef.current) return;
+    submittingRef.current = true;
     setVerificandoOtp(true);
     try {
-      const payload = generarPayloadPedido();
-      const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp';
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      const res = await fetch(edgeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-        body: JSON.stringify({ action: 'verify-and-order', telefono: clienteTel.replace(/\D/g, ''), codigo: otpCode, payload, carrito })
-      });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Código incorrecto');
-      
+      const data = await checkoutRequest({action: 'verify-and-order', telefono: pending.payload.cliente_tel,
+        codigo: otpCode, challenge_id: otpChallenge, payload: pending.payload, carrito: pending.carrito});
+      const order = data.pedido;
+      if (!order || typeof order !== 'object' || Array.isArray(order) || !('id' in order) || typeof order.id !== 'string') {
+        throw new Error('No pudimos comprobar el pedido. Reintenta con el mismo código; no crees otro pedido.');
+      }
       setShowOtpModal(false);
       _clearCart();
-      sessionStorage.clear();
-      const wbMsgId = data.pedido?.wb_message_id || 'desconocido';
-      navigate(`/success?pedido=${wbMsgId}&success=true`);
-      
-    } catch (err: any) {
-      showToast('Código Incorrecto', err.message, 'error');
+      for (const key of ['est_checkout_id','est_ubicacion','est_referencias']) sessionStorage.removeItem(key);
+      pendingCheckoutRef.current = null;
+      navigate('/success?pedido=' + encodeURIComponent(order.id));
+    } catch (error: unknown) {
+      showToast('Pedido sin confirmar', error instanceof Error ? error.message : 'Reintenta con el mismo código.', 'error');
     } finally {
+      submittingRef.current = false;
       setVerificandoOtp(false);
     }
   };
@@ -1084,7 +995,7 @@ export default function CartPage() {
     }
     if (checkoutStep === 3) {
       const pagoValido = metodoPago !== null && (metodoPago !== 'efectivo' || parseFloat(montoEfectivo || '0') >= total);
-      return pagoValido;
+      return pagoValido && entregaConfirmada && clienteNombre.trim().length > 0 && /^\d{10}$/.test(clienteTel.replace(/\D/g, ''));
     }
     return false;
   };
@@ -1175,9 +1086,9 @@ export default function CartPage() {
                         </p>
                       )}
                       <div className="flex items-center gap-3 mt-2 w-max bg-slate-100 rounded-full px-2 py-1.5">
-                        <button onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Minus size={12} strokeWidth={3}/></button>
+                        <button aria-label={'Reducir cantidad de ' + p.item.nombre} onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Minus size={12} strokeWidth={3}/></button>
                         <span className="font-black text-sm w-5 text-center tabular-nums">{p.cantidad}</span>
-                        <button onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Plus size={12} strokeWidth={3}/></button>
+                        <button aria-label={'Aumentar cantidad de ' + p.item.nombre} onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Plus size={12} strokeWidth={3}/></button>
                       </div>
                     </div>
                   </div>
@@ -1327,7 +1238,7 @@ export default function CartPage() {
                             </div>
                             <button onClick={() => setIsMapModalOpen(true)} className="text-blue-600 text-[12px] font-bold shrink-0 hover:underline">Cambiar</button>
                           </div>
-                          {!calculandoEnvio && costoEnvio >= 0 && (
+                          {entregaConfirmada && costoEnvio >= 0 && (
                             <div className="flex justify-between items-center px-1">
                               <span className="text-[13px] text-slate-400 font-medium">Costo de envío</span>
                               <span className="text-[13px] font-bold text-slate-800">{costoEnvioFinal === 0 ? <span className="text-green-600">GRATIS 🎉</span> : `$${costoEnvioFinal.toFixed(2)}`}</span>
@@ -1374,7 +1285,7 @@ export default function CartPage() {
                 )}
 
                 {/* Widget VIP */}
-                {datosCliente?.es_vip && (tipoEntrega === 'tienda' || ubicacionGPS) && (
+                {saldoVipHabilitado && datosCliente?.es_vip && (tipoEntrega === 'tienda' || ubicacionGPS) && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3">
                     <div>
                       <p className="text-[13px] font-black text-slate-800 flex items-center gap-1"><Star size={13} className="fill-slate-800"/> Cliente VIP · Saldo ${datosCliente.saldo.toFixed(2)}</p>
@@ -1436,18 +1347,7 @@ export default function CartPage() {
                     )}
                   </AnimatePresence>
 
-                  {restaurante?.acepta_pago_online && (
-                    <button onClick={() => setMetodoPago('en_linea')} className={`w-full py-4 px-5 font-bold flex items-center gap-4 transition-all last:rounded-b-3xl ${metodoPago === 'en_linea' ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}>
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${metodoPago === 'en_linea' ? 'bg-blue-100' : 'bg-slate-100'}`}>💳</div>
-                      <div className="flex-1 text-left">
-                        <span className={`block text-[15px] ${metodoPago === 'en_linea' ? 'text-[#1D4ED8]' : 'text-slate-700'}`}>Pago en Línea</span>
-                        <span className={`block text-[11px] font-medium ${metodoPago === 'en_linea' ? 'text-blue-400' : 'text-slate-400'}`}>Tarjeta o Mercado Pago</span>
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${metodoPago === 'en_linea' ? 'border-[#1D4ED8] bg-[#1D4ED8]' : 'border-slate-300'}`}>
-                        {metodoPago === 'en_linea' && <div className="w-2 h-2 rounded-full bg-white" />}
-                      </div>
-                    </button>
-                  )}
+                  <p className="px-5 py-3 text-sm text-slate-600">Por ahora aceptamos sólo efectivo al recibir.</p>
                 </div>
               </div>
 
@@ -1481,11 +1381,9 @@ export default function CartPage() {
                     <div className="flex justify-between items-center text-[14px]">
                       <span className="text-slate-500 font-semibold tracking-tight">Envío</span>
                       <span className="font-bold text-slate-800 tabular-nums">
-                        {calculandoEnvio
-                          ? <Loader2 size={14} className="animate-spin text-slate-400" />
-                          : costoEnvioFinal === 0
+                        {entregaConfirmada && costoEnvioFinal === 0
                             ? <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider text-[11px] border border-emerald-100/50">Gratis</span>
-                            : `$${costoEnvioFinal.toFixed(2)}`
+                            : textoEnvio
                         }
                       </span>
                     </div>
@@ -1607,13 +1505,7 @@ export default function CartPage() {
                   <div className="flex justify-between text-[13px]">
                     <span className="text-slate-500 font-medium">Envío</span>
                     <span className={`font-bold ${isFreeDelivery ? 'text-green-600' : 'text-slate-800'}`}>
-                      {isFreeDelivery
-                        ? '¡Gratis! 🎉'
-                        : calculandoEnvio
-                        ? 'Calculando...'
-                        : costoEnvioFinal > 0
-                        ? `$${costoEnvioFinal.toFixed(2)}`
-                        : 'Por confirmar'}
+                      {textoEnvio}
                     </span>
                   </div>
                 )}
@@ -1824,7 +1716,7 @@ export default function CartPage() {
                       center={draftUbicacion || ubicacionGPS || { lat: 16.2516, lng: -92.1332 }}
                       zoom={17}
                       onLoad={map => setMapInstance(map)}
-                      onDragEnd={handleMapDragEnd}
+                      onIdle={handleMapDragEnd}
                       options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: PREMIUM_MAP_STYLE }}
                     />
 
@@ -1963,9 +1855,9 @@ export default function CartPage() {
                 <ShieldCheck size={40} className="text-black" />
               </div>
               <h3 className="font-black text-xl mb-2 text-slate-800">Verifica tu pedido</h3>
-              <p className="text-sm text-slate-500 mb-6 font-medium">Ingresa el PIN de 4 dígitos enviado a tu WhatsApp al número <b className="text-slate-700">{clienteTel}</b></p>
-              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} maxLength={4} autoFocus className="w-full bg-slate-50 text-center text-3xl font-black tracking-[0.5em] py-4 rounded-2xl outline-none border border-slate-200 focus:border-[#1D4ED8] focus:ring-4 ring-blue-600/10 mb-6 transition-all text-slate-800" />
-              <button onClick={handleVerifyOtp} disabled={otpCode.length < 4 || verificandoOtp} className="w-full bg-[#1D4ED8] text-white font-black py-4 rounded-2xl disabled:opacity-50 shadow-lg shadow-blue-700/25 hover:bg-blue-700 flex items-center justify-center gap-2">
+              <p className="text-sm text-slate-500 mb-6 font-medium">Ingresa el código de 6 dígitos enviado a tu WhatsApp al número <b className="text-slate-700">{clienteTel}</b></p>
+              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))} maxLength={6} inputMode="numeric" autoComplete="one-time-code" aria-label="Código de WhatsApp" autoFocus className="w-full bg-slate-50 text-center text-3xl font-black tracking-[0.5em] py-4 rounded-2xl outline-none border border-slate-200 focus:border-[#1D4ED8] focus:ring-4 ring-blue-600/10 mb-6 transition-all text-slate-800" />
+              <button onClick={handleVerifyOtp} disabled={otpCode.length !== 6 || verificandoOtp} className="w-full bg-[#1D4ED8] text-white font-black py-4 rounded-2xl disabled:opacity-50 shadow-lg shadow-blue-700/25 hover:bg-blue-700 flex items-center justify-center gap-2">
                 {verificandoOtp ? <Loader2 className="animate-spin" /> : 'Confirmar y Enviar'}
               </button>
             </motion.div>
