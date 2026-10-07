@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLottie } from 'lottie-react';
 import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
 import cookingAnimation from '../assets/Cooking.json';
+import { acceptedDriver } from '../utils/orderState';
 
 const CookingAnimation = () => {
   const { View } = useLottie({ animationData: cookingAnimation, loop: true });
@@ -105,13 +106,14 @@ export function TrackerPage() {
         }
 
         // Fetch repartidor if assigned
-        if (orderData.repartidor_id) {
-          fetchRepartidor(orderData.repartidor_id).then(repData => {
+        const driverId = acceptedDriver(orderData);
+        if (driverId) {
+          fetchRepartidor(driverId).then(repData => {
             if (repData && repData.id) {
               subscribeToDriver(repData.id);
             }
           });
-        }
+        } else setRepartidor(null);
 
         // Subscribirse al estado del pedido
         orderChannel = supabase.channel(`order-tracker-${orderData.id}-${Date.now()}`)
@@ -122,12 +124,16 @@ export function TrackerPage() {
               setPedido((prev: any) => ({ ...prev, ...payload.new }));
               
               // Si el repartidor se asignó o cambió
-              if (payload.new.repartidor_id) {
-                fetchRepartidor(payload.new.repartidor_id).then(repData => {
+              const nextDriver = acceptedDriver({ estado: payload.new.estado, repartidor_id: payload.new.repartidor_id });
+              if (nextDriver) {
+                fetchRepartidor(nextDriver).then(repData => {
                   if (repData && repData.id) {
                     subscribeToDriver(repData.id);
                   }
                 });
+              } else {
+                setRepartidor(null);
+                if (driverChannel) supabase.removeChannel(driverChannel);
               }
             }
           ).subscribe();
@@ -268,6 +274,11 @@ export function TrackerPage() {
 
   // ── Detectar tipo de pedido ───────────────────────────────────────────────
   const esMandadito = pedido?.tipo_pedido === 'mandadito';
+  const esRecogida = pedido?.tipo_pedido === 'tienda';
+  const enCocina = pedido?.estado_cocina === 'en_cocina';
+  const listoParaRecoger = pedido?.estado_cocina === 'listo_para_recoger';
+  const esperandoRestaurante = !esMandadito && pedido?.estado === 'pendiente' && !enCocina && !listoParaRecoger;
+  const cancelado = ['cancelado', 'rechazado'].includes(pedido?.estado);
 
   // Limpiar descripción para mandaditos multi-parada (eliminar JSON embebido de paradas)
   const descripcionLimpia = esMandadito
@@ -278,7 +289,8 @@ export function TrackerPage() {
 
   if (pedido?.estado === 'entregado') currentStep = 4;
   else if (pedido?.estado === 'en_camino') currentStep = 3;
-  else if (pedido?.estado && pedido?.estado !== 'cancelado') currentStep = 2;
+  else if (esRecogida && listoParaRecoger) currentStep = 3;
+  else if (!cancelado && (esMandadito || enCocina || listoParaRecoger)) currentStep = 2;
 
   return (
     <motion.div 
@@ -414,7 +426,7 @@ export function TrackerPage() {
             className="absolute top-4 left-4 right-4 md:hidden z-10 flex justify-center pointer-events-none"
           >
             <div className="bg-white px-5 py-2.5 rounded-full shadow-lg border border-slate-100 flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${pedido?.estado === 'cancelado' ? 'bg-red-500' : pedido?.estado === 'entregado' ? 'bg-emerald-500' : pedido?.estado === 'en_camino' ? 'bg-blue-500' : 'bg-orange-500 animate-pulse'}`} />
+              <div className={`w-2 h-2 rounded-full ${cancelado ? 'bg-red-500' : pedido?.estado === 'entregado' ? 'bg-emerald-500' : pedido?.estado === 'en_camino' ? 'bg-blue-500' : 'bg-orange-500 animate-pulse'}`} />
               <span className="text-sm font-bold text-slate-800">
                 {pedido?.estado?.replace('_', ' ').toUpperCase() || 'PROCESANDO'}
               </span>
@@ -457,7 +469,7 @@ export function TrackerPage() {
               <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-md ${
                 pedido?.estado === 'en_camino' ? 'bg-blue-600 text-white shadow-blue-500/20' : 
                 pedido?.estado === 'entregado' ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 
-                pedido?.estado === 'cancelado' ? 'bg-red-500 text-white shadow-red-500/20' :
+                cancelado ? 'bg-red-500 text-white shadow-red-500/20' :
                 esMandadito ? 'bg-violet-600 text-white shadow-violet-500/20' :
                 'bg-slate-100 border border-slate-200'
               }`}>
@@ -465,7 +477,7 @@ export function TrackerPage() {
                   <Navigation className="w-6 h-6" />
                 ) : pedido?.estado === 'entregado' ? (
                   <MapPin className="w-6 h-6" />
-                ) : pedido?.estado === 'cancelado' ? (
+                ) : cancelado ? (
                   <Navigation className="w-6 h-6" />
                 ) : esMandadito ? (
                   <Package className="w-6 h-6" />
@@ -482,24 +494,30 @@ export function TrackerPage() {
                     ? (esMandadito ? '🛵 TU PAQUETE VA EN CAMINO' : 'TU ORDEN VA EN CAMINO')
                     : pedido?.estado === 'entregado'
                     ? (esMandadito ? '📦 ¡PAQUETE ENTREGADO!' : 'PEDIDO ENTREGADO')
-                    : pedido?.estado === 'cancelado'
-                    ? 'PEDIDO CANCELADO'
+                    : cancelado
+                    ? (pedido?.estado === 'rechazado' ? 'PEDIDO RECHAZADO' : 'PEDIDO CANCELADO')
                     : esMandadito
                     ? '📦 ENVÍO EN PROCESO'
                     : pedido?.restaurante}
                 </h2>
                 <div className="flex items-center gap-2 mt-1">
                   {/* Sub-texto: diferenciado para mandaditos */}
-                  <p className="text-[12px] font-bold text-slate-400">
+                  <p className="text-sm font-medium text-slate-600">
                     {pedido?.estado === 'en_camino'
                       ? (esMandadito ? 'Tu mensajero lleva el paquete' : 'Nos vemos pronto')
                       : pedido?.estado === 'entregado'
                       ? (esMandadito ? '¡Entregado con éxito!' : '¡Disfruta tu comida!')
-                      : pedido?.estado === 'cancelado'
+                      : cancelado
                       ? 'Este viaje terminó'
                       : esMandadito
                       ? (repartidor ? 'Mensajero asignado' : 'Buscando mensajero...')
-                      : 'Está preparando tu pedido'}
+                      : esperandoRestaurante
+                      ? 'Esperando aceptación del restaurante'
+                      : listoParaRecoger
+                      ? (esRecogida ? 'Tu pedido está listo para recoger' : 'Tu pedido está listo; esperamos al repartidor')
+                      : enCocina
+                      ? 'El restaurante está preparando tu pedido'
+                      : 'Consultando el estado del pedido'}
                   </p>
                   
                   {pedido?.estado === 'en_camino' && eta && (
@@ -513,14 +531,14 @@ export function TrackerPage() {
             </div>
             
             {/* Animación de cocina: solo para pedidos de restaurante en preparación */}
-            {!esMandadito && pedido?.estado !== 'cancelado' && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
+            {!esMandadito && enCocina && !cancelado && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
               <div className="w-16 h-16 shrink-0 mr-1">
                 <CookingAnimation />
               </div>
             )}
 
             {/* Para mandaditos esperando mensajero: icono pulsante */}
-            {esMandadito && pedido?.estado !== 'cancelado' && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
+            {esMandadito && !cancelado && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
               <div className="w-16 h-16 shrink-0 mr-1 flex items-center justify-center">
                 <span className="text-4xl animate-bounce">📦</span>
               </div>
@@ -529,7 +547,7 @@ export function TrackerPage() {
 
 
           {/* Timeline Progress */}
-          {pedido?.estado !== 'cancelado' && (
+          {!cancelado && (
             <div className={`mb-2 mt-2 ${!isExpanded ? 'hidden md:block' : 'block'}`}>
               <div className="flex items-center justify-between relative">
                 {/* Background Line */}
@@ -560,7 +578,7 @@ export function TrackerPage() {
                 <span className={`text-[10px] font-bold ${currentStep >= 2 ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {esMandadito ? 'Recogiendo' : 'Preparando'}
                 </span>
-                <span className={`text-[10px] font-bold ${currentStep >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>En camino</span>
+                <span className={`text-[10px] font-bold ${currentStep >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>{esRecogida ? 'Listo' : 'En camino'}</span>
                 <span className={`text-[10px] font-bold ${currentStep >= 4 ? 'text-emerald-600' : 'text-slate-400'}`}>Entregado</span>
               </div>
             </div>
@@ -571,7 +589,10 @@ export function TrackerPage() {
           {/* Order Details Toggle */}
           <div className="mt-4 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
             <button 
-              onClick={() => setShowDetails(!showDetails)}
+              onClick={() => {
+                if (!showDetails) setIsExpanded(true);
+                setShowDetails(!showDetails);
+              }}
               className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
             >
               <span className="text-sm font-bold text-slate-700">
@@ -591,6 +612,13 @@ export function TrackerPage() {
                   <div className="pt-3 border-t border-slate-100 text-sm text-slate-600 whitespace-pre-wrap font-medium">
                     {descripcionLimpia || 'No hay detalles disponibles.'}
                   </div>
+                  {!esRecogida && !cancelado && pedido?.estado !== 'entregado' && typeof pedido?.pin_seguridad === 'string' && /^\d{4}$/.test(pedido.pin_seguridad) && (
+                    <div className="pt-4 mt-4 border-t border-slate-100">
+                      <p className="text-sm font-bold text-slate-700">PIN de entrega</p>
+                      <p className="text-2xl font-bold tabular-nums text-slate-800">{pedido.pin_seguridad}</p>
+                      <p className="text-sm text-slate-600">Dáselo al repartidor cuando recibas tu pedido.</p>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
