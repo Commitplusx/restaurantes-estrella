@@ -22,7 +22,11 @@ El servidor sigue recalculando catálogo, tarifa y beneficios al confirmar por O
 
 Build TypeScript/Vite aprobado; ESLint de los dos módulos nuevos aprobado. Nueve pruebas de contrato más cinco regresiones de cotización y cuatro de recibo: 18 aprobadas, con comprobación de tipos. Cubren ausencia, errores, datos inválidos, VIP, valores nulos del esquema y separación inmediata de teléfono/intento, incluso al regresar a un teléfono consultado anteriormente.
 
-En el navegador local, la consulta real al número reportado devuelve el estado «Tu número aún no tiene historial de lealtad» sin `checkout_loyalty_lookup_failed`. Se comprobó el retiro del estado al dejar el teléfono incompleto. No se envió OTP ni se confirmó un pedido. Publicación: pendiente al guardar esta nota; no interpretar un build local como publicación productiva.
+En el navegador local, la consulta real al número reportado devuelve el estado «Tu número aún no tiene historial de lealtad» sin `checkout_loyalty_lookup_failed`. Se comprobó el retiro del estado al dejar el teléfono incompleto.
+
+Publicado en `main` con `fef4830a29c97d79aa52abcebb59a43de6b02633`. Vercel `C8UTvsHjm8BxHuy1sCpBKdgjrqAC` quedó **Ready**, Production, Current, con dominio `estrella-eats.mx`. El navegador público cargó `index-RLcy1hRv.js` y comprobó una ficha existente con beneficio, seguida del número reportado sin historial: mensaje correcto, cero errores de consulta de lealtad y cero errores 406 capturados. No se envió OTP ni se confirmó un pedido. El artículo usado sólo en el borrador se retiró al terminar y se restauró el teléfono previo.
+
+Recibo y captura sin datos privados: `C:/Users/Kaleb/Desktop/pollo-robins-panel/output/loyalty-lookup-20261012/receipt.json` y `customer-not-found-public.png`. La captura local adicional usa un número sintético.
 
 ## Alcance
 
