@@ -12,6 +12,7 @@ import DeliveryLocationPicker from '../components/DeliveryLocationPicker';
 import { canConfirmLocation, isDeliveryCoordinates, readSavedCoordinates } from '../lib/deliveryLocation';
 import type { DeliveryCoordinates, DeliveryLocation } from '../lib/deliveryLocation';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
+import { useCheckoutLoyalty } from '../hooks/useCheckoutLoyalty';
 import { ACTIVE_ORDER_STATES } from '../utils/orderState';
 import { CheckoutHeader, CheckoutAction } from '../components/CheckoutChrome';
 import CheckoutStepScene from '../components/CheckoutStepScene';
@@ -134,8 +135,9 @@ export default function CartPage() {
 
   const [pinError, setPinError] = useState(false);
   const [telError, setTelError] = useState(false);
-  const [datosCliente, setDatosCliente] = useState<any>(null);
-  const [checkingLoyalty, setCheckingLoyalty] = useState(false);
+  const { loyalty, retry: retryLoyalty } = useCheckoutLoyalty(clienteTel);
+  const datosCliente = loyalty.status === 'found' ? loyalty.customer : null;
+  const checkingLoyalty = loyalty.status === 'loading';
 
   const [ubicacionGPS, setUbicacionGPS] = useState<DeliveryCoordinates | null>(() =>
     readSavedCoordinates(sessionStorage.getItem('est_ubicacion')));
@@ -183,7 +185,6 @@ export default function CartPage() {
   const [pinSeguridad, setPinSeguridad] = useState('');
   const [verificandoPin, setVerificandoPin] = useState(false);
   const [pinAutorizado, setPinAutorizado] = useState(false);
-  const [didInitLoyalty, setDidInitLoyalty] = useState(false);
 
   // Hooks de cálculo
   const { costoEnvioBase, fueraDeCobertura, calculandoEnvio } = useDeliveryCalculation(ubicacionGPS, tipoEntrega || 'tienda');
@@ -263,63 +264,10 @@ export default function CartPage() {
     loadRestaurante();
   }, [id]);
 
-  // Checar Lealtad - con debounce 400ms, misma tabla/columnas que PublicMenuView
+  // Only the current phone's successful lookup may activate its benefit.
   useEffect(() => {
-    const tel = clienteTel.replace(/\D/g, '');
-    if (tel.length !== 10) {
-      setDatosCliente(null);
-      setUsarBeneficioNormal(false);
-      setDidInitLoyalty(false);
-      setCheckingLoyalty(false);
-      return;
-    }
-
-    // Debounce: espera 400ms antes de hacer la query
-    const debounceTimer = setTimeout(async () => {
-      setCheckingLoyalty(true);
-      setDidInitLoyalty(false);
-      const startTime = Date.now();
-
-      try {
-        // Usar misma tabla y columnas que PublicMenuView.tsx (checkLoyaltyPoints)
-        const { data, error } = await supabase
-          .from('clientes')
-          .select('puntos, rango, es_vip, saldo_billetera, envios_gratis_disponibles, nombre')
-          .eq('telefono', tel)
-          .single();
-
-        if (!error && data) {
-          const clienteNormalizado = {
-            es_vip: data.es_vip || data.rango === 'vip',
-            saldo: data.saldo_billetera || 0,
-            puntos: data.puntos || 0,
-            envios_gratis: data.envios_gratis_disponibles || 0,
-            nombre: data.nombre || ''
-          };
-          setDatosCliente(clienteNormalizado);
-          if ((clienteNormalizado.envios_gratis > 0 || clienteNormalizado.puntos >= 6) && checkoutStep <= 3) {
-            setUsarBeneficioNormal(true);
-          }
-        } else {
-          setDatosCliente(null);
-          setUsarBeneficioNormal(false);
-        }
-      } catch (e) {
-        setDatosCliente(null);
-        setUsarBeneficioNormal(false);
-      }
-
-      // Mínimo 2 segundos de animación de verificando
-      const elapsed = Date.now() - startTime;
-      if (elapsed < 2000) {
-        await new Promise(resolve => setTimeout(resolve, 2000 - elapsed));
-      }
-      setCheckingLoyalty(false);
-      setDidInitLoyalty(true);
-    }, 400);
-
-    return () => clearTimeout(debounceTimer);
-  }, [clienteTel]);
+    setUsarBeneficioNormal(Boolean(datosCliente && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6)));
+  }, [datosCliente]);
 
   const _addToCart = useCartStore(state => state.addToCart);
   const addToCart = (product: CartItem) => _addToCart(product);
@@ -479,7 +427,7 @@ export default function CartPage() {
   const bolsaSubsidio = cantidadSubsidio * 8;
   
   // Solo aplicar el beneficio de envío gratis si ya establecieron su ubicación (para no arruinar la sorpresa en el resumen)
-  const isFreeDelivery = usarBeneficioNormal && datosCliente && !datosCliente.es_vip && ubicacionGPS !== null && tipoEntrega === 'domicilio';
+  const isFreeDelivery = usarBeneficioNormal && datosCliente !== null && !datosCliente.es_vip && ubicacionGPS !== null && tipoEntrega === 'domicilio';
   
   const tarifaBaseEnvio = tipoEntrega === 'tienda' ? 0 : datosCliente?.es_vip ? (datosCliente.puntos < 26 ? 10 : 7) : costoEnvioBase;
   const costoEnvioCalculado = tarifaBaseEnvio > 0 ? Math.max(0, tarifaBaseEnvio - bolsaSubsidio) : 0;
@@ -982,11 +930,11 @@ export default function CartPage() {
                       <motion.div key="checking" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-slate-100/80 bg-slate-50">
                         <div className="px-4 py-3 flex items-center gap-3">
                           <Loader2 size={16} className="animate-spin text-slate-400 shrink-0"/>
-                          <p className="text-[12px] font-bold text-slate-500">Verificando tu historial...</p>
+                          <p className="text-[12px] font-bold text-slate-500" role="status">Consultando tus beneficios...</p>
                         </div>
                       </motion.div>
                     )}
-                    {clienteTel.replace(/\D/g, '').length === 10 && !checkingLoyalty && didInitLoyalty && (
+                    {loyalty.status === 'found' && (
                       <motion.div key="result" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={`border-t border-slate-100/80 ${(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? 'bg-amber-50' : 'bg-slate-50'}`}>
                         <div className="px-4 py-3 flex items-center gap-3">
                           <span className="text-lg shrink-0">{(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? '🎁' : '⭐'}</span>
@@ -1003,6 +951,29 @@ export default function CartPage() {
                               </>
                             )}
                           </div>
+                        </div>
+                      </motion.div>
+                    )}
+                    {loyalty.status === 'not-found' && (
+                      <motion.div key="new-customer" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-slate-100/80 bg-slate-50">
+                        <div className="px-4 py-3 flex items-center gap-3" role="status">
+                          <span className="text-lg shrink-0" aria-hidden="true">⭐</span>
+                          <div>
+                            <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">Tu número aún no tiene historial de lealtad</p>
+                            <p className="text-[11px] text-slate-500 font-medium leading-tight">Puedes continuar con tu pedido.</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                    {loyalty.status === 'error' && (
+                      <motion.div key="loyalty-error" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-amber-100 bg-amber-50">
+                        <div className="px-4 py-3 flex flex-wrap items-center gap-3" role="status">
+                          <AlertCircle size={18} className="text-amber-700 shrink-0" aria-hidden="true" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">No pudimos consultar tus beneficios</p>
+                            <p className="text-[11px] text-slate-600 font-medium leading-tight">Reintenta para comprobar tus puntos y envíos gratis.</p>
+                          </div>
+                          <button type="button" onClick={retryLoyalty} className="min-h-11 px-3 rounded-lg text-[12px] font-bold text-amber-800 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-800">Reintentar</button>
                         </div>
                       </motion.div>
                     )}

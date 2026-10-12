@@ -36,6 +36,8 @@ Los dominios aliados se identifican en `App.tsx`; no deben alterar los patrones 
 
 El checkout actual ofrece efectivo. Los diagramas antiguos de Mercado Pago no describen este recorrido activo. Los callbacks y documentos legales heredados no autorizan volver a habilitar pagos en línea.
 
+La consulta previa de lealtad es opcional: `CartPage` → `useCheckoutLoyalty` → `clientes.maybeSingle()`. Separa ficha válida, ausencia y fallo; valida el contrato, aborta respuestas anteriores y ofrece reintento explícito con plazo de ocho segundos. Una ficha ausente no provoca 406 ni se crea artificialmente desde el navegador. La validación final de beneficios sigue en el servidor. Ver [causa, pruebas y publicación](LOYALTY_LOOKUP_20261012.md).
+
 ## Presentación y navegación
 
 Inicio: `DesktopLandingIntro`, `DesktopRestaurantList` y `LandingFoodCategories`. Menú: componentes `MenuProductCard`, `RestaurantMenuIdentity` y `MenuDetailsFrame`. Carrito: `CheckoutHeader`, `CheckoutStepScene` y `DeliveryLocationPicker`.
