@@ -133,7 +133,6 @@ export default function CartPage() {
   const metodoPago = 'efectivo';
   const setMetodoPago = useCartStore(state => state.setMetodoPago);
 
-  const [pinError, setPinError] = useState(false);
   const [telError, setTelError] = useState(false);
   const { loyalty, retry: retryLoyalty } = useCheckoutLoyalty(clienteTel);
   const datosCliente = loyalty.status === 'found' ? loyalty.customer : null;
@@ -178,13 +177,6 @@ export default function CartPage() {
 
   // VIP
   const [usarBeneficioNormal, setUsarBeneficioNormal] = useState(false);
-  const [usarSaldoVip, setUsarSaldoVip] = useState(false);
-  const saldoVipHabilitado = false;
-  const [montoSaldoVip, setMontoSaldoVip] = useState('');
-  const [pinVip, setPinVip] = useState('');
-  const [pinSeguridad, setPinSeguridad] = useState('');
-  const [verificandoPin, setVerificandoPin] = useState(false);
-  const [pinAutorizado, setPinAutorizado] = useState(false);
 
   // Hooks de cálculo
   const { costoEnvioBase, fueraDeCobertura, calculandoEnvio } = useDeliveryCalculation(ubicacionGPS, tipoEntrega || 'tienda');
@@ -266,7 +258,7 @@ export default function CartPage() {
 
   // Only the current phone's successful lookup may activate its benefit.
   useEffect(() => {
-    setUsarBeneficioNormal(Boolean(datosCliente && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6)));
+    setUsarBeneficioNormal(datosCliente?.deliveryBenefit===true);
   }, [datosCliente]);
 
   const _addToCart = useCartStore(state => state.addToCart);
@@ -396,29 +388,6 @@ export default function CartPage() {
     }
   };
 
-  const handlePinVerify = async () => {
-    setVerificandoPin(true);
-    try {
-      const edgeUrl = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/auth-otp';
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      const res = await fetch(edgeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-        body: JSON.stringify({ action: 'verify-vip-pin', telefono: clienteTel.replace(/\D/g, ''), pin: pinVip })
-      });
-      
-      if (!res.ok) throw new Error('PIN Incorrecto');
-      setPinAutorizado(true);
-      setPinSeguridad(pinVip);
-      setPinError(false);
-    } catch (err) {
-      setPinAutorizado(false);
-      setPinError(true);
-    } finally {
-      setVerificandoPin(false);
-    }
-  };
 
   // CALCULOS DE SUBTOTAL Y ENVIO
   const subtotal = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
@@ -427,12 +396,12 @@ export default function CartPage() {
   const bolsaSubsidio = cantidadSubsidio * 8;
   
   // Solo aplicar el beneficio de envío gratis si ya establecieron su ubicación (para no arruinar la sorpresa en el resumen)
-  const isFreeDelivery = usarBeneficioNormal && datosCliente !== null && !datosCliente.es_vip && ubicacionGPS !== null && tipoEntrega === 'domicilio';
+  const isFreeDelivery = usarBeneficioNormal && datosCliente?.deliveryBenefit===true && ubicacionGPS !== null && tipoEntrega === 'domicilio';
   
-  const tarifaBaseEnvio = tipoEntrega === 'tienda' ? 0 : datosCliente?.es_vip ? (datosCliente.puntos < 26 ? 10 : 7) : costoEnvioBase;
+  const tarifaBaseEnvio = tipoEntrega === 'tienda' ? 0 : datosCliente?.vipDeliveryFee ?? costoEnvioBase;
   const costoEnvioCalculado = tarifaBaseEnvio > 0 ? Math.max(0, tarifaBaseEnvio - bolsaSubsidio) : 0;
   const costoEnvio = isFreeDelivery ? 0 : costoEnvioCalculado;
-  const descuentoVip = (usarSaldoVip && datosCliente?.es_vip && pinAutorizado) ? Math.max(0, parseFloat(montoSaldoVip || '0')) : 0;
+  const descuentoVip = 0; // Checkout currently accepts cash only; wallet redemption has its authenticated route.
 
   // Cupon manual aplicado
   let descuentoTotal = cuponValido && descuento > 0 ? descuento : 0;
@@ -553,16 +522,16 @@ export default function CartPage() {
       monto_efectivo: Number(montoEfectivo || total),
       precio_entrega: costoEnvioCalculado, // El pago real que recibirá el repartidor (incluso si costoEnvioFinal es 0 para el cliente)
       tipo_pedido: tipoEntrega === 'domicilio' ? 'domicilio' : 'tienda',
-      pin_seguridad: pinSeguridad,
+      pin_seguridad: null,
       pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(), // Generamos un PIN anti-robo de 4 dígitos
       wb_message_id: ticketIdRef.current,
       idempotency_key: idempotencyKeyRef.current,
       cupon_plataforma_id: cuponPlataformaIdManual || null,
       descuento_plataforma: descuentoTotal + (costoEnvioCalculado - costoEnvioFinal), // Registramos que hubo un descuento en el envío si aplica
       cupon_cliente: cuponCliente || null,
-      usar_saldo_vip: usarSaldoVip,
-      monto_saldo_vip: usarSaldoVip && montoSaldoVip ? Number(montoSaldoVip) : 0,
-      pin_vip: pinVip || null,
+      usar_saldo_vip: false,
+      monto_saldo_vip: 0,
+      pin_vip: null,
       usar_beneficio_fidelidad: usarBeneficioNormal
     };
   };
@@ -937,19 +906,19 @@ export default function CartPage() {
                     {loyalty.status === 'found' && (
                       <motion.div key="result" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="checkout-loyalty">
                         <div className="checkout-loyalty-content" role="status" aria-atomic="true">
-                          {(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6
+                          {datosCliente?.deliveryBenefit
                             ? <Gift size={20} className="checkout-loyalty-icon" aria-hidden="true" />
                             : <Star size={20} className="checkout-loyalty-icon" aria-hidden="true" />}
                           <div>
-                            {(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? (
+                            {datosCliente?.deliveryBenefit ? (
                               <>
                                 <p className="checkout-loyalty-title">¡Tienes un beneficio!</p>
                                 <p className="checkout-loyalty-description">Continúa para desbloquear tu envío gratis.</p>
                               </>
                             ) : (
                               <>
-                                <p className="checkout-loyalty-title">Llevas {datosCliente?.puntos || 0} de 6 pedidos</p>
-                                <p className="checkout-loyalty-description">¡Al 6to pedido el envío es gratis!</p>
+                                <p className="checkout-loyalty-title">Encontramos tu tarjeta Estrella</p>
+                                <p className="checkout-loyalty-description">{datosCliente?.vipDeliveryFee!==null ? 'Tu tarifa de envío VIP se valida al confirmar tu WhatsApp.' : 'Consulta tus puntos y movimientos entrando a tu tarjeta.'}</p>
                               </>
                             )}
                           </div>
@@ -974,7 +943,7 @@ export default function CartPage() {
                           <div>
                             <div role="status" aria-atomic="true">
                               <p className="checkout-loyalty-title">No pudimos consultar tus beneficios</p>
-                              <p className="checkout-loyalty-description">Inténtalo de nuevo para revisar tus puntos y envíos gratis.</p>
+                              <p className="checkout-loyalty-description">Reintenta para comprobar si tienes un beneficio de envío.</p>
                             </div>
                             <button type="button" onClick={retryLoyalty} className="checkout-loyalty-retry">Reintentar</button>
                           </div>
@@ -1044,7 +1013,7 @@ export default function CartPage() {
                 </AnimatePresence>
 
                 {/* Widget lealtad envío gratis */}
-                {datosCliente && !calculandoEnvio && (tipoEntrega === 'tienda' || ubicacionGPS) && !datosCliente.es_vip && costoEnvioCalculado > 0 && (datosCliente.envios_gratis > 0 || datosCliente.puntos >= 6) && (
+                {datosCliente?.deliveryBenefit && !calculandoEnvio && tipoEntrega === 'domicilio' && ubicacionGPS && costoEnvioCalculado > 0 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4">
                     <button 
                       onClick={() => setUsarBeneficioNormal(!usarBeneficioNormal)}
@@ -1066,26 +1035,6 @@ export default function CartPage() {
                   </motion.div>
                 )}
 
-                {/* Widget VIP */}
-                {saldoVipHabilitado && datosCliente?.es_vip && (tipoEntrega === 'tienda' || ubicacionGPS) && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3">
-                    <div>
-                      <p className="text-[13px] font-black text-slate-800 flex items-center gap-1"><Star size={13} className="fill-slate-800"/> Cliente VIP · Saldo ${datosCliente.saldo.toFixed(2)}</p>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Usa tu saldo para pagar</p>
-                    </div>
-                    {!usarSaldoVip ? (
-                      <button onClick={() => setUsarSaldoVip(true)} className="bg-black text-white px-3 py-1.5 rounded-xl font-bold text-[11px]">Usar</button>
-                    ) : (
-                      <div className="flex gap-1.5">
-                        <input type="number" value={montoSaldoVip} onChange={e => setMontoSaldoVip(e.target.value)} placeholder="$0" className="w-14 bg-white border border-slate-200 rounded-xl px-2 py-1 text-[11px] font-bold outline-none text-center"/>
-                        <input type="password" value={pinVip} onChange={e => { setPinVip(e.target.value.replace(/\D/g, '')); setPinError(false); }} maxLength={4} placeholder="PIN" className={`w-12 bg-white border ${pinError ? 'border-red-400' : 'border-slate-200'} rounded-xl px-2 py-1 text-[11px] text-center font-black tracking-widest outline-none`}/>
-                        <button onClick={handlePinVerify} disabled={verificandoPin || pinVip.length < 4} className="bg-black text-white rounded-xl px-2 text-[11px] font-bold disabled:opacity-50 flex items-center">
-                          {verificandoPin ? <Loader2 size={10} className="animate-spin"/> : 'OK'}
-                        </button>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
               </section>
 
             </div>
