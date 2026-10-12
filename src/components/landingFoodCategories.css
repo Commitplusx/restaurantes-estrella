@@ -1,0 +1,22 @@
+.food-categories-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.food-categories-heading h2 { font-size: 23px; line-height: 1.25; font-weight: 650; letter-spacing: -.025em; color: #1d1d1f; }
+.food-categories-heading p { color: #6e6e73; font-size: 12px; line-height: 1.4; }
+.food-categories-list { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 12px; }
+.food-categories-list button { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 66px; padding: 10px 12px; border: 1px solid #e8e8ed; border-radius: 12px; background: #fff; color: #515154; text-align: left; transition: background .18s, border-color .18s, color .18s; }
+.food-categories-list button:hover:not([aria-pressed=true]) { background: #f5f5f7; border-color: #d2d2d7; }
+.food-categories-list button[aria-pressed=true] { background: #1d1d1f; border-color: #1d1d1f; color: white; }
+.food-category-photo { display: grid; place-items: center; position: relative; overflow: hidden; width: 44px; height: 44px; flex-shrink: 0; background: #f5f5f7; color: #515154; border-radius: 9px; }
+.food-category-photo img { width: 100%; height: 100%; object-fit: contain; }
+.food-category-name { font-size: 13px; line-height: 1.3; font-weight: 500; overflow-wrap: anywhere; }
+.food-category-check { margin-left: auto; flex-shrink: 0; }
+.eats-landing .food-categories-list button:focus-visible { outline: 2px solid #bd3818; outline-offset: 3px; }
+@media (min-width: 768px) and (max-width: 1199px) { .food-categories-list { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+@media (max-width: 767px) {
+  .food-categories-heading { display: block; }
+  .food-categories-heading h2 { font-size: 21px; }
+  .food-categories-heading p { margin-top: 6px; }
+  .food-categories-list { position: relative; display: flex; overflow-x: auto; gap: 8px; padding: 5px 4px 12px; margin: -5px -4px -12px; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: #d2d2d7 transparent; }
+  .food-categories-list button { flex-shrink: 0; min-width: 124px; scroll-snap-align: start; }
+  .food-category-name { white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) { .food-categories-list, .food-categories-list button { transition: none; scroll-behavior: auto; } }

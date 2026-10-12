@@ -177,15 +177,15 @@
   .eats-header-cart { padding: 12px 16px; color: white; background: var(--eats-orange); border-radius: 9px; }
   .eats-header-cart:hover { background: #c93c17; }
   .eats-landing .eats-landing-main { max-width: 1440px; padding: 120px 48px 32px; }
-  .eats-desktop-hero { display: grid; grid-template-columns: 1.03fr 1fr; min-height: 510px; margin-bottom: 48px; gap: 42px; }
+  .eats-desktop-hero { display: grid; grid-template-columns: minmax(0,1.03fr) minmax(0,1fr); min-height: 510px; margin-bottom: 48px; gap: 42px; }
   .eats-hero-copy { padding: 27px 0 12px; position: relative; }
   .eats-eyebrow { display: flex; align-items: center; gap: 9px; font-size: 10px; font-weight: 700; letter-spacing: 2.2px; margin-bottom: 27px; }
   .eats-eyebrow span { width: 7px; height: 7px; background: var(--eats-orange); border-radius: 50%; }
-  .eats-hero-copy h1 { font-size: clamp(64px, 6.2vw, 94px); line-height: .98; font-weight: 800; letter-spacing: -5px; position: relative; width: max-content; }
+  .eats-hero-copy h1 { font-size: clamp(56px, 5.6vw, 84px); line-height: .98; font-weight: 800; letter-spacing: -.045em; position: relative; width: fit-content; max-width: 100%; }
   .eats-hero-copy h1 > span { color: var(--eats-orange); }
   .eats-title-star { position: absolute; right: -78px; bottom: 18px; width: 54px; height: 54px; color: var(--eats-orange); transform: rotate(12deg); }
   .eats-hero-copy > p { margin-top: 26px; font-size: 16px; line-height: 1.6; color: #6e6e73; }
-  .eats-hero-actions { display: flex; align-items: center; gap: 24px; margin-top: 27px; }
+  .eats-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin-top: 27px; }
   .eats-explore-button { display: inline-flex; align-items: center; justify-content: space-between; gap: 24px; padding: 17px 20px; border-radius: 9px; background: var(--eats-orange); color: white; font-size: 14px; font-weight: 600; transition: background .2s, transform .2s; }
   .eats-explore-button:hover { background: #cf3d18; transform: translateY(-2px); }
   .eats-hero-benefits { display: inline-flex; align-items: center; gap: 9px; font-size: 12px; text-decoration: underline; text-underline-offset: 5px; white-space: nowrap; }
@@ -279,6 +279,16 @@
 
 
 /* White home palette: keep the composition and Estrella orange as the accent. */
+@media (min-width: 1024px) and (max-height: 700px) {
+  .eats-landing .eats-landing-main { padding-top: 104px; }
+  .eats-desktop-hero { min-height: 420px; }
+  .eats-hero-visual { min-height: 420px; }
+  .eats-hero-copy { padding-top: 12px; }
+  .eats-hero-copy h1 { font-size: clamp(56px,5vw,72px); }
+  .eats-eyebrow { margin-bottom: 20px; }
+  .eats-hero-copy > p, .eats-hero-actions { margin-top: 20px; }
+  .eats-hero-footnote { margin-top: 20px; }
+}
 .eats-landing .eats-landing-footer { color: #1d1d1f; }
 .eats-landing-footer .text-white { color: #1d1d1f; }
 .eats-landing-footer a:hover { color: #1d1d1f; }

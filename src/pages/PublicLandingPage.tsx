@@ -11,6 +11,8 @@ import { SearchView } from '../components/SearchView';
 import { DesktopRestaurantList, DesktopRestaurantSkeletons } from '../components/DesktopRestaurantList';
 import { DesktopLandingHeader, DesktopLandingHero } from '../components/DesktopLandingIntro';
 import { useIsDesktop } from '../hooks/useIsDesktop';
+import LandingFoodCategories from '../components/LandingFoodCategories';
+import type { LandingFoodCategory } from '../components/LandingFoodCategories';
 import { isLandingBanner, type LandingBanner } from '../lib/landingBanner';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
@@ -330,7 +332,7 @@ export function PublicLandingPage() {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
   const [heroBanners, setHeroBanners] = useState<LandingBanner[]>([])
-  const [activeCategories, setActiveCategories] = useState<{name: string, emoji: string}[]>([])
+  const [activeCategories, setActiveCategories] = useState<LandingFoodCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingPromos, setLoadingPromos] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -1263,54 +1265,7 @@ export function PublicLandingPage() {
         </AnimatePresence>
 
         {/* Categorías Desktop (Horizontal Premium con Imágenes Reales) */}
-        <div id="eats-desktop-categories" role="region" aria-label="Restaurantes por tipo de comida" tabIndex={-1} className="eats-desktop-categories flex flex-col mb-10 mt-2">
-          <div className="eats-category-heading flex">
-            <h2>Busca por tipo de comida</h2>
-            <span>Filtra los restaurantes por categoría</span>
-          </div>
-          <div className="eats-category-strip flex items-center gap-4 overflow-x-auto no-scrollbar pb-4 px-1 snap-x">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              aria-pressed={!selectedCategory}
-              className={`flex flex-col items-center gap-3 min-w-[88px] snap-start group outline-none`}
-            >
-              <div className={`w-[76px] h-[76px] rounded-full flex items-center justify-center transition-all duration-300 ${!selectedCategory ? 'bg-black shadow-lg shadow-black/20 scale-105' : 'bg-white border border-slate-100 hover:bg-slate-50 hover:shadow-md hover:-translate-y-1'}`}>
-                <House size={26} aria-hidden="true" />
-              </div>
-              <span className={`text-[14px] transition-all ${!selectedCategory ? 'font-black text-black' : 'font-medium text-slate-500 group-hover:text-slate-800'}`}>Inicio</span>
-            </button>
-
-            {activeCategories.map(c => (
-              <button
-                key={c.name}
-                onClick={() => setSelectedCategory(c.name)}
-                aria-pressed={selectedCategory === c.name}
-                className={`flex flex-col items-center gap-3 min-w-[88px] snap-start group outline-none`}
-              >
-                <div className={`w-[76px] h-[76px] rounded-full flex items-center justify-center transition-all duration-300 overflow-hidden relative ${
-                  selectedCategory === c.name
-                    ? 'ring-[3px] ring-black ring-offset-[3px] scale-105 shadow-lg'
-                    : 'bg-white border border-slate-100 hover:shadow-md hover:-translate-y-1'
-                }`}>
-                  <img
-                    src={(c as any).image}
-                    alt={c.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                    }}
-                  />
-                  <span className="hidden absolute inset-0 flex items-center justify-center text-[28px] bg-slate-100">{c.emoji}</span>
-                  {selectedCategory === c.name && <div className="absolute inset-0 bg-black/5" />}
-                </div>
-                <span className={`text-[14px] transition-all ${selectedCategory === c.name ? 'font-black text-black' : 'font-medium text-slate-500 group-hover:text-slate-800'}`}>
-                  {c.name}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <LandingFoodCategories categories={activeCategories} selected={selectedCategory} onSelect={setSelectedCategory} />
 
         {/* Grid de Restaurantes */}
         {loading ? (

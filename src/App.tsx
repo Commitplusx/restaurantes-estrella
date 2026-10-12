@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import { FloatingOrderTracker } from './components/FloatingOrderTracker'
 import { InstallPWA } from './components/InstallPWA'
 import { OfflineBanner } from './components/OfflineBanner'
+import { PwaUpdateNotice } from './components/PwaUpdateNotice'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
@@ -96,6 +97,7 @@ export default function App() {
   );
   return (
     <BrowserRouter>
+      <PwaUpdateNotice />
       <OfflineBanner />
       <CookieBanner />
       <FloatingOrderTracker />

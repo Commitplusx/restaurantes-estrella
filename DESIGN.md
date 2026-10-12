@@ -201,7 +201,7 @@ El campo móvil mide al menos (48px), recibe texto de (16px) y muestra borde y f
 
 ### Categories and restaurant cards
 
-Las categorías muestran selección en contorno, fondo y texto. En PC desde 1024px sus imágenes miden 64px, con esquinas de 16px y separación de 16px. El listado móvil conserva fotografía, nombre, categoría, modalidad y favorito.
+Las categorías usan `LandingFoodCategories`: tarjetas horizontales de al menos 66px, foto de 44px y texto de 13px; selección negra con texto blanco y check. Grid de seis columnas desde 1200px, cuatro de 768px a 1199px y carrusel horizontal en teléfono. El filtro seleccionado se centra en el carrusel móvil, respetando reduced motion. El listado móvil conserva fotografía, nombre, categoría, modalidad y favorito.
 
 Desde 768px, el carrusel de restaurantes usa tarjetas de 224px de ancho y separación de 20px; la foto tiene relación 16:9, `contain` y 10px de padding, sin ampliar el logo. El listado completo usa `repeat(auto-fill,minmax(200px,1fr))`, separado por 20px entre columnas y 28px entre filas. Las esquinas de foto miden 12px. Favoritos y flechas tienen objetivos de 44px; el favorito es hermano del enlace al menú y expone `aria-pressed`. La imagen fallida usa el icono Store. El carrusel puede operarse con teclado y sus flechas respetan reduced motion. Los nombres permiten dos líneas, con ruptura de cadenas largas. Las muestras del sidecar usan nombres y metadatos de muestra, no ratings ni tiempos comerciales nuevos.
 
