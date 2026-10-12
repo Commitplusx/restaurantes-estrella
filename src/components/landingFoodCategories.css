@@ -15,7 +15,8 @@
   .food-categories-heading { display: block; }
   .food-categories-heading h2 { font-size: 21px; }
   .food-categories-heading p { margin-top: 6px; }
-  .food-categories-list { position: relative; display: flex; overflow-x: auto; gap: 8px; padding: 5px 4px 12px; margin: -5px -4px -12px; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: #d2d2d7 transparent; }
+  .food-categories-list { position: relative; display: flex; overflow-x: auto; gap: 8px; padding: 5px 4px 12px; margin: -5px -4px -12px; scroll-snap-type: x proximity; scrollbar-width: none; }
+  .food-categories-list::-webkit-scrollbar { display: none; }
   .food-categories-list button { flex-shrink: 0; min-width: 124px; scroll-snap-align: start; }
   .food-category-name { white-space: nowrap; }
 }

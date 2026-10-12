@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import type { MenuPromocion } from '../lib/supabase'
 import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { animate, motion, AnimatePresence } from 'framer-motion'
+import { animate, motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useLoadScript, GoogleMap, OverlayView } from '@react-google-maps/api';
 import { OnboardingFlow } from '../components/OnboardingFlow';
 import { BottomNav } from '../components/BottomNav';
@@ -345,6 +345,7 @@ export function PublicLandingPage() {
   const [showHeader, setShowHeader] = useState(true)
   const lastScrollY = useRef(0)
   const catalogScroll = useRef<ReturnType<typeof animate> | null>(null)
+  const prefersReducedMotion = useReducedMotion()
   const [showNotifications, setShowNotifications] = useState(false)
   const observerTarget = useRef(null)
   
@@ -916,30 +917,49 @@ export function PublicLandingPage() {
     return result;
   }, [restaurantes, search, selectedCategory, activeTab, userLocation]);
 
-  const exploreRestaurants = () => {
+  const exploreRestaurants = useCallback(() => {
     const catalog = document.getElementById('eats-desktop-categories');
     if (!catalog) return;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const margin = Number.parseFloat(getComputedStyle(catalog).scrollMarginTop) || 0;
-    const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    const destination = Math.min(limit, Math.max(0, window.scrollY + catalog.getBoundingClientRect().top - margin));
+    const destination = () => {
+      const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      return Math.min(limit, Math.max(0, window.scrollY + catalog.getBoundingClientRect().top - margin));
+    };
     catalogScroll.current?.stop();
-    if (Math.abs(destination - window.scrollY) < 1) {
+    if (reducedMotion || Math.abs(destination() - window.scrollY) < 1) {
       catalogScroll.current = null;
+      window.scrollTo({ top: destination(), behavior: 'instant' });
       catalog.focus({ preventScroll: true });
       return;
     }
     // Animate the scroll position itself: native smooth scrolling may be disabled by the browser.
-    catalogScroll.current = animate(window.scrollY, destination, {
-      duration: reducedMotion ? 0.45 : 0.8,
+    const origin = window.scrollY;
+    catalogScroll.current = animate(0, 1, {
+      duration: 0.8,
       ease: [0.4, 0, 0.2, 1],
-      onUpdate: top => window.scrollTo({ top, behavior: 'instant' }),
+      onUpdate: progress => window.scrollTo({ top: origin + (destination() - origin) * progress, behavior: 'instant' }),
       onComplete: () => {
         catalogScroll.current = null;
         catalog.focus({ preventScroll: true });
       },
     });
-  };
+  }, []);
+
+  const catalogEntry = useRef<string | null>(null);
+  const infoNavigationState: unknown = location.state;
+  const returningFromInfo = typeof infoNavigationState === 'object' && infoNavigationState !== null
+    && 'publicInfoReturn' in infoNavigationState && infoNavigationState.publicInfoReturn === true;
+  useLayoutEffect(() => {
+    if (location.hash === '#eats-desktop-categories' || returningFromInfo) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [location.key, location.hash, returningFromInfo]);
+  useEffect(() => {
+    if (location.hash !== '#eats-desktop-categories' || loading || loadingPromos || catalogEntry.current === location.key) return;
+    catalogEntry.current = location.key;
+    exploreRestaurants();
+  }, [location.hash, location.key, loading, loadingPromos, exploreRestaurants]);
 
   return (
     <div data-catalog-filtered={Boolean(search || selectedCategory)} className="eats-landing min-h-screen bg-[#f8f8f8] text-slate-900 font-sans pb-20 selection:bg-orange-100">
@@ -1186,10 +1206,10 @@ export function PublicLandingPage() {
         <AnimatePresence>
           {!loadingPromos && promosGlobales.length > 0 && !search && !selectedCategory && (
             <motion.div 
-              initial={{ opacity: 0, height: 0, scale: 0.95 }}
+              initial={prefersReducedMotion ? false : { opacity: 0, height: 0, scale: 0.95 }}
               animate={{ opacity: 1, height: 'auto', scale: 1 }}
               exit={{ opacity: 0, height: 0, scale: 0.95 }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
               className="eats-desktop-offers mt-6 md:mt-8 mb-2 overflow-hidden"
             >
             <div className="flex items-center justify-between mb-4 px-2 md:px-0">
