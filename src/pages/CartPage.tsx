@@ -5,10 +5,12 @@ import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, Plus, Minus, X, CheckCircle2, AlertCircle, 
-  Loader2, MapPin, LocateFixed, Star, ShieldCheck,
+  Loader2, MapPin, Star, ShieldCheck,
   ShoppingBag, ArrowRight, Gift, Utensils, User, Phone, CreditCard, Banknote
 } from 'lucide-react';
-import { useLoadScript, GoogleMap } from '@react-google-maps/api';
+import DeliveryLocationPicker from '../components/DeliveryLocationPicker';
+import { canConfirmLocation, isDeliveryCoordinates, readSavedCoordinates } from '../lib/deliveryLocation';
+import type { DeliveryCoordinates, DeliveryLocation } from '../lib/deliveryLocation';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
 import { ACTIVE_ORDER_STATES } from '../utils/orderState';
 
@@ -43,11 +45,6 @@ interface Restaurante {
   maps_url: string;
   foto_fachada_url: string;
 }
-
-const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
-import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
-
-const PREMIUM_MAP_STYLE = UBER_EATS_MAP_STYLE;
 
 const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string, className?: string }) => {
   const [loaded, setLoaded] = useState(false);
@@ -88,11 +85,6 @@ export default function CartPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: LIBRARIES
-  });
-
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -131,19 +123,12 @@ export default function CartPage() {
   const [datosCliente, setDatosCliente] = useState<any>(null);
   const [checkingLoyalty, setCheckingLoyalty] = useState(false);
 
-  const [ubicacionGPS, setUbicacionGPS] = useState<{ lat: number; lng: number } | null>(() => {
-    const saved = sessionStorage.getItem('est_ubicacion');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [ubicacionGPS, setUbicacionGPS] = useState<DeliveryCoordinates | null>(() =>
+    readSavedCoordinates(sessionStorage.getItem('est_ubicacion')));
   
   const [direccionReferencias, setDireccionReferencias] = useState(() => sessionStorage.getItem('est_referencias') || '');
   
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
-  const [buscandoGPS, setBuscandoGPS] = useState(false);
-  const [draftUbicacion, setDraftUbicacion] = useState<{lat: number, lng: number} | null>(null);
-  const [draftDireccion, setDraftDireccion] = useState('');
-  const mapSelectionRef = useRef('');
   
   const [cuponPlataformaIdManual, setCuponPlataformaIdManual] = useState<string | null>(null);
   const [validandoCupon, setValidandoCupon] = useState(false);
@@ -328,205 +313,11 @@ export default function CartPage() {
   const _removeFromCart = useCartStore(state => state.removeFromCart);
   const removeFromCart = (cartItemId: string) => _removeFromCart(cartItemId);
 
-  const obtenerUbicacionPorIP = async () => {
-    const googleKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-    if (googleKey) {
-      try {
-        const res = await fetch(
-          `https://www.googleapis.com/geolocation/v1/geolocate?key=${googleKey}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(6000) }
-        );
-        const data = await res.json();
-        if (data.location?.lat && data.location?.lng) {
-          let ciudad = 'Tu ubicación aproximada';
-          try {
-            const geoRes = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${data.location.lat},${data.location.lng}&key=${googleKey}&language=es`,
-              { signal: AbortSignal.timeout(5000) }
-            );
-            const geoData = await geoRes.json();
-            if (geoData.results?.[0]?.formatted_address) {
-              ciudad = geoData.results[0].formatted_address;
-            }
-          } catch (_) { /* usar ciudad genérica */ }
-          return { lat: data.location.lat, lng: data.location.lng, ciudad };
-        }
-      } catch (_) { /* continuar con el siguiente */ }
-    }
-
-    try {
-      const res = await fetch('https://freeipapi.com/api/json', { signal: AbortSignal.timeout(5000) });
-      const data = await res.json();
-      if (data.latitude && data.longitude) {
-        return { lat: data.latitude, lng: data.longitude, ciudad: `${data.cityName}, ${data.regionName}` };
-      }
-    } catch (_) { /* ignorar */ }
-
-    return null;
-  };
-
-  const obtenerUbicacionGPS = () => {
-    const TIMEOUT_GPS_MS = 8000;
-
-    if (!('geolocation' in navigator)) {
-      showToast('GPS no disponible', 'Escribe tu dirección manualmente en el campo de abajo 👇', 'error');
-      return;
-    }
-
-    setBuscandoGPS(true);
-    let yaResuelto = false;
-
-    const timeoutId = setTimeout(async () => {
-      if (yaResuelto) return;
-      yaResuelto = true;
-      const ipLoc = await obtenerUbicacionPorIP();
-      if (ipLoc) {
-        setDraftUbicacion({ lat: ipLoc.lat, lng: ipLoc.lng });
-        setDraftDireccion(ipLoc.ciudad);
-        
-        if (!isMapModalOpen) {
-           setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng });
-           setDireccionEntrega(ipLoc.ciudad);
-        }
-        
-        if (mapInstance) {
-          mapInstance.panTo({ lat: ipLoc.lat, lng: ipLoc.lng });
-          mapInstance.setZoom(16);
-        }
-        showToast('Ubicación aproximada', `Detectamos que estás en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`, 'success');
-      } else {
-        showToast(
-          'No pudimos detectar tu ubicación',
-          'Escribe tu dirección manualmente o arrastra el pin en el mapa 📍',
-          'error'
-        );
-      }
-      setBuscandoGPS(false);
-    }, TIMEOUT_GPS_MS);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (yaResuelto) return;
-        yaResuelto = true;
-        clearTimeout(timeoutId);
-
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setDraftUbicacion({ lat, lng });
-        
-        if (mapInstance) {
-          mapInstance.panTo({ lat, lng });
-          mapInstance.setZoom(17);
-        }
-
-        if (window.google) {
-          const geocoder = new window.google.maps.Geocoder();
-          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-            setBuscandoGPS(false);
-            if (status === 'OK' && results && results[0]) {
-              setDraftDireccion(results[0].formatted_address);
-              if (!isMapModalOpen) {
-                setUbicacionGPS({ lat, lng });
-                setDireccionEntrega(results[0].formatted_address);
-              }
-            } else {
-              setDraftDireccion(`Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-            }
-          });
-        } else {
-          setBuscandoGPS(false);
-        }
-      },
-      async (error) => {
-        if (yaResuelto) return;
-        yaResuelto = true;
-        clearTimeout(timeoutId);
-
-        const ipLoc = await obtenerUbicacionPorIP();
-        if (ipLoc) {
-          setDraftUbicacion({ lat: ipLoc.lat, lng: ipLoc.lng });
-          setDraftDireccion(ipLoc.ciudad);
-          
-          if (!isMapModalOpen) {
-            setUbicacionGPS({ lat: ipLoc.lat, lng: ipLoc.lng });
-            setDireccionEntrega(ipLoc.ciudad);
-          }
-
-          if (mapInstance) {
-            mapInstance.panTo({ lat: ipLoc.lat, lng: ipLoc.lng });
-            mapInstance.setZoom(16);
-          }
-          const tituloToast = error.code === 1 ? 'Tu navegador bloqueó el GPS' : 'Ubicación aproximada por red';
-          const msjToast = error.code === 1 
-            ? `Por favor dale permisos o ajusta el pin manualmente. Te ubicamos en ${ipLoc.ciudad} por ahora.`
-            : `No pudimos usar tu GPS. Te ubicamos en ${ipLoc.ciudad}. Ajusta el pin si es necesario.`;
-
-          showToast(tituloToast, msjToast, error.code === 1 ? 'error' : 'success');
-        } else {
-          const mensajeError = error.code === 1
-            ? 'Bloqueaste el GPS. Escribe tu dirección en el campo de abajo 👇'
-            : error.code === 2
-            ? 'GPS no disponible. Escribe tu dirección manualmente 👇'
-            : 'GPS tardó demasiado. Escribe tu dirección manualmente 👇';
-          showToast('No pudimos obtener tu ubicación', mensajeError, 'error');
-        }
-        setBuscandoGPS(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
-  };
-
-  const handleMapDragEnd = () => {
-    if (mapInstance) {
-      const center = mapInstance.getCenter();
-      if (center) {
-        const lat = center.lat();
-        const lng = center.lng();
-        const selection = lat.toFixed(7) + ',' + lng.toFixed(7);
-        if (mapSelectionRef.current === selection) return;
-        mapSelectionRef.current = selection;
-        setDraftUbicacion({ lat, lng });
-        
-        const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-          if (mapSelectionRef.current !== selection) return;
-          if (status === 'OK' && results && results.length > 0 && results[0]) {
-            let route = '';
-            let streetNumber = '';
-            let neighborhood = '';
-
-            // Buscar en todos los componentes para priorizar calle, número y colonia
-            results[0].address_components.forEach((comp: google.maps.GeocoderAddressComponent) => {
-              if (comp.types.includes('route')) route = comp.short_name;
-              if (comp.types.includes('street_number')) streetNumber = comp.long_name;
-              if (comp.types.includes('sublocality') || comp.types.includes('neighborhood')) neighborhood = comp.long_name;
-            });
-
-            let customAddress = route ? `${route} ${streetNumber}`.trim() : '';
-            if (neighborhood) customAddress = customAddress ? `${customAddress}, ${neighborhood}` : neighborhood;
-            
-            // Si por alguna razón Google no trae calle/colonia, usamos un trozo del formateado
-            if (!customAddress) {
-               const parts = results[0].formatted_address.split(',');
-               customAddress = parts.length > 1 ? `${parts[0].trim()}, ${parts[1].trim()}` : results[0].formatted_address;
-            }
-
-            setDraftDireccion(customAddress);
-          } else {
-            setDraftDireccion(`Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-          }
-        });
-      }
-    }
-  };
-
-  const handleConfirmarUbicacion = () => {
-    if (draftUbicacion) {
-      setUbicacionGPS(draftUbicacion);
-      setDireccionEntrega(draftDireccion);
-      setIsMapModalOpen(false);
-    }
+  const handleConfirmarUbicacion = (location: DeliveryLocation) => {
+    if (!canConfirmLocation(location, location.address)) return;
+    setUbicacionGPS({ lat: location.lat, lng: location.lng });
+    setDireccionEntrega(location.address);
+    setIsMapModalOpen(false);
   };
 
   const validarCuponBtn = async () => {
@@ -687,7 +478,7 @@ export default function CartPage() {
   let costoEnvioFinal = (cuponValido && costoEnvioFijoOverride !== null && costoEnvioFijoOverride < costoEnvio) 
     ? costoEnvioFijoOverride 
     : costoEnvio;
-  const entregaConfirmada = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && Boolean(ubicacionGPS) && !fueraDeCobertura && !calculandoEnvio);
+  const entregaConfirmada = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && canConfirmLocation(ubicacionGPS, direccionEntrega) && !fueraDeCobertura && !calculandoEnvio);
   const textoEnvio = !ubicacionGPS ? 'Por confirmar' : calculandoEnvio ? 'Calculando...' : fueraDeCobertura ? 'No disponible'
     : costoEnvioFinal === 0 ? 'Gratis' : `$${costoEnvioFinal.toFixed(2)}`;
 
@@ -845,7 +636,7 @@ export default function CartPage() {
         navigate('/success?pedido=' + active[0].id);
         return;
       }
-      if (tipoEntrega === 'domicilio' && (!ubicacionGPS || fueraDeCobertura || calculandoEnvio)) throw new Error('Confirma una ubicación dentro de la cobertura y espera la cotización.');
+      if (tipoEntrega === 'domicilio' && (!canConfirmLocation(ubicacionGPS, direccionEntrega) || fueraDeCobertura || calculandoEnvio)) throw new Error('Confirma una dirección y ubicación dentro de la cobertura y espera la cotización.');
       const payload = generarPayloadPedido();
       pendingCheckoutRef.current = {payload, carrito: structuredClone(carrito)};
       const data = await checkoutRequest({action: 'request-client-otp', telefono: phone, idempotency_key: payload.idempotency_key});
@@ -975,7 +766,7 @@ export default function CartPage() {
       if (checkingLoyalty) return 'Verificando...';
       if (!clienteNombre.trim() || clienteTel.replace(/\D/g, '').length !== 10) return 'Faltan tus datos';
       if (!tipoEntrega) return 'Elige cómo recibirlo';
-      if (tipoEntrega === 'domicilio' && (!ubicacionGPS || fueraDeCobertura)) return 'Confirma tu ubicación';
+      if (tipoEntrega === 'domicilio' && (!canConfirmLocation(ubicacionGPS, direccionEntrega) || fueraDeCobertura)) return 'Confirma tu ubicación';
       return 'Continuar a Entrega y Pago';
     }
     if (checkoutStep === 3) {
@@ -990,7 +781,7 @@ export default function CartPage() {
     if (checkoutStep === 1) return true;
     if (checkoutStep === 2) {
       const datosValidos = clienteTel.replace(/\D/g, '').length === 10 && clienteNombre.trim().length > 0;
-      const entregaValida = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && ubicacionGPS && !fueraDeCobertura && !calculandoEnvio);
+      const entregaValida = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && canConfirmLocation(ubicacionGPS, direccionEntrega) && !fueraDeCobertura && !calculandoEnvio);
       return datosValidos && entregaValida;
     }
     if (checkoutStep === 3) {
@@ -1670,177 +1461,13 @@ export default function CartPage() {
 
       {/* MAP MODAL */}
       <AnimatePresence>
-        {isMapModalOpen && (
-          /* Layer 1: full-screen container = backdrop (desktop) + slide-in base (mobile) */
-          <motion.div
-            key="map-modal-outer"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] lg:bg-slate-900/60 lg:backdrop-blur-sm lg:flex lg:items-center lg:justify-center"
-            onClick={(e) => { if (e.target === e.currentTarget) setIsMapModalOpen(false) }}
-          >
-            {/* Layer 2: the dialog itself */}
-            <motion.div
-              key="map-modal-inner"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-              onClick={(e) => e.stopPropagation()}
-              className="
-                fixed inset-0 bg-[#f0f4f0] flex flex-col
-                lg:static lg:inset-auto lg:w-[860px] lg:h-[560px]
-                lg:rounded-3xl lg:overflow-hidden lg:shadow-2xl lg:flex-row
-              "
-            >
-              {/* ═══ LEFT: MAP ═══ */}
-              <div className="flex-1 relative overflow-hidden">
-
-                {/* Mobile-only header */}
-                <div className="lg:hidden absolute top-0 left-0 right-0 z-30 flex items-center gap-3 px-5 pt-12 pb-4">
-                  <button
-                    onClick={() => setIsMapModalOpen(false)}
-                    className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md"
-                  >
-                    <ChevronLeft size={22} className="text-slate-800" strokeWidth={2.5} />
-                  </button>
-                  <h2 className="font-black text-[17px] text-slate-900">Elige tu ubicación</h2>
-                </div>
-
-                {/* Map */}
-                {isGoogleMapsLoaded ? (
-                  <>
-                    <GoogleMap
-                      mapContainerStyle={{ width: '100%', height: '100%' }}
-                      center={draftUbicacion || ubicacionGPS || { lat: 16.2516, lng: -92.1332 }}
-                      zoom={17}
-                      onLoad={map => setMapInstance(map)}
-                      onIdle={handleMapDragEnd}
-                      options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: PREMIUM_MAP_STYLE }}
-                    />
-
-                    {/* Center pin */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none flex flex-col items-center">
-                      <div className="w-14 h-14 bg-[#1D4ED8] rounded-full flex items-center justify-center shadow-xl shadow-blue-700/40 border-4 border-white">
-                        <MapPin size={26} className="text-white fill-white/30" strokeWidth={2} />
-                      </div>
-                      <div className="w-[3px] h-4 bg-[#1D4ED8] rounded-full -mt-0.5" />
-                      <div className="w-5 h-2 bg-black/15 rounded-full blur-[2px] -mt-0.5" />
-                    </div>
-
-                    {/* Drag guide */}
-                    <AnimatePresence>
-                      {!draftUbicacion && !ubicacionGPS && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }} transition={{ delay: 0.5 }}
-                          className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-10 z-10 pointer-events-none flex flex-col items-center"
-                        >
-                          <motion.div
-                            animate={{ scale: [1, 1.5, 1], opacity: [0.6, 0, 0.6] }}
-                            transition={{ repeat: Infinity, duration: 1.8 }}
-                            className="w-10 h-10 rounded-full border-2 border-[#1D4ED8] absolute"
-                          />
-                          <div className="bg-slate-900/80 backdrop-blur-sm text-white text-[12px] font-bold px-3 py-1.5 rounded-full whitespace-nowrap mt-8 shadow-lg">
-                            🖐️ Arrastra el mapa para mover el pin
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                    <Loader2 className="animate-spin text-[#1D4ED8] w-10 h-10" />
-                  </div>
-                )}
-
-                {/* GPS button + tooltip */}
-                <div className="absolute bottom-6 right-5 z-20 flex flex-col items-end gap-3">
-                  <AnimatePresence>
-                    {!ubicacionGPS && !buscandoGPS && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.85, x: 20 }}
-                        animate={{ opacity: 1, scale: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.85, x: 20 }}
-                        transition={{ delay: 0.7, type: 'spring', stiffness: 260, damping: 22 }}
-                        className="pointer-events-none flex flex-col items-end gap-1.5"
-                      >
-                        <div className="bg-white rounded-2xl px-4 py-3 shadow-xl border border-slate-100 max-w-[200px] relative">
-                          <p className="text-[13px] font-black text-slate-800 leading-snug">¡Haz clic aquí!</p>
-                          <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
-                            Te ubicamos automáticamente en el mapa
-                          </p>
-                          <div className="absolute bottom-[-8px] right-6 w-4 h-4 bg-white rotate-45 border-b border-r border-slate-100" />
-                        </div>
-                        <motion.span
-                          animate={{ y: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}
-                          className="text-xl mr-1"
-                        >↓</motion.span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  <div className="relative">
-                    {!ubicacionGPS && !buscandoGPS && (
-                      <motion.div
-                        animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
-                        transition={{ repeat: Infinity, duration: 1.6 }}
-                        className="absolute inset-0 rounded-full bg-[#1D4ED8]/30"
-                      />
-                    )}
-                    <button
-                      onClick={obtenerUbicacionGPS}
-                      className={`relative w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all active:scale-95 ${
-                        ubicacionGPS ? 'bg-white text-slate-600' : 'bg-[#1D4ED8] text-white hover:bg-blue-700 shadow-blue-700/30'
-                      }`}
-                    >
-                      {buscandoGPS ? <Loader2 size={22} className="animate-spin" /> : <LocateFixed size={22} strokeWidth={2.5} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* ═══ RIGHT: PANEL ═══ */}
-              <div className="bg-white lg:w-[300px] rounded-t-[32px] lg:rounded-none px-5 pt-5 pb-8 flex flex-col lg:justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.08)] lg:shadow-[-4px_0_20px_rgba(0,0,0,0.06)]">
-                <div>
-                  {/* Desktop header */}
-                  <div className="hidden lg:flex items-center justify-between mb-6">
-                    <h2 className="font-black text-[18px] text-slate-900">Elige tu ubicación</h2>
-                    <button
-                      onClick={() => setIsMapModalOpen(false)}
-                      className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors"
-                    >
-                      <X size={16} className="text-slate-600" />
-                    </button>
-                  </div>
-                  {/* Mobile drag handle */}
-                  <div className="lg:hidden w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
-
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Ubicación seleccionada</p>
-                  <div className="flex items-start gap-3 bg-slate-50 rounded-2xl px-4 py-3.5 mb-4 border border-slate-100">
-                    <MapPin size={18} className="text-[#1D4ED8] shrink-0 mt-0.5" strokeWidth={2.5} />
-                    <p className="text-[14px] font-semibold text-slate-800 leading-snug">
-                      {draftDireccion || 'Mueve el mapa o usa el GPS para seleccionar tu dirección'}
-                    </p>
-                  </div>
-                  <div className="hidden lg:flex items-center gap-2 text-[12px] text-slate-400 font-medium mb-2">
-                    <LocateFixed size={13} />
-                    <span>Usa el botón azul en el mapa para ubicarte automáticamente</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleConfirmarUbicacion}
-                  disabled={!draftUbicacion && !ubicacionGPS}
-                  className="w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-black text-[16px] disabled:opacity-40 shadow-lg shadow-blue-700/25 hover:bg-blue-700 active:scale-[0.98] transition-all"
-                >
-                  Confirmar ubicación
-                </button>
-              </div>
-
-            </motion.div>
-          </motion.div>
-        )}
+        {isMapModalOpen && <DeliveryLocationPicker
+          key="delivery-location"
+          initialLocation={ubicacionGPS ? { ...ubicacionGPS, address: direccionEntrega } : null}
+          restaurantLocation={isDeliveryCoordinates(restaurante) ? { lat: restaurante.lat, lng: restaurante.lng } : null}
+          onConfirm={handleConfirmarUbicacion}
+          onClose={() => setIsMapModalOpen(false)}
+        />}
       </AnimatePresence>
 
 
