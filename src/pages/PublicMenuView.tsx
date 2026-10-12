@@ -27,9 +27,14 @@ import {
   ChevronDown,
   ShieldCheck,
   Sparkles,
-  Gift
+  Gift,
+  ArrowRight
 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
+import MenuProductCard from '../components/MenuProductCard';
+import RestaurantMenuIdentity from '../components/RestaurantMenuIdentity';
+import MenuDetailsFrame from '../components/MenuDetailsFrame';
+import './PublicMenuView.css';
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
@@ -234,6 +239,7 @@ export function PublicMenuView() {
   const [loading, setLoading] = useState(true)
 
   const [activeTab, setActiveTab] = useState<string>('')
+  const [openingCart, setOpeningCart] = useState(false);
   const categoryChipsRef = useRef<HTMLDivElement>(null)
   const [chipsAtEnd, setChipsAtEnd] = useState(false)
 
@@ -241,8 +247,10 @@ export function PublicMenuView() {
   useEffect(() => {
     if (!categoryChipsRef.current) return
     const activeChip = categoryChipsRef.current.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement
-    if (activeChip) {
-      activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    if (activeChip && window.matchMedia('(max-width: 899px)').matches) {
+      const list = categoryChipsRef.current;
+      list.scrollTo({ left: activeChip.offsetLeft - (list.clientWidth - activeChip.offsetWidth) / 2,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     }
   }, [activeTab])
 
@@ -1265,119 +1273,30 @@ export function PublicMenuView() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 selection:bg-[#FA4A0C]/20 font-sans pb-32">
+    <MotionConfig reducedMotion="user">
+    <motion.div className="restaurant-menu-page" initial={{ opacity: 0 }} animate={{ opacity: openingCart ? 0 : 1 }} transition={{ duration: .24, ease: [.22, 1, .36, 1] }} onAnimationComplete={() => {
+      if (openingCart) navigate(`/menu/${id}/carrito`);
+    }}>
 
       {/* TOPBAR */}
-      <header className={`fixed top-0 left-0 right-0 z-50 py-3 px-4 md:px-10 flex items-center gap-3 transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm' : 'bg-transparent'}`}>
+      <header className="menu-topbar">
+        <div className="menu-topbar-inner">
         <Link
           to="/"
           state={fromSearch ? { activeNavTab: 'search' } : undefined}
-          className={`p-2.5 rounded-full transition-all shrink-0 ${isScrolled ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-black/20 backdrop-blur-md text-white hover:bg-black/30'}`}
+          className="menu-back"
+          aria-label="Volver a los restaurantes"
         >
           <ChevronLeft size={20} />
         </Link>
-        <div className={`flex-1 min-w-0 transition-all duration-500 ease-out flex items-center gap-3 ${isScrolled ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          {restaurante.foto_fachada_url && (
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-sm">
-              <img src={restaurante.foto_fachada_url} loading="lazy" alt="Logo" className="w-full h-full object-cover" />
-            </div>
-          )}
-          <h1 className="text-[16px] md:text-[18px] font-brother font-bold uppercase tracking-widest text-slate-900 truncate mt-0.5">{restaurante.nombre}</h1>
+        <Link to="/" className="menu-brand" aria-label="Estrella Eats, inicio"><img src="/estrella-circle.png" alt="" width="32" height="32" /><span>Estrella<span>Eats</span></span></Link>
+        {cartCount === 0 && <span className="menu-topbar-label">Menú del restaurante</span>}
         </div>
       </header>
 
       {/* HERO FULL BLEED (RAPPI STYLE) */}
-      <div className="relative w-full h-[20vh] md:h-[15vh] bg-slate-50 overflow-hidden border-b border-slate-100">
-        {restaurante.foto_fachada_url && (
-          <>
-            {/* Mobile: Fondo borroso */}
-            <div 
-              className="absolute inset-0 bg-cover bg-center blur-[50px] scale-150 opacity-60 saturate-150 md:hidden"
-              style={{ backgroundImage: `url(${restaurante.foto_fachada_url})` }}
-            />
-            {/* PC: Gradiente muy limpio y premium en tonos claros */}
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-50/50 via-slate-50 to-orange-100/30 hidden md:block" />
-            
-            {/* Sombra de transición en móvil */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-slate-50/80 md:hidden" />
-          </>
-        )}
-      </div>
-
-      <div className="max-w-[1200px] mx-auto px-4 md:px-8 relative z-10">
-
-        {/* INFO CARD (RAPPI STYLE) */}
-        <div className="bg-white rounded-t-3xl sm:rounded-none -mt-6 sm:mt-0 pt-0 pb-6 flex flex-col items-center sm:items-start text-center sm:text-left border-b border-slate-100">
-          
-          <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-[18px] md:rounded-[20px] overflow-hidden shadow-sm border-4 border-white bg-white shrink-0 flex items-center justify-center -mt-10 md:-mt-12 mb-3 z-20">
-            <LazyImage src={restaurante.foto_fachada_url} alt="Logo" className="w-full h-full object-cover" />
-          </div>
-          
-          <div className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div className="flex-1 min-w-0 flex flex-col items-center sm:items-start">
-              <div className="flex flex-col sm:flex-row items-center gap-2 mb-1 mt-1 px-2 sm:px-0">
-                <h1 className="text-2xl sm:text-3xl font-brother font-bold uppercase tracking-widest text-slate-900 text-balance leading-none break-words">
-                  {restaurante.nombre}
-                </h1>
-                {sucursalesFamilia.length > 0 && (
-                  <button 
-                    onClick={() => setShowSucursalesModal(true)} 
-                    className="bg-slate-50 hover:bg-slate-100 text-[#FA4A0C] border border-[#FA4A0C]/20 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors"
-                  >
-                    {sessionStorage.getItem('est_branch_id') ? 'Cambiar sucursal' : 'Seleccionar sucursal'}
-                  </button>
-                )}
-              </div>
-              
-              <p className="text-slate-500 text-sm mb-4 flex items-center justify-center sm:justify-start gap-1 px-2 sm:px-0">
-                <Star size={14} className="text-amber-400 fill-amber-400" /> 
-                <span className="font-medium text-slate-700">4.8</span>
-                <span className="text-slate-300 mx-1">•</span>
-                {restaurante.categorias?.slice(0, 2).join(' • ') || 'Restaurante'}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap justify-center sm:justify-start gap-4 text-sm mt-1">
-            <div className="flex items-center gap-1.5 text-slate-600">
-              <Clock size={16} className="text-slate-400" /> 
-              <span>
-                {(() => {
-                  let abre = restaurante.hora_apertura?.slice(0, 5) || '';
-                  let cierra = restaurante.hora_cierre?.slice(0, 5) || '';
-                  if (restaurante.horarios) {
-                    const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-                    const diaString = dias[new Date().getDay()];
-                    const horarioHoy = (restaurante.horarios as any)[diaString];
-                    if (horarioHoy && horarioHoy.activo) {
-                      abre = horarioHoy.abre;
-                      cierra = horarioHoy.cierra;
-                    }
-                  }
-                  return `${abre} - ${cierra}`;
-                })()}
-              </span>
-            </div>
-            
-            <a 
-              href={(() => {
-                if (restaurante.lat && restaurante.lng) return `https://www.google.com/maps/search/?api=1&query=${restaurante.lat},${restaurante.lng}`;
-                if (restaurante.maps_url) return restaurante.maps_url;
-                if (restaurante.direccion?.startsWith('http')) return restaurante.direccion;
-                if (restaurante.direccion) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurante.direccion.replace('GPS: ', ''))}`;
-                return '#';
-              })()}
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className={`flex items-center gap-1.5 transition-colors ${(restaurante.lat && restaurante.lng) || restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-600 hover:text-blue-700' : 'text-slate-600 hover:text-slate-800'}`}
-            >
-              <MapPin size={16} className={(restaurante.lat && restaurante.lng) || restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'text-blue-500' : 'text-slate-400'} /> 
-              <span className={`line-clamp-1 max-w-[200px] font-medium ${(restaurante.lat && restaurante.lng) || restaurante.maps_url || restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'underline decoration-blue-200 underline-offset-2' : ''}`}>
-                {restaurante.direccion?.includes('GPS:') || restaurante.direccion?.startsWith('http') ? 'Ver ubicación en el mapa' : (restaurante.direccion || 'Comitán')}
-              </span>
-            </a>
-          </div>
-        </div>
+      <div className="menu-shell">
+        <RestaurantMenuIdentity restaurant={restaurante} open={estaAbierto(restaurante)} hasBranches={sucursalesFamilia.length > 0} onBranches={() => setShowSucursalesModal(true)} />
 
         {!estaAbierto(restaurante) && (
           <div className="bg-slate-50 text-slate-600 font-medium text-sm p-4 rounded-xl mt-6 flex items-center justify-center sm:justify-start gap-2 border border-slate-200">
@@ -1386,51 +1305,24 @@ export function PublicMenuView() {
           </div>
         )}
 
-        {/* CHIPS DE CATEGORÍA — premium pill chips estilo Rappi/UberEats */}
+        <div className="menu-catalog-layout">
+        {/* Categorías del catálogo */}
         {(categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 0 || combos.length > 0 || promos.length > 0) && (
-          <div className="sticky top-[52px] z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
+          <nav className="menu-category-nav" aria-label="Categorías del menú">
             <div className="relative">
-              {/* Gradiente izquierdo */}
-              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white/95 to-transparent z-10" />
-
-              {/* Gradiente derecho + flechita animada */}
-              <div
-                className={`pointer-events-none absolute right-0 top-0 bottom-0 z-10 flex items-center justify-end pr-1 transition-all duration-300 ${
-                  chipsAtEnd ? 'opacity-0 w-8' : 'opacity-100 w-14'
-                }`}
-                style={{ background: 'linear-gradient(to left, rgba(255,255,255,0.97) 55%, transparent)' }}
-              >
-                {!chipsAtEnd && (
-                  <div className="animate-bounce">
-                    <ChevronDown size={16} className="text-slate-400 rotate-[-90deg]" />
-                  </div>
-                )}
-              </div>
-
               <div
                 ref={categoryChipsRef}
                 onScroll={handleChipsScroll}
-                className="flex overflow-x-auto gap-2 px-4 py-3"
-                style={{
-                  WebkitOverflowScrolling: 'touch',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none',
-                }}
+                className="menu-category-list"
               >
                 {promos.length > 0 && (
                   <button
                     data-tab="promos"
                     onClick={() => setActiveTab('promos')}
-                    style={{ minHeight: '44px' }}
-                    className={`shrink-0 flex items-center gap-1.5 px-4 rounded-full text-[13.5px] font-bold
-                      transition-all duration-150 whitespace-nowrap
-                      active:scale-95 select-none
-                      ${activeTab === 'promos'
-                        ? 'bg-[#FA4A0C] text-white shadow-lg shadow-orange-500/25'
-                        : 'bg-orange-50 text-orange-500 active:bg-orange-100'
-                      }`}
+                    aria-pressed={activeTab === 'promos'}
+                    className="menu-category-button"
                   >
-                    <span className="text-base leading-none">🔥</span> Promociones
+                    <span>Promociones</span><small>{promos.length}</small>
                   </button>
                 )}
                 {categorias.filter(c => items.some(i => i.categoria_id === c.id)).map(cat => (
@@ -1438,48 +1330,33 @@ export function PublicMenuView() {
                     key={`chip-${cat.id}`}
                     data-tab={cat.id}
                     onClick={() => setActiveTab(cat.id)}
-                    style={{ minHeight: '44px' }}
-                    className={`shrink-0 flex items-center gap-1.5 px-4 rounded-full text-[13.5px] font-bold
-                      transition-all duration-150 whitespace-nowrap
-                      active:scale-95 select-none
-                      ${activeTab === cat.id
-                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
-                        : 'bg-slate-100 text-slate-600 active:bg-slate-200'
-                      }`}
+                    aria-pressed={activeTab === cat.id}
+                    className="menu-category-button"
                   >
-                    <span className="text-base leading-none">
-                      {(!cat.emoji || cat.emoji.trim() === '🍽️' || cat.emoji.trim() === '🍽') ? getEmojiForCategory(cat.nombre) : cat.emoji}
-                    </span>
-                    {cat.nombre}
+                    <span>{cat.nombre}</span><small>{items.filter(item => item.categoria_id === cat.id).length}</small>
                   </button>
                 ))}
                 {combos.length > 0 && (
                   <button
                     data-tab="combos"
                     onClick={() => setActiveTab('combos')}
-                    style={{ minHeight: '44px' }}
-                    className={`shrink-0 flex items-center gap-1.5 px-4 rounded-full text-[13.5px] font-bold
-                      transition-all duration-150 whitespace-nowrap
-                      active:scale-95 select-none
-                      ${activeTab === 'combos'
-                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20'
-                        : 'bg-slate-100 text-slate-600 active:bg-slate-200'
-                      }`}
+                    aria-pressed={activeTab === 'combos'}
+                    className="menu-category-button"
                   >
-                    <span className="text-base leading-none">🏷️</span> Combos
+                    <span>Combos</span><small>{combos.length}</small>
                   </button>
                 )}
 
-                {/* Spacer para que el último chip no quede pegado al borde */}
-                <div className="shrink-0 w-8" />
               </div>
             </div>
-          </div>
+          </nav>
         )}
 
 
             {/* PRODUCT CATEGORIES CONTENT */}
-            <div className="mt-8 relative">
+            <main className="menu-catalog-content" aria-label="Productos del restaurante">
+              <div className="menu-catalog-heading"><h2>{activeTab === 'promos' ? 'Promociones' : activeTab === 'combos' ? 'Combos' : categorias.find(category => category.id === activeTab)?.nombre || 'Menú'}</h2><p>Elige un producto para ver los detalles.</p></div>
+              <div className="relative">
                 <AnimatePresence mode="popLayout">
                   {categorias.filter(cat => cat.id === activeTab).map(cat => {
                     const catItems = items.filter(i => i.categoria_id === cat.id)
@@ -1490,10 +1367,10 @@ export function PublicMenuView() {
                         id={`cat-${cat.id}`}
                         key={cat.id}
                         className="mb-10 scroll-mt-[140px]"
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                        transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 25 }}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.24, ease: [.22, 1, .36, 1] }}
                       >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {catItems.map((item) => {
@@ -1505,72 +1382,31 @@ export function PublicMenuView() {
                             (horaActual < item.hora_inicio_disponible || horaActual > item.hora_fin_disponible)
                           )
                           return (
-                            <div
+                            <MenuProductCard
                               key={item.id}
-                              className={`bg-white p-4 rounded-[16px] border border-slate-100 flex gap-4 items-stretch cursor-pointer hover:border-slate-200 transition-colors ${fueraDeHorario ? 'opacity-50' : ''}`}
-                              onClick={() => {
-                                if (item.opciones && item.opciones.length > 0) {
+                              name={item.nombre}
+                              description={item.descripcion}
+                              image={item.foto_url}
+                              price={item.precio}
+                              quantity={carrito.filter(entry => entry.item.id === item.id && entry.item.tipo === 'item').reduce((sum, entry) => sum + entry.cantidad, 0)}
+                              customizable={Boolean(item.opciones?.length)}
+                              unavailable={item.agotado_hoy ? 'Agotado por hoy' : fueraDeHorario ? `Disponible de ${item.hora_inicio_disponible} a ${item.hora_fin_disponible}` : undefined}
+                              onDetails={() => {
+                                if (item.opciones?.length && !item.agotado_hoy && !fueraDeHorario) {
                                   setSelectedItemForOptions({ ...item, __tipo: 'item' });
                                   setSelectedOptionsState({});
                                 } else {
-                                  setSelectedItemDetail({ ...item, cartItemTipo: 'item' });
+                                  setSelectedItemDetail({ ...item, cartItemTipo: 'item', unavailable: item.agotado_hoy || fueraDeHorario });
                                 }
                               }}
-                            >
-                              <div className="flex-1 min-w-0 flex flex-col">
-                                <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{item.nombre}</h4>
-                                <p className="text-slate-500 text-sm mb-3 line-clamp-2 leading-snug">{item.descripcion}</p>
-                                <div className="mt-auto flex items-center justify-between">
-                                  <span className="text-slate-900 font-bold text-[15px]">${item.precio.toFixed(2)}</span>
-                                  
-                                  <div className="flex items-center gap-2">
-                                    {item.agotado_hoy ? (
-                                      <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">Agotado</span>
-                                    ) : fueraDeHorario ? (
-                                      <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">{item.hora_inicio_disponible}</span>
-                                    ) : null}
-
-                                    {!item.foto_url && (!item.agotado_hoy && !fueraDeHorario) && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          if (item.opciones && item.opciones.length > 0) {
-                                            setSelectedItemForOptions({ ...item, __tipo: 'item' })
-                                            setSelectedOptionsState({})
-                                          } else {
-                                            addToCart({ ...cartItem, cartItemId: item.id })
-                                          }
-                                        }}
-                                        className="w-8 h-8 bg-orange-50 text-[#FA4A0C] rounded-full shadow-sm flex items-center justify-center hover:scale-105 transition-transform z-30"
-                                      >
-                                        <Plus size={16} strokeWidth={3} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              {item.foto_url && (
-                                <div className="w-[100px] h-[100px] rounded-[12px] overflow-hidden bg-slate-50 shrink-0 relative flex items-center justify-center border border-slate-100">
-                                  <LazyImage src={item.foto_url} alt={item.nombre} className="w-full h-full" />
-                                  {(!item.agotado_hoy && !fueraDeHorario) && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        if (item.opciones && item.opciones.length > 0) {
-                                          setSelectedItemForOptions({ ...item, __tipo: 'item' })
-                                          setSelectedOptionsState({})
-                                        } else {
-                                          addToCart({ ...cartItem, cartItemId: item.id })
-                                        }
-                                      }}
-                                      className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
-                                    >
-                                      <Plus size={16} strokeWidth={3} />
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                              onAdd={() => {
+                                if (item.agotado_hoy || fueraDeHorario) return;
+                                if (item.opciones?.length) {
+                                  setSelectedItemForOptions({ ...item, __tipo: 'item' });
+                                  setSelectedOptionsState({});
+                                } else addToCart({ ...cartItem, cartItemId: item.id });
+                              }}
+                            />
                           )
                         })}
                         </div>
@@ -1599,66 +1435,17 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <div className="bg-white p-4 rounded-[16px] border border-slate-100 shadow-sm cursor-pointer hover:border-orange-200 transition-colors flex gap-4 items-stretch relative overflow-hidden group" onClick={() => {
-                        setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' });
-                      }}>
-                          <div className="absolute top-0 right-0 bg-blue-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-[12px] z-10 shadow-sm">
-                            Combo
-                          </div>
-                          
-                          <div className="flex-1 min-w-0 flex flex-col pt-1">
-                            <div className="cursor-pointer" onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' });
-                            }}>
-                              <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{combo.nombre}</h4>
-                              <p className="text-slate-500 text-sm mb-2 line-clamp-2 leading-snug">{combo.descripcion}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5 mb-3">
-                              {combo.incluye?.slice(0, 2).map((inc, i) => <span key={i} className="text-[11px] font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded-md truncate max-w-full">✓ {inc}</span>)}
-                              {combo.incluye && combo.incluye.length > 2 && <span className="text-[11px] font-bold text-slate-500 self-center">+{combo.incluye.length - 2} más</span>}
-                            </div>
-                            <div className="mt-auto flex items-center justify-between">
-                              <span className="text-slate-900 font-bold text-[15px]">${combo.precio.toFixed(2)}</span>
-                              {!combo.foto_url && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (combo.opciones && combo.opciones.length > 0) {
-                                      setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
-                                      setSelectedOptionsState({});
-                                    } else {
-                                      addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
-                                    }
-                                  }}
-                                  className="w-8 h-8 bg-orange-50 text-[#FA4A0C] rounded-full shadow-sm flex items-center justify-center hover:scale-105 transition-transform z-30"
-                                >
-                                  <Plus size={16} strokeWidth={3} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {combo.foto_url && (
-                            <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-blue-50 flex items-center justify-center">
-                              <LazyImage blurBackground={true} src={combo.foto_url} alt={combo.nombre} className="w-full h-full" imgClassName="object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (combo.opciones && combo.opciones.length > 0) {
-                                    setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
-                                    setSelectedOptionsState({});
-                                  } else {
-                                    addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
-                                  }
-                                }}
-                                className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
-                              >
-                                <Plus size={16} strokeWidth={3} />
-                              </button>
-                            </div>
-                          )}
-                      </div>
+                      <MenuProductCard name={combo.nombre} description={combo.descripcion} price={combo.precio} image={combo.foto_url} includes={combo.incluye} badge="Combo"
+                        quantity={carrito.filter(entry => entry.item.id === combo.id && entry.item.tipo === 'combo').reduce((sum, entry) => sum + entry.cantidad, 0)}
+                        customizable={Boolean(combo.opciones?.length)}
+                        onDetails={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' })}
+                        onAdd={() => {
+                          if (combo.opciones?.length) {
+                            setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
+                            setSelectedOptionsState({});
+                          } else addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
+                        }}
+                      />
                     </motion.div>
                   )
                 })}
@@ -1674,77 +1461,29 @@ export function PublicMenuView() {
                       key={promo.id}
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: index * 0.05, type: 'spring', bounce: 0.4 }}
+                      transition={{ duration: 0.24, delay: Math.min(index * 0.03, 0.12), ease: [.22, 1, .36, 1] }}
                     >
-                      <div
-                        className="bg-white p-4 rounded-[16px] border border-slate-100 shadow-sm cursor-pointer hover:border-orange-200 transition-colors flex gap-4 items-stretch relative overflow-hidden group"
-                        onClick={() => {
-                          setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
-                        }}
-                      >
-                          <div className="absolute top-0 right-0 bg-[#FA4A0C] text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-[12px] z-10 shadow-sm">
-                            Promo
-                          </div>
-                          
-                          <div className="flex-1 min-w-0 flex flex-col pt-1">
-                            <h4 className="font-medium text-slate-900 text-base leading-tight mb-1">{promo.titulo}</h4>
-                            {promo.descripcion && (
-                              <p className="text-slate-500 text-sm mb-3 line-clamp-2 leading-snug">{promo.descripcion}</p>
-                            )}
-                            <div className="mt-auto flex items-center justify-between">
-                              <span className="text-[#FA4A0C] font-bold text-[15px]">${promo.precio_especial?.toFixed(2)}</span>
-                              {!promo.foto_url && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
-                                  }}
-                                  className="w-8 h-8 bg-orange-50 text-[#FA4A0C] rounded-full shadow-sm flex items-center justify-center hover:scale-105 transition-transform z-30"
-                                >
-                                  <Plus size={16} strokeWidth={3} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {promo.foto_url && (
-                            <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[12px] overflow-hidden shrink-0 bg-orange-50 flex items-center justify-center">
-                              <LazyImage blurBackground={true} src={promo.foto_url} alt={promo.titulo} className="w-full h-full" imgClassName="object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial || 0, cartItemTipo: 'promo' });
-                                }}
-                                className="absolute bottom-2 right-2 w-8 h-8 bg-white text-[#FA4A0C] rounded-full shadow-md flex items-center justify-center hover:scale-105 transition-transform z-30"
-                              >
-                                <Plus size={16} strokeWidth={3} />
-                              </button>
-                            </div>
-                          )}
-                      </div>
+                      <MenuProductCard name={promo.titulo} description={promo.descripcion} price={promo.precio_especial} image={promo.foto_url} badge="Promoción"
+                        quantity={carrito.filter(entry => entry.item.id === promo.id && entry.item.tipo === 'promo').reduce((sum, entry) => sum + entry.cantidad, 0)}
+                        customizable={Boolean(promo.opciones?.length)}
+                        onDetails={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo' })}
+                        onAdd={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo' })}
+                      />
                     </motion.div>
                   )
                 })}
               </div>
             )}
+          </main>
+          </div>{/* menú y categorías */}
           </div>
           {/* Fin Contenedor Central */}
 
           {/* ── Item Detail Sheet ─────────────────────────────── */}
           <AnimatePresence>
             {selectedItemDetail && (
-                <motion.div
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  onClick={() => setSelectedItemDetail(null)}
-                  className="fixed inset-0 bg-slate-900/40 z-[60] backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-6"
-                >
-                  <motion.div
-                    initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}
-                    transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="bg-white rounded-t-[32px] md:rounded-[32px] w-full max-w-lg mx-auto overflow-hidden shadow-2xl p-6 relative"
-                    style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-                  >
+                <MenuDetailsFrame key={selectedItemDetail.id} onClose={() => setSelectedItemDetail(null)}>
+                  {selectedItemDetail.foto_url && <LazyImage src={selectedItemDetail.foto_url} alt="" className="menu-detail-photo" />}
                   <div className="flex items-start justify-between mb-2 gap-4">
                     <div>
                       {selectedItemDetail.cartItemTipo === 'promo' && (
@@ -1752,13 +1491,14 @@ export function PublicMenuView() {
                           Promo Especial
                         </div>
                       )}
-                      <h2 className="text-2xl font-extrabold text-slate-900 leading-tight">
+                      <h2 id="menu-detail-title" className="text-2xl font-semibold tracking-tight text-slate-900 leading-tight">
                         {selectedItemDetail.nombre || selectedItemDetail.titulo}
                       </h2>
                     </div>
                     <button
                       onClick={() => { vibrateLight(); setSelectedItemDetail(null); }}
-                      className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 flex items-center justify-center transition-colors shrink-0 mt-1"
+                      aria-label="Cerrar detalles del producto"
+                      className="menu-detail-close"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -1766,7 +1506,7 @@ export function PublicMenuView() {
 
                   <div className="max-h-[50vh] overflow-y-auto pr-2">
                     <p className="text-[15px] text-slate-500 leading-relaxed">
-                      {selectedItemDetail.descripcion || 'Sin descripción adicional.'}
+                      {selectedItemDetail.descripcion || 'Consulta los detalles con el restaurante si necesitas más información.'}
                     </p>
 
                     {(selectedItemDetail.cartItemTipo === 'combo' || selectedItemDetail.__tipo === 'combo') && selectedItemDetail.incluye && (
@@ -1781,12 +1521,13 @@ export function PublicMenuView() {
                     )}
 
                     <div className="flex items-center justify-between mt-8">
-                      <p className="text-3xl font-black text-[#FA4A0C]">
-                        ${(selectedItemDetail.precio || selectedItemDetail.precio_especial || 0).toFixed(2)}
+                      <p className="text-2xl font-semibold text-slate-900 tabular-nums">
+                        {typeof selectedItemDetail.precio === 'number' && Number.isFinite(selectedItemDetail.precio) ? `$${selectedItemDetail.precio.toFixed(2)}` : 'Precio no disponible'}
                       </p>
                     </div>
 
                     <button
+                      disabled={selectedItemDetail.unavailable || typeof selectedItemDetail.precio !== 'number' || !Number.isFinite(selectedItemDetail.precio) || selectedItemDetail.precio < 0}
                       onClick={() => {
                         const cartItem = {
                           id: selectedItemDetail.id,
@@ -1808,89 +1549,48 @@ export function PublicMenuView() {
                         
                         setSelectedItemDetail(null)
                       }}
-                      className="mt-6 w-full h-14 rounded-[20px] bg-slate-900 text-white font-extrabold text-[17px] shadow-xl shadow-slate-900/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+                      className="menu-detail-add"
                     >
                       <Plus className="w-5 h-5" />
-                      {selectedItemDetail.opciones && selectedItemDetail.opciones.length > 0 ? 'Elegir opciones' : 'Añadir al carrito'}
+                      {selectedItemDetail.unavailable ? 'No disponible por ahora' : selectedItemDetail.opciones?.length ? 'Elegir opciones' : 'Añadir al carrito'}
                     </button>
                   </div>
-                </motion.div>
-              </motion.div>
+                </MenuDetailsFrame>
             )}
           </AnimatePresence>
 
       {/* FOOTER PÚBLICO */}
-      <footer className="bg-white border-t border-slate-100 py-16 px-10 relative z-10 mt-10">
-        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="text-center md:text-left">
-            <div className="flex items-center gap-2 mb-3 justify-center md:justify-start">
-              <span className="text-lg font-black text-slate-800 tracking-tighter">
-                Estrella<span className="text-orange-500">Eats</span>
-              </span>
-            </div>
-            <p className="text-slate-400 text-sm font-medium">La mejor selección gastronómica de Comitán.</p>
-            <div className="mt-6 flex justify-center md:justify-start">
-              <img src="/estrella-circle.png" alt="Sello Estrella" className="w-24 h-24 object-contain" />
-            </div>
-          </div>
-          
-          <div className="flex flex-col md:flex-row gap-8 md:gap-12 text-center md:text-left">
-            <div className="flex flex-col gap-3">
-              <p className="text-xs font-black uppercase tracking-widest text-slate-900">Ayuda</p>
-              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Soporte 24/7</a>
-              <a href="#" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Seguridad</a>
-            </div>
-            <div className="flex flex-col gap-3">
-              <p className="text-xs font-black uppercase tracking-widest text-slate-900">Legal</p>
-              <Link to="/terminos" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Términos y Condiciones</Link>
-              <Link to="/privacidad" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Aviso de Privacidad</Link>
-            </div>
-          </div>
-        </div>
+      <footer className="menu-footer">
+        <span>EstrellaEats</span>
+        <Link to="/terminos">Términos y condiciones</Link>
+        <Link to="/privacidad">Aviso de privacidad</Link>
       </footer>
 
       {/* Floating Cart Button en Mobile */}
       <AnimatePresence>
         {cartCount > 0 && (
           <motion.div 
-            initial={{ y: 100, opacity: 0 }}
+            initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            transition={{ type: "spring", bounce: 0.4 }}
-            className="fixed bottom-6 left-0 right-0 flex justify-center z-40 pointer-events-none sm:bottom-10 sm:right-10 sm:left-auto sm:justify-end"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            exit={{ y: 16, opacity: 0 }}
+            transition={{ duration: .28, ease: [.22, 1, .36, 1] }}
+            className="menu-cart-dock"
           >
             <motion.button 
-              whileTap={{ scale: 0.9 }}
-              className="bg-[#FA4A0C] text-white px-8 py-3.5 rounded-full font-bold shadow-xl shadow-[#FA4A0C]/30 flex items-center gap-3 text-sm overflow-hidden pointer-events-auto origin-center"
-              onClick={(e) => {
-                const btn = e.currentTarget;
-                btn.animate([
-                  { transform: 'scale(1)' },
-                  { transform: 'scale(0.8)' },
-                  { transform: 'scale(1.1)' },
-                  { transform: 'scale(1)' }
-                ], { duration: 400, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
-                
+              whileTap={{ scale: .985 }}
+              disabled={openingCart}
+              aria-label={`Ver pedido, ${cartCount} productos`}
+              onClick={() => {
                 if (sucursalesFamilia.length > 0 && !sessionStorage.getItem('est_branch_id')) {
-                  setTimeout(() => setShowSucursalesModal(true), 300);
+                  setShowSucursalesModal(true);
                   return;
                 }
-                
-                setTimeout(() => navigate(`/menu/${id}/carrito`), 300);
+                setOpeningCart(true);
               }}
             >
-              <ShoppingBag size={18} />
-              Ver Carrito • 
-              <motion.span 
-                key={cartCount}
-                initial={{ y: -20, opacity: 0, scale: 2, color: '#fcd34d' }}
-                animate={{ y: 0, opacity: 1, scale: 1, color: '#ffffff' }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                className="inline-block"
-              >
-                {cartCount}
-              </motion.span> items
+              <span className="menu-cart-icon"><ShoppingBag size={22} aria-hidden="true" /><span className="menu-cart-count">{cartCount}</span></span>
+              <span className="menu-cart-label"><strong>Ver mi pedido</strong><small>Productos · ${carrito.reduce((sum, entry) => sum + entry.item.precio * entry.cantidad, 0).toFixed(2)}</small></span>
+              <ArrowRight size={20} aria-hidden="true" />
             </motion.button>
           </motion.div>
         )}
@@ -2605,7 +2305,8 @@ export function PublicMenuView() {
         )}
       </AnimatePresence>
 
-    </div>
+    </motion.div>
+    </MotionConfig>
   )
 }
 

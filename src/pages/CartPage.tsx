@@ -2,17 +2,21 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useCartStore } from '../store/useCartStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { 
-  ChevronLeft, Plus, Minus, X, CheckCircle2, AlertCircle, 
+  Plus, Minus, X, CheckCircle2, AlertCircle,
   Loader2, MapPin, Star, ShieldCheck,
-  ShoppingBag, ArrowRight, Gift, Utensils, User, Phone, CreditCard, Banknote
+  ShoppingBag, ArrowRight, Gift, Utensils, User, Phone, CreditCard, Banknote, Bike, Store, Tag
 } from 'lucide-react';
 import DeliveryLocationPicker from '../components/DeliveryLocationPicker';
 import { canConfirmLocation, isDeliveryCoordinates, readSavedCoordinates } from '../lib/deliveryLocation';
 import type { DeliveryCoordinates, DeliveryLocation } from '../lib/deliveryLocation';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
 import { ACTIVE_ORDER_STATES } from '../utils/orderState';
+import { CheckoutHeader, CheckoutAction } from '../components/CheckoutChrome';
+import CheckoutStepScene from '../components/CheckoutStepScene';
+import type { CheckoutStepDirection } from '../components/CheckoutStepScene';
+import './CartPage.css';
 
 // Interfaces
 interface CartItem {
@@ -48,7 +52,8 @@ interface Restaurante {
 
 const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string, className?: string }) => {
   const [loaded, setLoaded] = useState(false);
-  if (!src) return <div className={`w-full h-full bg-slate-50/80 flex items-center justify-center ${className || ''}`}><Utensils size={28} className="text-slate-300"/></div>;
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  if (!src || failedSource === src) return <div className={`w-full h-full bg-slate-50/80 flex items-center justify-center ${className || ''}`}><Utensils size={28} className="text-slate-300" aria-hidden="true" /></div>;
   return (
     <div className={`relative overflow-hidden bg-slate-100 ${className || ''}`}>
       {!loaded && <div className="absolute inset-0 bg-slate-200 animate-pulse z-10" />}
@@ -57,6 +62,7 @@ const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string,
         alt={alt || ''}
         loading="lazy"
         onLoad={() => setLoaded(true)}
+        onError={() => setFailedSource(src)}
         className={`relative z-20 w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
       />
     </div>
@@ -66,6 +72,10 @@ const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string,
 // Helper para scroll suave garantizado en todos los móviles (iOS Safari a veces ignora behavior: 'smooth')
 const smoothScroll = (element: HTMLElement | null, target: number, duration: number) => {
   if (!element) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    element.scrollTop = target;
+    return;
+  }
   const start = element.scrollTop;
   const change = target - start;
   const startTime = performance.now();
@@ -93,6 +103,9 @@ export default function CartPage() {
 
   const checkoutStep = useCartStore(state => state.checkoutStep);
   const setCheckoutStep = useCartStore(state => state.setCheckoutStep);
+  const [stepDirection, setStepDirection] = useState<CheckoutStepDirection>(1);
+  const [stepChanging, setStepChanging] = useState(false);
+  const stepTransitionRef = useRef(false);
 
   const clienteNombre = useCartStore(state => state.clienteNombre);
   const setClienteNombre = useCartStore(state => state.setClienteNombre);
@@ -114,6 +127,7 @@ export default function CartPage() {
   
   const cuponValido = useCartStore(state => state.cuponValido);
   const setCuponValido = useCartStore(state => state.setCuponValido);
+  const [couponOpen, setCouponOpen] = useState(cuponValido);
   
   const metodoPago = 'efectivo';
   const setMetodoPago = useCartStore(state => state.setMetodoPago);
@@ -683,63 +697,51 @@ export default function CartPage() {
     </div>
   );
 
-  // === ESTADO VACÍO PREMIUM ===
+  // El carrito vacío conserva el mismo marco visual del checkout.
   if (carrito.length === 0) {
     const handleGoBack = () => {
       setIsExiting(true);
-      setTimeout(() => {
-        navigate(id === 'global' ? '/' : `/menu/${id}`);
-      }, 250);
     };
 
     return (
-      <motion.div 
+      <MotionConfig reducedMotion="user">
+      <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: isExiting ? 0 : 1, scale: isExiting ? 0.98 : 1 }}
         transition={{ duration: 0.25 }}
-        className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 origin-bottom"
+        onAnimationComplete={() => {
+          if (isExiting) navigate(id === 'global' ? '/' : `/menu/${id}`);
+        }}
+        className="checkout-page"
       >
-        <header className="bg-slate-100 px-4 pt-4 pb-3 flex items-center sticky top-0 z-50">
-          <button onClick={handleGoBack} className="p-2 bg-white rounded-full mr-3 shadow-sm hover:bg-slate-50 transition-colors">
-            <ChevronLeft size={20} className="text-slate-700" />
-          </button>
-          <h1 className="text-lg font-black text-slate-800">Carrito de Compras</h1>
-        </header>
+        <CheckoutHeader step={1} onBack={handleGoBack} />
         
-        <main className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
+        <main className="checkout-empty">
           <motion.div 
             initial={{ scale: 0.8, opacity: 0, y: 20 }} 
             animate={{ scale: 1, opacity: 1, y: 0 }} 
             transition={{ type: "spring", duration: 0.6 }}
-            className="w-48 h-48 bg-gradient-to-br from-orange-50 to-red-50 rounded-full flex items-center justify-center mb-8 shadow-inner relative overflow-hidden"
+            className="checkout-empty-icon"
           >
-            <div className="absolute inset-0 bg-white/40 backdrop-blur-3xl rounded-full"></div>
-            <ShoppingBag size={80} className="text-orange-400 relative z-10" strokeWidth={1.5} />
-            <motion.div 
-               animate={{ y: [0, -10, 0] }} 
-               transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-               className="absolute top-10 right-10 z-20 text-3xl"
-            >
-               💨
-            </motion.div>
+            <ShoppingBag size={46} strokeWidth={1.4} aria-hidden="true" />
           </motion.div>
           
           <motion.h2 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-2xl font-black text-slate-800 mb-3"
+            className="text-3xl font-semibold tracking-tight mb-3"
           >
-            Tu carrito está vacío
+            Tu pedido empieza aquí.
           </motion.h2>
           
           <motion.p 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="text-slate-500 mb-10 leading-relaxed text-sm px-4"
+            className="text-slate-600 mb-8 leading-relaxed text-base"
           >
-            Aún no has agregado ningún antojo{id === 'global' ? '.' : ` de ${restaurante?.nombre || 'este restaurante'}.`} ¡Explora {id === 'global' ? 'nuestros restaurantes' : 'el menú'} y date un gusto!
+            Elige algo {id === 'global' ? 'de nuestros restaurantes' : `del menú de ${restaurante?.nombre || 'este restaurante'}`} y lo guardaremos en tu carrito.
           </motion.p>
           
           <motion.button 
@@ -749,30 +751,31 @@ export default function CartPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleGoBack}
-            className="w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-700/25 flex items-center justify-center gap-2 group"
+            className="checkout-primary"
           >
-            {id === 'global' ? 'Explorar Restaurantes' : 'Ver el Menú'} 
-            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+            {id === 'global' ? 'Ver restaurantes' : 'Ver el menú'}
+            <ArrowRight size={20} aria-hidden="true" />
           </motion.button>
         </main>
       </motion.div>
+      </MotionConfig>
     );
   }
 
   // Textos inteligentes por paso
   const getBotonText = () => {
-    if (checkoutStep === 1) return 'Confirmar Resumen';
+    if (checkoutStep === 1) return 'Continuar con la entrega';
     if (checkoutStep === 2) {
       if (checkingLoyalty) return 'Verificando...';
       if (!clienteNombre.trim() || clienteTel.replace(/\D/g, '').length !== 10) return 'Faltan tus datos';
       if (!tipoEntrega) return 'Elige cómo recibirlo';
       if (tipoEntrega === 'domicilio' && (!canConfirmLocation(ubicacionGPS, direccionEntrega) || fueraDeCobertura)) return 'Confirma tu ubicación';
-      return 'Continuar a Entrega y Pago';
+      return 'Continuar al pago';
     }
     if (checkoutStep === 3) {
       if (!metodoPago) return 'Selecciona cómo pagar';
       if (metodoPago === 'efectivo' && (!montoEfectivo || parseFloat(montoEfectivo) < total)) return 'Indica con cuánto pagas';
-      return procesando ? 'Procesando...' : '¡Confirmar y Pedir!';
+      return procesando ? 'Enviando código...' : 'Verificar y pedir';
     }
     return 'Confirmar Pedido';
   };
@@ -791,120 +794,123 @@ export default function CartPage() {
     return false;
   };
 
+  const changeStep = (nextStep: number, direction: CheckoutStepDirection) => {
+    if (stepTransitionRef.current) return;
+    stepTransitionRef.current = true;
+    setStepChanging(true);
+    setStepDirection(direction);
+    setCheckoutStep(nextStep);
+  };
+  const handleStepExited = () => {
+    const container = document.getElementById('cart-scroll-container');
+    if (container) container.scrollTop = 0;
+  };
+  const handleStepEntered = () => {
+    stepTransitionRef.current = false;
+    setStepChanging(false);
+    document.getElementById('checkout-title')?.focus({ preventScroll: true });
+  };
+  const handleContinue = () => {
+    if (stepTransitionRef.current) return;
+    if (checkoutStep === 3) { handlePedir(); return; }
+    setTelError(false);
+    if (checkoutStep === 2 && !isStepValid()) {
+      const invalidContact = clienteTel.replace(/\D/g, '').length !== 10 || !clienteNombre.trim();
+      setTelError(clienteTel.replace(/\D/g, '').length !== 10);
+      showToast('Revisa tu pedido', invalidContact ? 'Completa tu nombre y teléfono.' : 'Confirma una dirección dentro de cobertura y espera la cotización.', 'error');
+      const section = document.getElementById(invalidContact ? 'seccion-datos' : 'seccion-entrega');
+      if (section) smoothScroll(document.getElementById('cart-scroll-container'), section.offsetTop - 24, 400);
+      return;
+    }
+    changeStep(checkoutStep + 1, 1);
+  };
+  const actionDisabled = stepChanging || checkingLoyalty || procesando || (checkoutStep === 3 && !isStepValid());
+  const actionNote = checkoutStep === 1 ? 'El envío se calcula al elegir tu dirección.'
+    : checkoutStep === 2 ? 'Tu número de WhatsApp sirve para verificar el pedido.'
+    : 'Antes de confirmar, recibirás un código por WhatsApp.';
+  const orderQuantity = carrito.reduce((count, entry) => count + entry.cantidad, 0);
+
   return (
-    <div className="fixed inset-0 bg-slate-100 flex flex-col font-sans text-slate-900 overflow-hidden">
-      {/* HEADER NATIVO */}
-      <header className="bg-slate-100 px-5 pt-4 pb-3 sticky top-0 z-50 flex items-center gap-4">
-        <button 
-          onClick={() => {
-            if (checkoutStep > 1) {
-              setCheckoutStep(checkoutStep - 1);
-              smoothScroll(document.getElementById('cart-scroll-container'), 0, 400);
-            } else {
-              navigate(`/menu/${id}`);
-            }
-          }} 
-          className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center hover:bg-slate-50 shadow-sm transition-colors shrink-0"
-        >
-          <ChevronLeft size={20} className="text-slate-800" strokeWidth={3} />
-        </button>
-        
-        <div className="flex-1">
-          {checkoutStep === 1 && (
-            <>
-              <h1 className="font-black text-xl text-slate-800 leading-tight">Tu Carrito</h1>
-              <p className="text-[12px] text-slate-500 font-medium">{carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</p>
-            </>
-          )}
-          {checkoutStep === 2 && (
-            <>
-              <h1 className="font-black text-xl text-slate-800 leading-tight">Entrega</h1>
-              <p className="text-[12px] text-slate-500 font-medium">¿Dónde te lo llevamos?</p>
-            </>
-          )}
-          {checkoutStep === 3 && (
-            <>
-              <h1 className="font-black text-xl text-slate-800 leading-tight">Pago</h1>
-              <p className="text-[12px] text-slate-500 font-medium">Casi listo para comer</p>
-            </>
-          )}
-        </div>
-        
-        <div className="w-10 shrink-0"></div>
-      </header>
+    <MotionConfig reducedMotion="user">
+    <motion.div className="checkout-page" initial={{ opacity: 0 }} animate={{ opacity: isExiting ? 0 : 1 }} transition={{ duration: .24, ease: [.22, 1, .36, 1] }} onAnimationComplete={() => {
+      if (isExiting) navigate(id === 'global' ? '/' : `/menu/${id}`);
+    }}>
+      <CheckoutHeader step={checkoutStep} backDisabled={stepChanging || isExiting} onBack={() => {
+        if (checkoutStep > 1) {
+          changeStep(checkoutStep - 1, -1);
+        } else setIsExiting(true);
+      }} />
 
-      {/* BARRA DE PROGRESO */}
-      <div className="w-full h-[3px] bg-slate-200 sticky top-[68px] z-50">
-        <motion.div
-          className="h-full bg-[#1D4ED8] rounded-full"
-          initial={false}
-          animate={{ width: checkoutStep === 1 ? '33%' : checkoutStep === 2 ? '66%' : '100%' }}
-          transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-        />
-      </div>
-
-      <main id="cart-scroll-container" className="flex-1 overflow-y-auto p-4 w-full relative scroll-smooth">
-        <div className="max-w-7xl mx-auto">
+      <main id="cart-scroll-container" className="checkout-scroll">
+        <div>
           {/* Desktop 2-col layout */}
-          <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8 lg:items-start">
+          <div className="checkout-layout">
 
           {/* LEFT COLUMN — checkout steps */}
-          <div>
-          <div className="max-w-lg md:max-w-2xl lg:max-w-none mx-auto pb-32 lg:pb-8">
-          <AnimatePresence mode="wait">
+          <div className="checkout-content">
+          <div className="checkout-step-viewport">
+          <AnimatePresence mode="wait" initial={false} custom={stepDirection} onExitComplete={handleStepExited}>
+          <CheckoutStepScene key={checkoutStep} step={checkoutStep} direction={stepDirection} onEntered={handleStepEntered}>
+          <div className="checkout-intro">
+            <p className="checkout-eyebrow">{restaurante?.nombre || 'Tu restaurante'} · Paso {checkoutStep} de 3</p>
+            <h1 id="checkout-title" tabIndex={-1}>{checkoutStep === 1 ? 'Así va tu pedido.' : checkoutStep === 2 ? '¿Dónde lo recibes?' : 'Un último vistazo.'}</h1>
+            <p>{checkoutStep === 1 ? 'Revisa tus productos. Todavía puedes agregar algo más.' : checkoutStep === 2 ? 'Dinos a nombre de quién va y cómo quieres recibirlo.' : 'Revisa los detalles y elige con cuánto vas a pagar.'}</p>
+          </div>
           
           {/* ══════════════════════════════════════
               PASO 1 — Tu Carrito
           ══════════════════════════════════════ */}
           {checkoutStep === 1 && (
-            <motion.div key="step1" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4 space-y-3">
+            <div className="pb-4">
 
               {/* Tarjeta: Lista de artículos */}
-              <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_-4px_rgba(0,0,0,0.07)]">
-                {carrito.map((p, i) => (
-                  <div key={i} className="flex gap-4 px-4 py-4 border-b border-slate-100 last:border-0">
-                    <div className="w-[68px] h-[68px] rounded-2xl overflow-hidden shrink-0 bg-slate-100">
+              <section className="checkout-panel" aria-label="Productos de tu pedido">
+                <div className="checkout-panel-heading">
+                  {restaurante?.foto_fachada_url && <img src={restaurante.foto_fachada_url} alt="" />}
+                  <div><h2>{restaurante?.nombre || 'Tu restaurante'}</h2><p>{orderQuantity} {orderQuantity === 1 ? 'producto' : 'productos'} en tu pedido</p></div>
+                </div>
+                {carrito.map(p => (
+                  <div key={p.item.cartItemId} className="checkout-item">
+                    <div className="checkout-item-image">
                       <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
                     </div>
-                    <div className="flex-1 flex flex-col justify-between py-0.5">
-                      <div className="flex justify-between items-start gap-2">
-                        <h4 className="font-bold text-[15px] text-slate-800 leading-tight">{p.item.nombre}</h4>
-                        <span className="font-black text-[15px] text-slate-900 shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
+                    <div className="min-w-0">
+                      <div className="checkout-item-title">
+                        <h3>{p.item.nombre}</h3>
+                        <span className="checkout-item-price">${(p.item.precio * p.cantidad).toFixed(2)}</span>
                       </div>
                       {p.item.opcionesSeleccionadas && p.item.opcionesSeleccionadas.length > 0 && (
-                        <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-snug">
+                        <p className="checkout-item-options">
                           {p.item.opcionesSeleccionadas.map(o => o.opcion).join(' · ')}
                         </p>
                       )}
-                      <div className="flex items-center gap-3 mt-2 w-max bg-slate-100 rounded-full px-2 py-1.5">
-                        <button aria-label={'Reducir cantidad de ' + p.item.nombre} onClick={() => removeFromCart(p.item.cartItemId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Minus size={12} strokeWidth={3}/></button>
-                        <span className="font-black text-sm w-5 text-center tabular-nums">{p.cantidad}</span>
-                        <button aria-label={'Aumentar cantidad de ' + p.item.nombre} onClick={() => addToCart(p.item)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-slate-50 transition-colors"><Plus size={12} strokeWidth={3}/></button>
+                      <div className="checkout-quantity">
+                        <button type="button" aria-label={'Reducir cantidad de ' + p.item.nombre} onClick={() => removeFromCart(p.item.cartItemId)}><Minus size={15} aria-hidden="true" /></button>
+                        <span>{p.cantidad}</span>
+                        <button type="button" aria-label={'Aumentar cantidad de ' + p.item.nombre} onClick={() => addToCart(p.item)}><Plus size={15} aria-hidden="true" /></button>
                       </div>
+                      <p className="checkout-item-unit">${p.item.precio.toFixed(2)} por producto</p>
                     </div>
                   </div>
                 ))}
 
-                {/* Subtotal dentro de la tarjeta */}
-                <div className="flex justify-between items-center px-4 py-3.5 bg-slate-50">
-                  <span className="text-[13px] text-slate-500 font-medium">Subtotal</span>
-                  <span className="font-black text-[17px] text-slate-900">${subtotal.toFixed(2)}</span>
-                </div>
-              </div>
+                <a className="checkout-add-more" href={id === 'global' ? '/' : `/menu/${id}`}><Plus size={16} aria-hidden="true" /> Agregar algo más</a>
+              </section>
 
               {/* Tarjeta: Cupón */}
-              <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_-4px_rgba(0,0,0,0.07)] px-4 py-4">
-                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Tienes un cupón?</span>
-                <div className="flex gap-2">
+              <details className="checkout-panel checkout-coupon" open={couponOpen} onToggle={event => setCouponOpen(event.currentTarget.open)}>
+                <summary><Tag size={17} aria-hidden="true" /> ¿Tienes un cupón? <Plus size={16} aria-hidden="true" /></summary>
+                <div className="checkout-coupon-entry">
                   <input
+                    aria-label="Código de cupón"
                     type="text"
                     placeholder="CÓDIGO"
                     value={cuponCliente}
                     onChange={e => { setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0); }}
                     disabled={validandoCupon}
-                    className="flex-1 bg-slate-100 rounded-2xl px-4 py-3 text-[15px] font-bold uppercase outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-600/20 transition-all placeholder:text-slate-300"
+                    className="uppercase"
                   />
-                  <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()} className="bg-[#1D4ED8] text-white px-5 py-3 rounded-2xl text-[14px] font-bold hover:bg-blue-700 transition-colors disabled:opacity-40 shadow-sm shadow-blue-700/20">
+                  <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()}>
                     {validandoCupon ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Aplicar'}
                   </button>
                 </div>
@@ -915,26 +921,29 @@ export default function CartPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
+              </details>
 
-            </motion.div>
+            </div>
           )}
 
           {/* ══════════════════════════════════════
               PASO 2 — Entrega
           ══════════════════════════════════════ */}
           {checkoutStep === 2 && (
-            <motion.div key="step2" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4 space-y-6">
+            <div className="pb-4 space-y-5">
 
               {/* Tus datos */}
-              <div id="seccion-datos">
-                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">Tus datos</span>
-                <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100/80">
+              <section id="seccion-datos" className="checkout-section" aria-labelledby="checkout-contact-heading">
+                <h2 id="checkout-contact-heading" className="checkout-kicker">A nombre de quién</h2>
+                <div>
                   
                   {/* Nombre Input */}
-                  <div className="px-4 py-2.5 border-b border-slate-100/80 focus-within:bg-blue-50/30 transition-colors">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Nombre completo</label>
+                  <div className="checkout-field">
+                    <label htmlFor="checkout-name" className="block mb-1">Nombre completo</label>
                     <input
+                      id="checkout-name"
+                      autoComplete="name"
+                      required
                       type="text"
                       value={clienteNombre}
                       onChange={e => setClienteNombre(e.target.value)}
@@ -944,13 +953,17 @@ export default function CartPage() {
                   </div>
 
                   {/* Teléfono Input */}
-                  <div className={`px-4 py-2.5 transition-colors ${telError ? 'bg-red-50/50' : 'focus-within:bg-blue-50/30'}`}>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 mb-0.5 ${telError ? 'text-red-400' : 'text-slate-400'}`}>
-                      Teléfono {telError && <span className="lowercase font-medium normal-case ml-1 flex items-center gap-0.5"><AlertCircle size={10}/> 10 dígitos</span>}
-                    </label>
+                  <div className="checkout-field">
+                    <label htmlFor="checkout-phone" className="block mb-1">Teléfono</label>
                     <div className="flex items-center">
                       <span className="text-slate-400 font-bold text-[15px] mr-2">+52</span>
                       <input
+                        id="checkout-phone"
+                        autoComplete="tel-national"
+                        inputMode="tel"
+                        required
+                        aria-invalid={telError}
+                        aria-describedby={telError ? 'checkout-phone-error' : 'checkout-phone-help'}
                         type="tel"
                         value={clienteTel}
                         onChange={e => { setClienteTel(e.target.value); setTelError(false); }}
@@ -959,6 +972,8 @@ export default function CartPage() {
                         className="w-full bg-transparent outline-none text-[15px] font-bold tracking-wide text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
                       />
                     </div>
+                    {telError ? <p id="checkout-phone-error" role="alert" className="checkout-input-error">Escribe un teléfono de 10 dígitos.</p>
+                      : <p id="checkout-phone-help" className="checkout-field-help">Usa tu número de WhatsApp para recibir el código.</p>}
                   </div>
 
                   {/* Estado lealtad integrado como footer de la tarjeta */}
@@ -993,27 +1008,27 @@ export default function CartPage() {
                     )}
                   </AnimatePresence>
                 </div>
-              </div>
+              </section>
 
               {/* Tipo de entrega */}
-              <div id="seccion-entrega">
+              <section id="seccion-entrega" className="checkout-section" aria-label="Forma de entrega">
                 {sessionStorage.getItem('est_delivery_type') !== 'recoger' ? (
                   <div>
-                    <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">¿Cómo lo recibes?</span>
+                    <h2 className="checkout-kicker">¿Cómo lo recibes?</h2>
                     <div className="flex gap-2 mb-4">
-                      <button onClick={() => setTipoEntrega('domicilio')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'domicilio' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                        <span className="text-xl">🛵</span>
-                        <span className="text-[13.5px]">A Domicilio</span>
+                      <button type="button" onClick={() => setTipoEntrega('domicilio')} className="checkout-choice" aria-pressed={tipoEntrega === 'domicilio'}>
+                        <Bike size={20} aria-hidden="true" />
+                        <span>A domicilio</span>
                       </button>
-                      <button onClick={() => setTipoEntrega('tienda')} className={`flex-1 py-3 px-2 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${tipoEntrega === 'tienda' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                        <span className="text-xl">🏪</span>
-                        <span className="text-[13.5px]">En Tienda</span>
+                      <button type="button" onClick={() => setTipoEntrega('tienda')} className="checkout-choice" aria-pressed={tipoEntrega === 'tienda'}>
+                        <Store size={20} aria-hidden="true" />
+                        <span>Yo lo recojo</span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="mb-4">
-                    <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-1">Recoger en Sucursal</span>
+                    <h2 className="checkout-kicker">Recoger en sucursal</h2>
                     <p className="text-[13px] text-slate-500 font-medium">Pasarás al restaurante por tu pedido.</p>
                   </div>
                 )}
@@ -1027,7 +1042,7 @@ export default function CartPage() {
                               <MapPin size={16} className="text-black shrink-0 mt-0.5"/>
                               <p className="text-[13px] font-bold text-slate-800 leading-snug">{direccionEntrega}</p>
                             </div>
-                            <button onClick={() => setIsMapModalOpen(true)} className="text-blue-600 text-[12px] font-bold shrink-0 hover:underline">Cambiar</button>
+                            <button onClick={() => setIsMapModalOpen(true)} className="checkout-location-edit shrink-0">Cambiar</button>
                           </div>
                           {entregaConfirmada && costoEnvio >= 0 && (
                             <div className="flex justify-between items-center px-1">
@@ -1036,16 +1051,17 @@ export default function CartPage() {
                             </div>
                           )}
                           <textarea
+                            aria-label="Referencias de entrega (opcional)"
                             rows={2}
                             value={direccionReferencias}
                             onChange={e => setDireccionReferencias(e.target.value)}
                             placeholder="Referencias (opcional) — casa verde, portón negro..."
-                            className="w-full bg-slate-100 rounded-2xl px-4 py-3 text-[14px] outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-600/20 transition-all resize-none text-slate-800 placeholder:text-slate-300"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 resize-none text-slate-800"
                           />
                         </div>
                       ) : (
-                        <button onClick={() => setIsMapModalOpen(true)} className="mt-4 w-full bg-[#1D4ED8] text-white py-4 rounded-2xl font-bold text-[15px] flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-700/20">
-                          <MapPin size={18}/> Indicar ubicación en el mapa
+                        <button onClick={() => setIsMapModalOpen(true)} className="checkout-location">
+                          <MapPin size={18} aria-hidden="true" /> Elegir dirección en el mapa
                         </button>
                       )}
                     </motion.div>
@@ -1095,41 +1111,35 @@ export default function CartPage() {
                     )}
                   </motion.div>
                 )}
-              </div>
+              </section>
 
-            </motion.div>
+            </div>
           )}
 
           {/* ══════════════════════════════════════
               PASO 3 — Pago
           ══════════════════════════════════════ */}
           {checkoutStep === 3 && (
-            <motion.div key="step3" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -40, opacity: 0 }} className="pb-4 space-y-6">
+            <div className="pb-4 space-y-5">
 
               {/* Método de pago */}
-              <div>
-                <span className="inline-block bg-[#1D4ED8] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">Método de pago</span>
-                <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_-4px_rgba(0,0,0,0.07)] space-y-0 divide-y divide-slate-100">
-
-                  {/* Efectivo */}
-                  <button onClick={() => setMetodoPago('efectivo')} className={`w-full py-4 px-5 font-bold flex items-center gap-4 transition-all first:rounded-t-3xl ${metodoPago === 'efectivo' ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}>
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${metodoPago === 'efectivo' ? 'bg-blue-100' : 'bg-slate-100'}`}>💵</div>
-                    <span className={`flex-1 text-left text-[15px] ${metodoPago === 'efectivo' ? 'text-[#1D4ED8]' : 'text-slate-700'}`}>Efectivo al recibir</span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${metodoPago === 'efectivo' ? 'border-[#1D4ED8] bg-[#1D4ED8]' : 'border-slate-300'}`}>
-                      {metodoPago === 'efectivo' && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-                  </button>
+              <section className="checkout-section" aria-labelledby="checkout-payment-heading">
+                <div className="checkout-payment-heading">
+                  <Banknote size={24} aria-hidden="true" />
+                  <div><h2 id="checkout-payment-heading">Efectivo al recibir</h2><p>{tipoEntrega === 'tienda' ? 'Pagas cuando recojas tu pedido.' : 'Pagas cuando llegue tu pedido.'}</p></div>
+                </div>
+                <div>
 
                   <AnimatePresence>
                     {metodoPago === 'efectivo' && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden bg-blue-50">
-                        <div className="px-5 pb-4 pt-1">
-                          <p className="text-[11px] font-bold text-blue-400 uppercase tracking-widest mb-2">¿Con cuánto pagas?</p>
-                          <div className="flex gap-2">
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <div>
+                          <p className="text-sm text-slate-600">¿Con cuánto vas a pagar?</p>
+                          <div className="checkout-cash-options">
                             {smartDenominations.map((denom, idx) => (
-                              <button key={idx} onClick={() => setMontoEfectivo(denom.toString())} className={`flex-1 py-3 rounded-2xl font-black text-[14px] transition-all border-2 ${montoEfectivo === denom.toString() ? 'bg-[#1D4ED8] border-[#1D4ED8] text-white shadow-md shadow-blue-700/20' : 'bg-white border-slate-200 text-slate-700 hover:border-blue-200'}`}>
+                              <button type="button" key={idx} onClick={() => setMontoEfectivo(denom.toString())} aria-pressed={montoEfectivo === denom.toString()}>
                                 ${denom.toFixed(0)}
-                                {idx === 0 && <span className="block text-[9px] font-bold opacity-60 uppercase mt-0.5">Exacto</span>}
+                                {idx === 0 && <small>Exacto</small>}
                               </button>
                             ))}
                           </div>
@@ -1138,21 +1148,23 @@ export default function CartPage() {
                     )}
                   </AnimatePresence>
 
-                  <p className="px-5 py-3 text-sm text-slate-600">Por ahora aceptamos sólo efectivo al recibir.</p>
+                  {montoEfectivo && Number(montoEfectivo) >= total && <p className="mt-4 text-sm text-slate-600">{Number(montoEfectivo) === total ? 'No necesitas cambio.' : `Tu cambio: $${(Number(montoEfectivo) - total).toFixed(2)}`}</p>}
                 </div>
-              </div>
+              </section>
 
               {/* ─── CARD RESUMEN TIPO RECIBO ─── */}
-              <div className="bg-slate-50 rounded-3xl overflow-hidden">
+              <div className="checkout-receipt overflow-hidden">
 
-                {/* Primer artículo del pedido */}
-                <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-slate-100/80">
-                  <div className="w-12 h-12 rounded-xl bg-slate-200 overflow-hidden shrink-0">
-                    <LazyImage src={carrito[0]?.item?.foto_url} alt={carrito[0]?.item?.nombre}/>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[14px] text-slate-800 truncate">{carrito.length === 1 ? carrito[0].item.nombre : `${carrito[0].item.nombre} y ${carrito.length - 1} más`}</p>
-                    <p className="text-[11px] text-slate-400 font-medium">{restaurante?.nombre} · {carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</p>
+                <div className="px-5 py-5 border-b border-slate-100">
+                  <h2 className="checkout-kicker">Esto es lo que vas a pedir</h2>
+                  <div className="space-y-4">
+                    {carrito.map(entry => (
+                      <div key={entry.item.cartItemId} className="checkout-summary-item">
+                        <span>{entry.cantidad}×</span>
+                        <div>{entry.item.nombre}{entry.item.opcionesSeleccionadas?.length ? <small>{entry.item.opcionesSeleccionadas.map(option => option.opcion).join(' · ')}</small> : null}</div>
+                        <span>${(entry.item.precio * entry.cantidad).toFixed(2)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1254,206 +1266,50 @@ export default function CartPage() {
                 </motion.div>
               )}
 
-            </motion.div>
+            </div>
           )}
 
 
+          </CheckoutStepScene>
         </AnimatePresence>
         </div>
         </div>
         {/* END LEFT COLUMN */}
 
         {/* RIGHT COLUMN — sticky order summary, desktop only */}
-        <div className="hidden lg:block">
-          <div className="sticky top-[78px] space-y-4">
-
-            {/* Summary card */}
-            <div className="bg-white rounded-3xl shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] overflow-hidden">
-              <div className="px-5 pt-5 pb-3 border-b border-slate-100">
-                <h2 className="font-black text-[16px] text-slate-800">Resumen del pedido</h2>
-                <p className="text-[12px] text-slate-400 font-medium mt-0.5">{carrito.length} {carrito.length === 1 ? 'artículo' : 'artículos'}</p>
-              </div>
-              <div className="px-5 py-3 max-h-56 overflow-y-auto space-y-3">
-                {carrito.map((p, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-slate-100">
-                      <LazyImage src={p.item.foto_url} alt={p.item.nombre} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[13px] text-slate-800 truncate">{p.item.nombre}</p>
-                      <p className="text-[11px] text-slate-400 font-medium">x{p.cantidad}</p>
-                    </div>
-                    <span className="font-black text-[13px] text-slate-900 shrink-0">${(p.item.precio * p.cantidad).toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="px-5 py-4 bg-slate-50 space-y-2.5">
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-slate-500 font-medium">Subtotal</span>
-                  <span className="font-bold text-slate-800">${subtotal.toFixed(2)}</span>
+        <aside className="checkout-aside" aria-label="Resumen de tu pedido">
+          <section className="checkout-panel checkout-summary">
+            <h2>Resumen de tu pedido</h2>
+            <p>{orderQuantity} {orderQuantity === 1 ? 'producto' : 'productos'} · {restaurante?.nombre}</p>
+            <div className="checkout-summary-items">
+              {carrito.map(p => (
+                <div className="checkout-summary-item" key={p.item.cartItemId}>
+                  <span>{p.cantidad}×</span>
+                  <div>{p.item.nombre}{p.item.opcionesSeleccionadas?.length ? <small>{p.item.opcionesSeleccionadas.map(option => option.opcion).join(' · ')}</small> : null}</div>
+                  <span>${(p.item.precio * p.cantidad).toFixed(2)}</span>
                 </div>
-                {tipoEntrega === 'domicilio' && (
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-500 font-medium">Envío</span>
-                    <span className={`font-bold ${isFreeDelivery ? 'text-green-600' : 'text-slate-800'}`}>
-                      {textoEnvio}
-                    </span>
-                  </div>
-                )}
-                {descuentoAplicable > 0 && (
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-green-600 font-medium">Descuento</span>
-                    <span className="font-bold text-green-600">-${descuentoAplicable.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="border-t border-slate-200 pt-2.5 flex justify-between">
-                  <span className="font-black text-slate-900 text-[15px]">Total</span>
-                  <span className="font-black text-slate-900 text-[18px]">${displayTotal.toFixed(2)}</span>
-                </div>
-              </div>
+              ))}
             </div>
-
-            {/* Step progress */}
-            <div className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.06)]">
-              <div className="flex items-center">
-                {[1, 2, 3].map(step => (
-                  <div key={step} className="flex items-center flex-1">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 transition-all duration-300 ${
-                      checkoutStep > step
-                        ? 'bg-green-500 text-white'
-                        : checkoutStep === step
-                        ? 'bg-[#1D4ED8] text-white'
-                        : 'bg-slate-100 text-slate-400'
-                    }`}>
-                      {checkoutStep > step ? '✓' : step}
-                    </div>
-                    <span className={`text-[11px] font-semibold ml-1.5 ${
-                      checkoutStep === step ? 'text-slate-800' : 'text-slate-400'
-                    }`}>
-                      {step === 1 ? 'Carrito' : step === 2 ? 'Entrega' : 'Pago'}
-                    </span>
-                    {step < 3 && (
-                      <div className={`h-[2px] flex-1 mx-2 rounded-full transition-all duration-300 ${
-                        checkoutStep > step ? 'bg-green-400' : 'bg-slate-200'
-                      }`} />
-                    )}
-                  </div>
-                ))}
-              </div>
+            <div className="checkout-summary-totals">
+              <div><span>Productos</span><span>${subtotal.toFixed(2)}</span></div>
+              <div><span>{tipoEntrega === 'tienda' ? 'Recogida en sucursal' : 'Envío a domicilio'}</span><span>{tipoEntrega === 'tienda' ? 'Sin costo' : textoEnvio}</span></div>
+              {descuentoAplicable > 0 && <div><span>Descuento</span><span className="text-green-700">−${descuentoAplicable.toFixed(2)}</span></div>}
+              <div className="checkout-grand-total"><span>{entregaConfirmada ? 'Total' : 'Productos, sin envío'}</span><span>${displayTotal.toFixed(2)}</span></div>
             </div>
-
-            {/* Desktop action button */}
-            {checkoutStep < 3 ? (
-              <button
-                onClick={() => {
-                  setTelError(false);
-                  if (checkoutStep === 2) {
-                    const telLimpio = clienteTel.replace(/\D/g, '');
-                    if (telLimpio.length !== 10 || !clienteNombre.trim()) {
-                      setTelError(telLimpio.length !== 10);
-                      showToast('Error', 'Completa tus datos personales', 'error');
-                      const el = document.getElementById('seccion-datos');
-                      if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
-                      return;
-                    }
-                    if (!tipoEntrega || (tipoEntrega === 'domicilio' && (!direccionEntrega || fueraDeCobertura))) {
-                      showToast('Error', 'Revisa los datos de entrega', 'error');
-                      const el = document.getElementById('seccion-entrega');
-                      if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
-                      return;
-                    }
-                  }
-                  setCheckoutStep(checkoutStep + 1);
-                  smoothScroll(document.getElementById('cart-scroll-container'), 0, 400);
-                }}
-                disabled={checkingLoyalty}
-                className={`w-full text-white py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg ${
-                  !isStepValid() ? 'bg-slate-400 shadow-none' : 'bg-[#1D4ED8] shadow-blue-700/25 hover:bg-blue-700'
-                }`}
-              >
-                {getBotonText()}
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  if (!metodoPago || (metodoPago === 'efectivo' && (!montoEfectivo || parseFloat(montoEfectivo) < total))) {
-                    showToast('Error', 'Completa tu método de pago', 'error');
-                    return;
-                  }
-                  handlePedir();
-                }}
-                disabled={procesando || !isStepValid()}
-                className={`w-full py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 ${
-                  !isStepValid()
-                    ? 'bg-slate-300 text-slate-400 shadow-none'
-                    : 'bg-[#1D4ED8] text-white shadow-blue-700/25 hover:bg-blue-700'
-                } disabled:opacity-60`}
-              >
-                {procesando ? <Loader2 size={22} className="animate-spin text-white" /> : getBotonText()}
-              </button>
-            )}
-
-          </div>
-        </div>
+            <CheckoutAction label={getBotonText()} onClick={handleContinue} disabled={actionDisabled} busy={procesando || checkingLoyalty} />
+            <p className="checkout-action-note">{actionNote}</p>
+          </section>
+        </aside>
         {/* END RIGHT COLUMN */}
 
         </div>{/* end desktop grid */}
         </div>{/* end max-w-7xl */}
 
         {/* BOTÓN FIJO MOBILE ONLY */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 pb-6 bg-slate-100/95 backdrop-blur-md z-40">
-          <div className="max-w-lg md:max-w-2xl mx-auto">
-          {checkoutStep < 3 ? (
-            <button 
-              onClick={() => {
-                setTelError(false);
-                if (checkoutStep === 2) {
-                  const telLimpio = clienteTel.replace(/\D/g, '');
-                  if (telLimpio.length !== 10 || !clienteNombre.trim()) {
-                    setTelError(telLimpio.length !== 10);
-                    showToast('Error', 'Completa tus datos personales', 'error');
-                    const el = document.getElementById('seccion-datos');
-                    if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
-                    return;
-                  }
-                  if (!tipoEntrega || (tipoEntrega === 'domicilio' && (!direccionEntrega || fueraDeCobertura))) {
-                    showToast('Error', 'Revisa los datos de entrega', 'error');
-                    const el = document.getElementById('seccion-entrega');
-                    if (el) smoothScroll(document.getElementById('cart-scroll-container'), el.offsetTop - 80, 400);
-                    return;
-                  }
-                }
-                setCheckoutStep(checkoutStep + 1);
-                smoothScroll(document.getElementById('cart-scroll-container'), 0, 400);
-              }}
-              disabled={checkingLoyalty}
-              className={`w-full text-white py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg ${
-                !isStepValid()
-                  ? 'bg-slate-400 shadow-none'
-                  : 'bg-[#1D4ED8] shadow-blue-700/25 hover:bg-blue-700'
-              }`}
-            >
-              {getBotonText()}
-            </button>
-          ) : (
-            <button 
-              onClick={() => {
-                if (!metodoPago || (metodoPago === 'efectivo' && (!montoEfectivo || parseFloat(montoEfectivo) < total))) {
-                  showToast('Error', 'Completa tu método de pago', 'error');
-                  return;
-                }
-                handlePedir();
-              }}
-              disabled={procesando || !isStepValid()}
-              className={`w-full py-4 rounded-2xl font-black text-[16px] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 ${
-                !isStepValid()
-                  ? 'bg-slate-300 text-slate-400 shadow-none'
-                  : 'bg-[#1D4ED8] text-white shadow-blue-700/25 hover:bg-blue-700'
-              } disabled:opacity-60`}
-            >
-              {procesando ? <Loader2 size={22} className="animate-spin text-white" /> : getBotonText()}
-            </button>
-          )}
+        <div className="checkout-mobile-bar">
+          <div className="checkout-mobile-bar-inner">
+            <div className="checkout-mobile-price"><span>{entregaConfirmada ? 'Total del pedido' : 'Productos, sin envío'}</span><strong>${displayTotal.toFixed(2)}</strong></div>
+            <CheckoutAction label={getBotonText()} onClick={handleContinue} disabled={actionDisabled} busy={procesando || checkingLoyalty} />
           </div>
         </div>{/* END MOBILE BUTTON */}
 
@@ -1496,7 +1352,7 @@ export default function CartPage() {
       <AnimatePresence>
         {toastMsg && (
           <motion.div initial={{ y: -50, opacity: 0, scale: 0.9 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -50, opacity: 0, scale: 0.9 }} className="fixed top-4 left-4 right-4 z-[400] flex justify-center">
-            <div className="bg-slate-900/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-800">
+            <div role={toastMsg.type === 'error' ? 'alert' : 'status'} className="bg-slate-900/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-800">
               {toastMsg.type === 'error' ? <AlertCircle className="text-red-400" size={20} /> : <CheckCircle2 className="text-green-400" size={20} />}
               <div>
                 <p className="font-bold text-sm leading-tight">{toastMsg.title}</p>
@@ -1509,7 +1365,7 @@ export default function CartPage() {
       {/* CONFETTI OVERLAY */}
       <AnimatePresence>
         {confettiActive && (
-          <div className="fixed inset-0 pointer-events-none z-[100] flex items-center justify-center overflow-hidden">
+          <div className="checkout-confetti fixed inset-0 pointer-events-none z-[100] flex items-center justify-center overflow-hidden">
             {[...Array(30)].map((_, i) => (
               <motion.div
                 key={i}
@@ -1538,6 +1394,7 @@ export default function CartPage() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
+    </MotionConfig>
   );
 }
