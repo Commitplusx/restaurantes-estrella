@@ -358,7 +358,8 @@
       "Blanco y gris frío para las superficies del inicio.",
       "Outfit y naranja Estrella conservados.",
       "Fotografía y banners existentes, sin recolorear su contenido.",
-      "Controles oscuros y estados visibles; texto directo en español."
+      "Controles oscuros y estados visibles; texto directo en español.",
+      "Catálogo de PC compacto: carrusel de 224px, fotos completas 16:9, grid con mínimo de 200px y separación de 20px; categorías de 64px desde 1024px."
     ],
     "rules": [
       {

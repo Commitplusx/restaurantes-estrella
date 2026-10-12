@@ -183,7 +183,7 @@ La adaptación conserva el hero y su foto de escritorio. El contrato de esta com
 
 Las superficies principales del inicio son blancas y se distinguen con espacios y bordes discretos. El panel de foto y BottomNav conservan sombras concretas. La cabecera de escritorio conserva su blanco translúcido y blur; no se añade vidrio a los demás componentes. Los valores completos de sombra viven en el sidecar porque el formato de frontmatter no los admite.
 
-El catálogo de escritorio mantiene su tratamiento anterior de fotos; no se documentan como primitivas vigentes las reglas CSS de tarjetas que no coinciden con el markup activo de DesktopRestaurantList.
+El catálogo desde 768px usa fotografías completas sobre gris frío, sin fondo desenfocado ni sombras decorativas. Su implementación vigente es `DesktopRestaurantList.tsx` con `desktopRestaurantList.css`; las reglas antiguas `.eats-restaurant-card` que no coinciden con ese markup no son sus primitivas.
 
 ## Shapes
 
@@ -201,7 +201,9 @@ El campo móvil mide al menos (48px), recibe texto de (16px) y muestra borde y f
 
 ### Categories and restaurant cards
 
-Las categorías muestran selección en contorno, fondo y texto. El listado móvil conserva fotografía, nombre, categoría, modalidad y favorito. El listado que aparece desde (768px) conserva su componente de escritorio. Las muestras del sidecar usan nombres y metadatos de muestra, no ratings ni tiempos comerciales nuevos.
+Las categorías muestran selección en contorno, fondo y texto. En PC desde 1024px sus imágenes miden 64px, con esquinas de 16px y separación de 16px. El listado móvil conserva fotografía, nombre, categoría, modalidad y favorito.
+
+Desde 768px, el carrusel de restaurantes usa tarjetas de 224px de ancho y separación de 20px; la foto tiene relación 16:9, `contain` y 10px de padding, sin ampliar el logo. El listado completo usa `repeat(auto-fill,minmax(200px,1fr))`, separado por 20px entre columnas y 28px entre filas. Las esquinas de foto miden 12px. Favoritos y flechas tienen objetivos de 44px; el favorito es hermano del enlace al menú y expone `aria-pressed`. La imagen fallida usa el icono Store. El carrusel puede operarse con teclado y sus flechas respetan reduced motion. Los nombres permiten dos líneas, con ruptura de cadenas largas. Las muestras del sidecar usan nombres y metadatos de muestra, no ratings ni tiempos comerciales nuevos.
 
 ### Navigation
 

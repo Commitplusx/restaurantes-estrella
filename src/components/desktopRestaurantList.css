@@ -1,0 +1,36 @@
+.desktop-restaurant-list { display: flex; flex-direction: column; gap: 36px; margin-top: 12px; padding-bottom: 32px; }
+.desktop-directory-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.desktop-directory-heading h2 { font-size: 23px; line-height: 1.25; font-weight: 650; letter-spacing: -.025em; color: #1d1d1f; }
+.desktop-directory-controls { display: flex; gap: 8px; flex-shrink: 0; }
+.desktop-directory-controls button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #f5f5f7; color: #1d1d1f; transition: background .18s; }
+.desktop-directory-controls button:hover:not(:disabled) { background: #e8e8ed; }
+.desktop-directory-controls button:disabled { color: #8e8e93; opacity: .5; cursor: default; }
+.desktop-directory-rail { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: #d2d2d7 transparent; padding: 4px 4px 12px; margin: -4px; }
+.desktop-directory-rail::-webkit-scrollbar { height: 4px; }
+.desktop-directory-rail::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 4px; }
+.desktop-directory-slide { width: 224px; flex-shrink: 0; scroll-snap-align: start; }
+.desktop-directory-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 28px 20px; }
+.desktop-directory-loading { margin-top: 12px; }
+.desktop-restaurant-card { position: relative; min-width: 0; height: 100%; }
+.desktop-restaurant-link { display: block; border-radius: 12px; }
+.desktop-restaurant-photo { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: #f5f5f7; }
+.desktop-restaurant-photo > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 10px; }
+.desktop-restaurant-card[data-open=false] .desktop-restaurant-photo > img { filter: grayscale(1); opacity: .7; }
+.desktop-restaurant-placeholder { display: grid; place-items: center; height: 100%; color: #8e8e93; }
+.desktop-restaurant-badge { position: absolute; left: 10px; bottom: 10px; padding: 4px 8px; border-radius: 6px; color: white; background: #1d1d1f; font-size: 11px; font-weight: 500; }
+.desktop-restaurant-badge-free { color: #176a3a; background: #e5f5e9; }
+.desktop-restaurant-info { display: flex; align-items: start; justify-content: space-between; gap: 8px; padding-top: 12px; }
+.desktop-restaurant-info h3 { font-size: 16px; line-height: 1.3; font-weight: 600; color: #1d1d1f; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.desktop-restaurant-link:hover h3 { text-decoration: underline; text-underline-offset: 3px; }
+.desktop-restaurant-delivery { margin-top: 5px; color: #515154; font-size: 12px; line-height: 1.4; }
+.desktop-restaurant-category { margin-top: 3px; color: #6e6e73; font-size: 12px; line-height: 1.4; }
+.desktop-restaurant-rating { display: grid; place-items: center; min-width: 30px; height: 26px; padding: 0 6px; border-radius: 7px; background: #f5f5f7; color: #1d1d1f; font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.desktop-restaurant-favorite { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: #515154; background: #fff; transition: color .18s, background .18s; }
+.desktop-restaurant-favorite:hover { background: #fff0e7; color: #bd3818; }
+.desktop-restaurant-favorite[aria-pressed=true] { color: #bd3818; }
+.desktop-restaurant-favorite[aria-pressed=true] svg { fill: currentColor; }
+.desktop-restaurant-list :is(a,button,[tabindex]):focus-visible { outline: 2px solid #bd3818; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .desktop-restaurant-list *, .desktop-directory-rail { transition: none; scroll-behavior: auto; }
+  .desktop-directory-loading .animate-pulse { animation: none; }
+}

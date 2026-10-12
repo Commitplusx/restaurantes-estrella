@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, useId, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, ChevronLeft, ChevronRight, Store } from 'lucide-react';
+import './desktopRestaurantList.css';
 
 /**
- * Listado de restaurantes SOLO para desktop (md+), estilo Uber Eats:
- * tarjetas planas (foto grande con esquinas redondeadas + texto debajo), sin sombras,
- * carruseles con flechas y paleta blanco/negro/gris. En móvil se sigue usando el diseño original.
+ * Catálogo compacto de escritorio y tablet, con fotos completas y densidad
+ * adaptable al espacio disponible. La lista de teléfono tiene su propia vista.
  */
 
 interface DesktopRes {
@@ -47,6 +47,7 @@ function DesktopRestaurantCard({
 }: CardProps) {
   const isAbierto = estaAbierto(res);
   const recoger = globalDeliveryType === 'recoger';
+  const [failedImage, setFailedImage] = useState<string | null>(null);
 
   // Misma lógica de costo/distancia que la tarjeta original
   let costo = recoger ? 'Para llevar' : 'Envío $45';
@@ -61,85 +62,62 @@ function DesktopRestaurantCard({
   const esGratis = res.etiqueta_zona === 'verde' && !recoger;
 
   return (
-    <Link to={`/menu/${res.slug || res.id}`} className="group block outline-none">
+    <article className="desktop-restaurant-card" data-open={isAbierto}>
+    <Link to={`/menu/${res.slug || res.id}`} className="desktop-restaurant-link" aria-label={`Ver menú de ${res.nombre}`}>
       {/* Foto */}
-      <div className="relative aspect-[16/10] rounded-xl overflow-hidden bg-[#f3f3f3]">
-        {res.foto_fachada_url ? (
-          <>
+      <div className="desktop-restaurant-photo">
+        {res.foto_fachada_url && res.foto_fachada_url !== failedImage ? (
             <img
               src={res.foto_fachada_url}
               alt=""
-              aria-hidden="true"
-              className={`absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-50 ${!isAbierto ? 'grayscale' : ''}`}
-            />
-            <img
-              src={res.foto_fachada_url}
-              alt={res.nombre}
               loading="lazy"
-              className={`relative w-full h-full object-contain drop-shadow-sm ${!isAbierto ? 'grayscale' : ''}`}
+              decoding="async"
+              onError={() => setFailedImage(res.foto_fachada_url || null)}
             />
-          </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#a8a8a8] text-[13px] font-medium">
-            Sin foto
+          <div className="desktop-restaurant-placeholder">
+            <Store size={28} strokeWidth={1.5} aria-hidden="true" />
           </div>
         )}
 
-        {/* Oscurecido sutil al pasar el mouse */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/[0.06] transition-colors duration-200" />
-
         {esGratis && isAbierto && (
-          <span className="absolute bottom-3 left-3 bg-[#06C167] text-white text-[12px] font-medium px-2.5 py-1 rounded-md">
+          <span className="desktop-restaurant-badge desktop-restaurant-badge-free">
             Envío gratis
           </span>
         )}
 
         {!isAbierto && (
-          <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-            <span className="bg-black text-white text-[13px] font-medium px-3.5 py-1.5 rounded-full">
+            <span className="desktop-restaurant-badge">
               Cerrado
             </span>
-          </div>
         )}
-
-        {/* Favorito */}
-        <button
-          type="button"
-          aria-label={isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleFav(e, res.id);
-          }}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white hover:bg-[#f3f3f3] flex items-center justify-center transition-colors"
-        >
-          <Heart
-            size={16}
-            strokeWidth={2}
-            className={isFav ? 'fill-red-500 text-red-500' : 'text-black'}
-          />
-        </button>
       </div>
 
       {/* Info */}
-      <div className="pt-3 flex items-start justify-between gap-3">
+      <div className="desktop-restaurant-info">
         <div className="min-w-0">
-          <h3 className={`text-[16px] leading-tight font-medium truncate ${isAbierto ? 'text-black' : 'text-[#6b6b6b]'}`}>
+          <h3>
             {res.nombre}
           </h3>
-          <p className="mt-1 text-[14px] leading-tight text-[#545454] truncate">
+          <p className="desktop-restaurant-delivery">
             {isAbierto ? `${costo} · 25–35 min` : 'Cerrado por ahora'}
           </p>
-          <p className="mt-0.5 text-[14px] leading-tight text-[#6b6b6b] truncate">
+          <p className="desktop-restaurant-category">
             {categoria}
             {distancia && ` · ${distancia}`}
           </p>
         </div>
-        <span className="shrink-0 h-7 min-w-[34px] px-2 rounded-full bg-[#f3f3f3] text-black text-[12px] font-medium flex items-center justify-center">
+        <span className="desktop-restaurant-rating">
           4.8
         </span>
       </div>
     </Link>
+    <button type="button" className="desktop-restaurant-favorite" aria-pressed={isFav}
+      aria-label={`${isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}: ${res.nombre}`}
+      onClick={event => toggleFav(event, res.id)}>
+      <Heart size={18} strokeWidth={1.8} aria-hidden="true" />
+    </button>
+    </article>
   );
 }
 
@@ -148,41 +126,43 @@ function DesktopRow({ title, children }: { title: string; children: ReactNode })
   const ref = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  const headingId = useId();
 
-  const update = () => {
+  const update = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     setCanLeft(el.scrollLeft > 4);
     setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  };
+  }, []);
 
   useEffect(() => {
     update();
-  });
+  }, [children, update]);
 
   useEffect(() => {
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [update]);
 
   const scroll = (dir: 1 | -1) => {
     const el = ref.current;
     if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
+    el.scrollBy({ left: dir * el.clientWidth * 0.8,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   };
 
-  const arrowCls =
-    'w-9 h-9 rounded-full bg-[#f3f3f3] hover:bg-[#e2e2e2] disabled:opacity-40 disabled:hover:bg-[#f3f3f3] disabled:cursor-default flex items-center justify-center text-black transition-colors';
-
   return (
-    <section>
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-[24px] font-bold tracking-tight text-black">{title}</h2>
-        <div className="flex items-center gap-2">
-          <button type="button" aria-label="Anterior" disabled={!canLeft} onClick={() => scroll(-1)} className={arrowCls}>
+    <section aria-labelledby={headingId}>
+      <div className="desktop-directory-heading">
+        <h2 id={headingId}>{title}</h2>
+        <div className="desktop-directory-controls">
+          <button type="button" aria-label={`Anterior en ${title}`} disabled={!canLeft} onClick={() => scroll(-1)}>
             <ChevronLeft size={20} />
           </button>
-          <button type="button" aria-label="Siguiente" disabled={!canRight} onClick={() => scroll(1)} className={arrowCls}>
+          <button type="button" aria-label={`Siguiente en ${title}`} disabled={!canRight} onClick={() => scroll(1)}>
             <ChevronRight size={20} />
           </button>
         </div>
@@ -190,7 +170,9 @@ function DesktopRow({ title, children }: { title: string; children: ReactNode })
       <div
         ref={ref}
         onScroll={update}
-        className="flex gap-6 overflow-x-auto no-scrollbar scroll-smooth snap-x"
+        tabIndex={0}
+        aria-label={`Restaurantes en ${title}`}
+        className="desktop-directory-rail"
       >
         {children}
       </div>
@@ -251,12 +233,12 @@ export function DesktopRestaurantList({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="flex flex-col gap-12 mt-6 pb-12"
+      className="desktop-restaurant-list"
     >
       {sinFiltros && favs.length > 0 && (
         <DesktopRow title="Tus favoritos">
           {favs.map((res) => (
-            <div key={res.id} className="w-[300px] shrink-0 snap-start">
+            <div key={res.id} className="desktop-directory-slide">
               {renderCard(res)}
             </div>
           ))}
@@ -266,7 +248,7 @@ export function DesktopRestaurantList({
       {sinFiltros && restaurants.length > 4 && (
         <DesktopRow title="Para empezar">
           {restaurants.slice(0, 8).map((res) => (
-            <div key={res.id} className="w-[300px] shrink-0 snap-start">
+            <div key={res.id} className="desktop-directory-slide">
               {renderCard(res)}
             </div>
           ))}
@@ -274,10 +256,10 @@ export function DesktopRestaurantList({
       )}
 
       <section>
-        <h2 className="text-[24px] font-bold tracking-tight text-black mb-5">{titulo}</h2>
+        <div className="desktop-directory-heading"><h2>{titulo}</h2></div>
         <div
           key={selectedCategory || search || activeTab}
-          className="grid grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10"
+          className="desktop-directory-grid"
         >
           {restaurants.map((res) => (
             <div key={res.id}>{renderCard(res)}</div>
@@ -291,10 +273,10 @@ export function DesktopRestaurantList({
 /** Skeleton de carga para desktop (planos, sin sombras). */
 export function DesktopRestaurantSkeletons() {
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10 mt-6">
+    <div className="desktop-directory-grid desktop-directory-loading" aria-label="Cargando restaurantes" aria-busy="true">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="animate-pulse">
-          <div className="aspect-[16/10] rounded-xl bg-[#eeeeee]" />
+          <div className="desktop-restaurant-photo bg-[#eeeeee]" />
           <div className="pt-3 flex flex-col gap-2">
             <div className="h-4 w-2/3 rounded bg-[#eeeeee]" />
             <div className="h-3.5 w-1/2 rounded bg-[#f3f3f3]" />
