@@ -31,3 +31,11 @@ Recibo y captura sin datos privados: `C:/Users/Kaleb/Desktop/pollo-robins-panel/
 ## Alcance
 
 No se certifica la política general de privacidad de `clientes`, el alta automática de clientes ni la entrega de un pedido completo con esta corrección. La disponibilidad de Mapbox depende del estado de su cuenta y sigue documentada por separado.
+
+## Presentación del mensaje — refinamiento posterior
+
+El estado sin ficha ahora saluda con «¡Qué gusto verte por aquí!» y explica «Aún no tienes beneficios con este número. Puedes seguir con tu pedido». No supone que sea la primera compra ni promete registrar puntos automáticamente.
+
+La presentación queda integrada debajo del teléfono: divisor discreto, iconos Lucide de 20 px en naranja del carrito, título de 14 px y apoyo de 13 px con mayor interlineado. Carga, ficha encontrada y error comparten esta estructura. El error mantiene su mensaje propio y un botón Reintentar con objetivo mínimo de 44 px; no se convierte en ausencia de beneficios. Se conservan la consulta, las condiciones de canje y las transiciones existentes.
+
+Compilación TypeScript/Vite aprobada. Revisión local a 319 px y 1280 px: texto completo, sin desbordamiento horizontal. Teléfono sintético retirado al terminar; carrito de dos productos intacto. Capturas `loyalty-message-mobile.png` y `loyalty-message-desktop.png` en el directorio de evidencia anterior. Esta revisión visual es independiente de la comprobación pública de la corrección original.

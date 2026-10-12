@@ -924,30 +924,32 @@ export default function CartPage() {
                       : <p id="checkout-phone-help" className="checkout-field-help">Usa tu número de WhatsApp para recibir el código.</p>}
                   </div>
 
-                  {/* Estado lealtad integrado como footer de la tarjeta */}
+                  {/* Beneficios junto al teléfono, dentro del formulario */}
                   <AnimatePresence mode="wait">
                     {clienteTel.replace(/\D/g, '').length === 10 && checkingLoyalty && (
-                      <motion.div key="checking" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-slate-100/80 bg-slate-50">
-                        <div className="px-4 py-3 flex items-center gap-3">
-                          <Loader2 size={16} className="animate-spin text-slate-400 shrink-0"/>
-                          <p className="text-[12px] font-bold text-slate-500" role="status">Consultando tus beneficios...</p>
+                      <motion.div key="checking" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="checkout-loyalty">
+                        <div className="checkout-loyalty-content" role="status" aria-atomic="true">
+                          <Loader2 size={20} className="checkout-loyalty-icon animate-spin" aria-hidden="true" />
+                          <p className="checkout-loyalty-description">Buscando tus beneficios…</p>
                         </div>
                       </motion.div>
                     )}
                     {loyalty.status === 'found' && (
-                      <motion.div key="result" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={`border-t border-slate-100/80 ${(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? 'bg-amber-50' : 'bg-slate-50'}`}>
-                        <div className="px-4 py-3 flex items-center gap-3">
-                          <span className="text-lg shrink-0">{(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? '🎁' : '⭐'}</span>
+                      <motion.div key="result" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="checkout-loyalty">
+                        <div className="checkout-loyalty-content" role="status" aria-atomic="true">
+                          {(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6
+                            ? <Gift size={20} className="checkout-loyalty-icon" aria-hidden="true" />
+                            : <Star size={20} className="checkout-loyalty-icon" aria-hidden="true" />}
                           <div>
                             {(datosCliente?.envios_gratis || 0) > 0 || (datosCliente?.puntos || 0) >= 6 ? (
                               <>
-                                <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">¡Tienes un beneficio!</p>
-                                <p className="text-[11px] text-slate-500 font-medium leading-tight">Continúa para desbloquear tu envío gratis</p>
+                                <p className="checkout-loyalty-title">¡Tienes un beneficio!</p>
+                                <p className="checkout-loyalty-description">Continúa para desbloquear tu envío gratis.</p>
                               </>
                             ) : (
                               <>
-                                <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">Llevas {datosCliente?.puntos || 0} de 6 pedidos</p>
-                                <p className="text-[11px] text-slate-500 font-medium leading-tight">¡Al 6to pedido el envío es gratis!</p>
+                                <p className="checkout-loyalty-title">Llevas {datosCliente?.puntos || 0} de 6 pedidos</p>
+                                <p className="checkout-loyalty-description">¡Al 6to pedido el envío es gratis!</p>
                               </>
                             )}
                           </div>
@@ -955,25 +957,27 @@ export default function CartPage() {
                       </motion.div>
                     )}
                     {loyalty.status === 'not-found' && (
-                      <motion.div key="new-customer" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-slate-100/80 bg-slate-50">
-                        <div className="px-4 py-3 flex items-center gap-3" role="status">
-                          <span className="text-lg shrink-0" aria-hidden="true">⭐</span>
+                      <motion.div key="new-customer" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="checkout-loyalty">
+                        <div className="checkout-loyalty-content" role="status" aria-atomic="true">
+                          <Star size={20} className="checkout-loyalty-icon" aria-hidden="true" />
                           <div>
-                            <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">Tu número aún no tiene historial de lealtad</p>
-                            <p className="text-[11px] text-slate-500 font-medium leading-tight">Puedes continuar con tu pedido.</p>
+                            <p className="checkout-loyalty-title">¡Qué gusto verte por aquí!</p>
+                            <p className="checkout-loyalty-description">Aún no tienes beneficios con este número. Puedes seguir con tu pedido.</p>
                           </div>
                         </div>
                       </motion.div>
                     )}
                     {loyalty.status === 'error' && (
-                      <motion.div key="loyalty-error" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-amber-100 bg-amber-50">
-                        <div className="px-4 py-3 flex flex-wrap items-center gap-3" role="status">
-                          <AlertCircle size={18} className="text-amber-700 shrink-0" aria-hidden="true" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-black text-slate-800 leading-tight mb-0.5">No pudimos consultar tus beneficios</p>
-                            <p className="text-[11px] text-slate-600 font-medium leading-tight">Reintenta para comprobar tus puntos y envíos gratis.</p>
+                      <motion.div key="loyalty-error" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="checkout-loyalty">
+                        <div className="checkout-loyalty-content">
+                          <AlertCircle size={20} className="checkout-loyalty-icon" aria-hidden="true" />
+                          <div>
+                            <div role="status" aria-atomic="true">
+                              <p className="checkout-loyalty-title">No pudimos consultar tus beneficios</p>
+                              <p className="checkout-loyalty-description">Inténtalo de nuevo para revisar tus puntos y envíos gratis.</p>
+                            </div>
+                            <button type="button" onClick={retryLoyalty} className="checkout-loyalty-retry">Reintentar</button>
                           </div>
-                          <button type="button" onClick={retryLoyalty} className="min-h-11 px-3 rounded-lg text-[12px] font-bold text-amber-800 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-800">Reintentar</button>
                         </div>
                       </motion.div>
                     )}

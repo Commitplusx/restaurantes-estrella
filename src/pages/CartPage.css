@@ -84,6 +84,14 @@
 .checkout-field-help, .checkout-input-error { font-size: 12px; line-height: 1.5; margin-top: 6px; }
 .checkout-field-help { color: var(--checkout-muted); }
 .checkout-input-error { color: #b42318; }
+.checkout-loyalty { margin-top: 20px; border-top: 1px solid var(--checkout-line); overflow: hidden; }
+.checkout-loyalty-content { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 12px; padding-top: 18px; }
+.checkout-loyalty-icon { color: var(--checkout-accent); margin-top: 1px; }
+.checkout-loyalty-title { font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--checkout-ink); }
+.checkout-loyalty-description { font-size: 13px; font-weight: 400; line-height: 1.6; color: var(--checkout-muted); }
+.checkout-loyalty-title + .checkout-loyalty-description { margin-top: 4px; }
+.checkout-loyalty-retry { display: inline-flex; align-items: center; min-height: 44px; margin-top: 4px; color: var(--checkout-accent); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+.checkout-loyalty-retry:hover { color: var(--checkout-ink); }
 .checkout-choice { display: flex; align-items: center; justify-content: center; gap: 10px; flex: 1; min-height: 58px; padding: 12px; border: 1px solid var(--checkout-line); border-radius: 14px; font-size: 15px; font-weight: 500; transition: border-color .18s, background .18s; }
 .checkout-choice[aria-pressed=true] { border-color: var(--checkout-accent); color: var(--checkout-accent); background: var(--checkout-tint); }
 .checkout-choice:hover { border-color: var(--checkout-accent); }
