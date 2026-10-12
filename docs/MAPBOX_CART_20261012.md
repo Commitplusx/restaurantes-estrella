@@ -2,7 +2,9 @@
 
 ## Estado
 
-Implementado y ejecutado **en local**, con un token público suministrado por el usuario. No publicado en Vercel y sin cambios en Supabase, APK o worker. Vista compilada en `http://127.0.0.1:5194/menu/pollo-robin-s-1353/carrito`.
+Implementado y **publicado en estrella-eats.mx** desde `main`, commit `ef748c72725f66dafc7d07b32977087fe88ff6b8`. Vercel `deiffs-projects/restaurantes-estrella`, despliegue `8qdBmowJg7pQJytqDaScG1aNcVGs`, estado Ready y dominio de producción asignado. Sin cambios en Supabase, APK o worker.
+
+El usuario aprobó el rediseño posterior del carrito y menú y autorizó subirlo al repositorio oficial. Su [revisión y contrato](CART_REDESIGN_LOCAL_20261012.md) registran por separado el estado de esa entrega; el despliegue Mapbox indicado arriba es su base.
 
 El alcance es el selector de dirección de `CartPage.tsx`. Inicio, perfil del restaurante, tracker y editor de sucursales todavía usan Google Maps; conservar su dependencia hasta migrar esas superficies por separado.
 
@@ -41,6 +43,8 @@ Capturas sin datos privados: `C:/Users/Kaleb/Desktop/pollo-robins-panel/output/m
 
 Se encontró y corrigió que el CSS de Mapbox cambiaba el contenedor a `position:relative`, dejándolo con altura cero. Se fijó explícitamente su geometría absoluta al contenedor del mapa. Una vista de prueba anterior conservaba por PWA el índice de otro build e intentaba importar chunks ya reemplazados; la verificación final se realizó en un origen local limpio. Esto no certifica la actualización de una PWA de producción.
 
-## Pendiente para publicar
+## Publicación y límites
 
-Configurar las variables de Mapbox en Vercel, comprobar restricciones del token, publicar sólo los archivos revisados y repetir el recorrido sobre el dominio real. Esta entrega local no prueba el despliegue público ni migra las demás superficies de Google Maps.
+Las dos variables requeridas se guardaron en Production y Preview desde la sesión verificada de Vercel. GitHub disparó el despliegue del commit revisado. El dominio público actualizó su índice de `/assets/index-C04JuJR3.js` a `/assets/index-D5SCWuq1.js`; se comprobó el selector Mapbox y una búsqueda real, sin confirmar dirección, OTP, pedido o despacho. Se retiró el artículo de verificación del carrito público y se conservaron los datos previos del usuario.
+
+La actualización de la PWA requirió que el navegador recibiera su nueva versión; una primera recarga todavía mostraba el índice anterior. No se certifica funcionamiento offline ni actualización de todos los dispositivos. Una búsqueda genérica puede devolver otras ciudades de México: el cliente debe revisar el resultado y el pin; la cotización de cobertura continúa siendo obligatoria. Se mantienen las limitaciones de GPS, calidad de direcciones y restricciones del token descritas arriba. Otras superficies siguen usando Google Maps.
