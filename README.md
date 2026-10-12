@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# Estrella Eats — web pública y portal de restaurantes
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React, TypeScript y Vite. Publica el catálogo, menú, carrito, verificación por WhatsApp y seguimiento del pedido; también contiene el portal autenticado de restaurantes.
 
-Currently, two official plugins are available:
+Repositorio oficial: [Commitplusx/restaurantes-estrella](https://github.com/Commitplusx/restaurantes-estrella). Sitio: [estrella-eats.mx](https://estrella-eats.mx). Proyecto Vercel: `deiffs-projects/restaurantes-estrella`, rama productiva `main`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Leer antes de modificar
 
-## React Compiler
+La arquitectura central está en la raíz de **Loyalty**, en [`arquitectura_sistema_v2.md`](https://github.com/Commitplusx/loyalty-estrella/blob/main/arquitectura_sistema_v2.md); su título interno es v3. No crear otro motor de pedidos, asignación o transiciones desde esta web. La guía de este repositorio complementa esa arquitectura con rutas y operación del frontend.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [Guía de la web, contratos y preparación del trabajo de backend](docs/GUIA_WEB.md).
+- [Menú de restaurante](docs/MENU_DESIGN_20261012.md).
+- [Carrito y transiciones entre pasos](docs/CART_REDESIGN_LOCAL_20261012.md).
+- [Mapbox: dirección, pin y límites](docs/MAPBOX_CART_20261012.md).
+- [Promociones y selección del menú](docs/PROMOCIONES_MENU_2026-10-06.md).
+- [Actualizaciones de la PWA y categorías](docs/WEB_UPDATES_2026-10-12.md).
+- [Beneficios, documentos legales y navegación](docs/PUBLIC_INFO_DESIGN_20261012.md).
 
-## Expanding the ESLint configuration
+## Desarrollo
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Usar las versiones bloqueadas en `package-lock.json`:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+npm ci
+npm run dev -- --port 5196
+npm run build
+npm run preview -- --port 5197
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`npm run build` ejecuta TypeScript y genera `dist/` con la PWA. El servidor de desarrollo permite revisar el diseño; para comprobar cambios de versión del service worker se necesita la compilación y el preview.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Configuración
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Configurar `.env.local` y las variables equivalentes en Vercel. Consultar los contratos de cada integración antes de cambiar sus valores.
+
+| Variable | Uso |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Proyecto Supabase compartido con Loyalty |
+| `VITE_SUPABASE_ANON_KEY` | Clave pública del cliente, sujeta a las políticas del servidor |
+| `VITE_MAPBOX_ACCESS_TOKEN` | Token público del mapa del carrito |
+| `VITE_MAPBOX_PERMANENT_GEOCODING` | `true` sólo si la cuenta permite guardar los resultados de búsqueda |
+| `VITE_MAPBOX_STYLE_URL` | Estilo opcional de Mapbox; existe un estilo predeterminado |
+
+Las variables `VITE_` terminan en el navegador. Nunca colocar claves `service_role`, tokens privados de WhatsApp ni contraseñas en ellas. Los valores y archivos `.env` no pertenecen a GitHub. El resto de las pantallas que todavía usa Google Maps requiere su revisión independiente; el cambio a Mapbox cubre el selector del carrito.
+
+## Verificación y publicación
+
+Compilar, revisar los archivos cambiados con ESLint y probar las rutas afectadas en PC/móvil. El lint global conserva deuda previa: un lint de archivos concretos no certifica todo el repositorio.
+
+Un commit subido a `main` dispara Vercel, pero **push no significa publicado**. Comprobar que el despliegue correspondiente esté Ready y que el dominio público cargue esa versión. Supabase, worker/VPS y APK se despliegan por separado; este repositorio no publica esos servicios.
+
+El aviso de nueva versión requiere haber cargado previamente la versión que lo incorpora. Detecta la activación de la PWA existente y permite recargar; conserva un recordatorio si se pospone. La acción se bloquea en carrito, login y portal. No se modificó el ciclo de cachés ni el registro push.

@@ -13,3 +13,7 @@ La revisión automática rechazó una propuesta amplia que también cambiaba cac
 Verificación local: build TypeScript/Vite aprobado, ESLint de componentes nuevos aprobado; tres pruebas del bloqueo de formularios, conexión/instalación, concurrencia, throttle y recuperación del error. Prueba de dos compilaciones reales en preview 5197: aviso aparecido, Más tarde dejó recordatorio, restauración y Actualizar ahora cargó `/assets/index-FjwKInYE.js` y retiró el aviso. No se simuló el estado de actualización.
 
 Catálogo: Sushi filtró MAKITAN y Todos restauró la lista. Documento sin overflow horizontal en 320, 390, 768, 1024 y 1919px. Capturas locales en `output/mapbox-cart-20261012/pwa-update-mobile.png` y `categories-desktop.png` del workspace Robin's. Esta evidencia local no confirma publicación.
+
+Publicación comprobada del aviso y categorías: `93b53ec` en `main`, Vercel `M2vuwxboHqBs9Be3oRZfDRQb8M6d` Ready; `estrella-eats.mx` cargó `/assets/index-CZ55lH15.js`. La pestaña que conservaba una compilación antigua necesitó cargar esta versión primero; no se afirma que un cliente sin el observador pueda recibir un aviso retroactivo.
+
+En la entrega siguiente `3c51df8`, la línea gris móvil se ocultó conservando el carrusel. El diseño de información pública y el retorno al catálogo están descritos en [su registro](PUBLIC_INFO_DESIGN_20261012.md).

@@ -38,3 +38,9 @@ Catálogo y fotografías de restaurantes ya conectados a la aplicación. Logo en
 La referencia de paleta vigente para el inicio es blanca, Apple-like, por petición expresa del usuario. Se conservan la composición existente, Outfit, fotografías, arte de banners y acento naranja Estrella. Es un compromiso de esta home; no autoriza sustituir la identidad visual de menús, checkout ni otras rutas. El contrato responsive y las interacciones concretas viven en el brief de la superficie; los tokens de la paleta aprobada se registran en DESIGN.md y su sidecar, ambos acotados al inicio.
 
 El contenido comercial existente que muestra 4.8 o 25–35 min no dispone de verificación aportada en esta tarea. Conservar el catálogo no convierte esas cadenas heredadas en hechos comprobados ni autoriza crear nuevos claims.
+
+## Ampliación autorizada — 12 de octubre de 2026
+
+Las peticiones posteriores amplían el trabajo a menú de restaurante, carrito móvil/PC, Mapbox del carrito, aviso PWA, categorías e información pública. El usuario autorizó publicar en el repositorio oficial. Los contratos detallados de esas superficies viven en `docs/MENU_DESIGN_20261012.md`, `docs/CART_REDESIGN_LOCAL_20261012.md`, `docs/MAPBOX_CART_20261012.md`, `docs/WEB_UPDATES_2026-10-12.md` y `docs/PUBLIC_INFO_DESIGN_20261012.md`; el alcance anterior de home/local es contexto histórico.
+
+La arquitectura central permanece en la raíz de Loyalty, `arquitectura_sistema_v2.md`. El frontend no crea otro motor de pedidos ni asignación. `docs/GUIA_WEB.md` registra rutas, contratos y lo necesario para la siguiente revisión de backend. Una publicación de esta web no equivale a publicar Supabase, VPS o APK.

@@ -29,10 +29,10 @@ typography:
     letterSpacing: "-0.035em"
   display-desktop:
     fontFamily: "Outfit, sans-serif"
-    fontSize: "clamp(64px, 6.2vw, 94px)"
+    fontSize: "clamp(56px, 5.6vw, 84px)"
     fontWeight: 800
     lineHeight: 0.98
-    letterSpacing: "-5px"
+    letterSpacing: "-0.045em"
   body-phone:
     fontFamily: "Outfit, sans-serif"
     fontSize: "15px"
