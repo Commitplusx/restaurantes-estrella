@@ -1,276 +1,39 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { Loader2, Phone, MessageCircle, Navigation, MapPin, Store, Home, Bike, ChevronDown, CheckCircle, Clock, ChevronUp, Package } from 'lucide-react';
-import { useJsApiLoader, GoogleMap, OverlayView, Polyline } from '@react-google-maps/api';
+import { Loader2, Phone, MessageCircle, Navigation, MapPin, ChevronDown, CheckCircle, ChevronUp, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLottie } from 'lottie-react';
-import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
 import cookingAnimation from '../assets/Cooking.json';
-import { acceptedDriver } from '../utils/orderState';
+import { trackingPoint } from '../lib/orderTracking';
+import { useOrderTracking } from '../hooks/useOrderTracking';
+import TrackingMap from '../components/TrackingMap';
+import {useTrackingRoute} from '../hooks/useTrackingRoute';
+import './TrackerPage.css';
 
 const CookingAnimation = () => {
   const { View } = useLottie({ animationData: cookingAnimation, loop: true });
   return <>{View}</>;
 };
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '100%'
-};
-
 export function TrackerPage() {
   const [searchParams] = useSearchParams();
   const pedidoId = searchParams.get('pedido');
-  
-  const [pedido, setPedido] = useState<any>(null);
-  const [repartidor, setRepartidor] = useState<any>(null);
-  const [restaurante, setRestaurante] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Bottom Sheet state
-  const [isExpanded, setIsExpanded] = useState(false);
-  const touchStartY = useRef(0);
-
-  // Advanced feature states
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  const [eta, setEta] = useState<string | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
-
-  // Load Google Maps
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-  });
-
-  const fetchRepartidor = async (repId: string) => {
-    const { data: repData } = await supabase
-      .from('repartidores')
-      .select('*')
-      .or(`id.eq.${repId},user_id.eq.${repId}`)
-      .maybeSingle();
-    
-    if (repData) {
-      setRepartidor(repData);
-      return repData;
-    }
-    return null;
-  };
-
-  useEffect(() => {
-    if (!pedidoId) return;
-
-    let orderChannel: any = null;
-    let driverChannel: any = null;
-
-    const subscribeToDriver = (repId: string) => {
-      if (driverChannel) supabase.removeChannel(driverChannel);
-      
-      driverChannel = supabase.channel(`driver-tracker-${repId}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'repartidores', filter: `id=eq.${repId}` },
-          (payload) => {
-            setRepartidor((prev: any) => prev ? {
-              ...prev,
-              lat: payload.new.lat,
-              lng: payload.new.lng
-            } : prev);
-          }
-        ).subscribe();
-    };
-
-    const fetchInitialData = async () => {
-      // Fetch pedido (Soporta UUID largo o ID corto de 6 caracteres)
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pedidoId);
-      
-      let query = supabase.from('pedidos').select('*');
-      if (isUUID) {
-        query = query.eq('id', pedidoId);
-      } else {
-        query = query.eq('wb_message_id', pedidoId);
-      }
-      
-      const { data: orderData } = await query.single();
-        
-      if (orderData) {
-        setPedido(orderData);
-        
-        // Solo buscar restaurante si NO es mandadito
-        if (orderData.restaurante && orderData.tipo_pedido !== 'mandadito') {
-          const { data: restData } = await supabase
-            .from('restaurantes')
-            .select('*')
-            .ilike('nombre', orderData.restaurante)
-            .single();
-          if (restData) setRestaurante(restData);
-        }
-
-        // Fetch repartidor if assigned
-        const driverId = acceptedDriver(orderData);
-        if (driverId) {
-          fetchRepartidor(driverId).then(repData => {
-            if (repData && repData.id) {
-              subscribeToDriver(repData.id);
-            }
-          });
-        } else setRepartidor(null);
-
-        // Subscribirse al estado del pedido
-        orderChannel = supabase.channel(`order-tracker-${orderData.id}-${Date.now()}`)
-          .on(
-            'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${orderData.id}` },
-            (payload) => {
-              setPedido((prev: any) => ({ ...prev, ...payload.new }));
-              
-              // Si el repartidor se asignó o cambió
-              const nextDriver = acceptedDriver({ estado: payload.new.estado, repartidor_id: payload.new.repartidor_id });
-              if (nextDriver) {
-                fetchRepartidor(nextDriver).then(repData => {
-                  if (repData && repData.id) {
-                    subscribeToDriver(repData.id);
-                  }
-                });
-              } else {
-                setRepartidor(null);
-                if (driverChannel) supabase.removeChannel(driverChannel);
-              }
-            }
-          ).subscribe();
-          
-        setLoading(false);
-      } else {
-        setLoading(false); // No se encontró el pedido
-      }
-    };
-
-    fetchInitialData();
-
-    // Actualizar datos al volver a abrir/minimizar la app o pestaña
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchInitialData();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (orderChannel) supabase.removeChannel(orderChannel);
-      if (driverChannel) supabase.removeChannel(driverChannel);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [pedidoId]);
-
-  // Coordenadas base
-  const defaultCenter = useMemo(() => ({ lat: 16.2516, lng: -92.1332 }), []); // Comitán por defecto
-  
-  // Para mandaditos: el pin de "origen" es pedido.lat/lng (donde el repartidor recoge el paquete).
-  // Para restaurantes: es la ubicación del restaurante.
-  const restaurantLocation = useMemo(() => {
-    const isMandadito = pedido?.tipo_pedido === 'mandadito';
-    if (isMandadito) {
-      return pedido?.lat && pedido?.lng
-        ? { lat: Number(pedido.lat), lng: Number(pedido.lng) }
-        : null;
-    }
-    return restaurante?.lat && restaurante?.lng 
-      ? { lat: Number(restaurante.lat), lng: Number(restaurante.lng) } 
-      : null;
-  }, [pedido?.tipo_pedido, pedido?.lat, pedido?.lng, restaurante?.lat, restaurante?.lng]);
-  
-  const driverLocation = useMemo(() => repartidor?.lat && repartidor?.lng
-    ? { lat: Number(repartidor.lat), lng: Number(repartidor.lng) }
-    : null, [repartidor?.lat, repartidor?.lng]);
-
-  // Para mandaditos: el pin de destino (cliente) es lat_entrega/lng_entrega.
-  // Para restaurantes: es el lat/lng del pedido (dirección de entrega al cliente).
-  const clientLocation = useMemo(() => {
-    const isMandadito = pedido?.tipo_pedido === 'mandadito';
-    if (isMandadito) {
-      return pedido?.lat_entrega && pedido?.lng_entrega
-        ? { lat: Number(pedido.lat_entrega), lng: Number(pedido.lng_entrega) }
-        : null;
-    }
-    return pedido?.lat && pedido?.lng
-      ? { lat: Number(pedido.lat), lng: Number(pedido.lng) }
-      : null;
-  }, [pedido?.tipo_pedido, pedido?.lat, pedido?.lng, pedido?.lat_entrega, pedido?.lng_entrega]);
-
-
-  const mapRef = useRef<google.maps.Map | null>(null);
-
-  const fitMapToBounds = useCallback(() => {
-    if (!mapRef.current || !window.google?.maps) return;
-    
-    const bounds = new window.google.maps.LatLngBounds();
-    let count = 0;
-    
-    if (restaurantLocation) { bounds.extend(restaurantLocation); count++; }
-    if (clientLocation) { bounds.extend(clientLocation); count++; }
-    if (driverLocation) { bounds.extend(driverLocation); count++; }
-    
-    if (count > 1) {
-      // Usar un padding inferior para compensar el bottom sheet
-      mapRef.current.fitBounds(bounds, { top: 80, right: 80, bottom: window.innerWidth < 768 ? 320 : 80, left: window.innerWidth < 768 ? 80 : 400 });
-    } else if (count === 1) {
-      mapRef.current.setZoom(14);
-      mapRef.current.setCenter(driverLocation || restaurantLocation || clientLocation || defaultCenter);
-    }
-  }, [restaurantLocation, clientLocation, driverLocation, defaultCenter]);
-
-  useEffect(() => {
-    fitMapToBounds();
-  }, [fitMapToBounds]);
-
-  const lastDirectionsFetch = useRef<number>(0);
-
-  useEffect(() => {
-    if (pedido?.estado === 'en_camino' && driverLocation && clientLocation && isLoaded && window.google) {
-      const now = Date.now();
-      // Throttle: Solo pedir la ruta azul a Google Maps cada 30 segundos
-      if (now - lastDirectionsFetch.current < 30000) return;
-      lastDirectionsFetch.current = now;
-
-      const directionsService = new window.google.maps.DirectionsService();
-      directionsService.route(
-        {
-          origin: driverLocation,
-          destination: clientLocation,
-          travelMode: window.google.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (status === window.google.maps.DirectionsStatus.OK && result) {
-            setDirections(result);
-            if (result.routes[0]?.legs[0]?.duration?.text) {
-              setEta(result.routes[0].legs[0].duration.text);
-            }
-          }
-        }
-      );
-    } else if (pedido?.estado !== 'en_camino') {
-      setDirections(null);
-      setEta(null);
-      lastDirectionsFetch.current = 0;
-    }
-  }, [pedido?.estado, driverLocation?.lat, driverLocation?.lng, clientLocation?.lat, clientLocation?.lng, isLoaded]);
-
-  if (!pedidoId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <p className="text-slate-500 font-medium">ID de pedido inválido.</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-      </div>
-    );
-  }
-
-  const mapStyles = UBER_EATS_MAP_STYLE;
+  const {pedido,repartidor,restaurante,loading,error,retry} = useOrderTracking(pedidoId);
+  const [isExpanded,setIsExpanded] = useState(false);
+  const [showDetails,setShowDetails] = useState(true);
+  const restaurantLocation = trackingPoint(pedido?.tipo_pedido === 'mandadito' ? pedido : restaurante);
+  const driverLocation = trackingPoint(repartidor);
+  const clientLocation = trackingPoint(pedido?.tipo_pedido === 'mandadito'
+    ? {lat:pedido.lat_entrega,lng:pedido.lng_entrega} : pedido);
+  const route = useTrackingRoute(pedido?.estado === 'en_camino',driverLocation,clientLocation);
+  if (loading) return <main className="min-h-[100dvh] flex items-center justify-center bg-slate-50 gap-3" role="status">
+    <Loader2 size={24} className="animate-spin" aria-hidden="true" /> Consultando tu pedido…
+  </main>;
+  if (!pedido) return <main className="min-h-[100dvh] flex items-center justify-center bg-slate-50 p-6">
+    <div className="max-w-md text-center"><h1 className="text-2xl font-semibold mb-3">Vamos a encontrar tu pedido.</h1>
+      <p role="alert" className="text-slate-600">{error}</p><button className="mt-6 min-h-11 bg-slate-900 text-white rounded-xl px-6" onClick={retry}>Volver a consultar</button>
+      <a className="block min-h-11 mt-3 underline" href="/">Ver restaurantes</a></div>
+  </main>;
 
   // ── Detectar tipo de pedido ───────────────────────────────────────────────
   const esMandadito = pedido?.tipo_pedido === 'mandadito';
@@ -297,123 +60,13 @@ export function TrackerPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="h-[100dvh] w-full flex flex-col md:flex-row bg-slate-50 overflow-hidden font-sans relative"
+      data-panel-expanded={isExpanded}
+      className="order-tracker h-[100dvh] w-full flex flex-col md:flex-row bg-slate-50 overflow-hidden font-sans relative"
     >
       
       {/* MAPA (Fondo en móvil / Izquierda en Desktop) */}
-      <div className="w-full h-full md:w-2/3 bg-slate-200 absolute md:relative inset-0 md:inset-auto z-0">
-        {loadError && (
-          <div className="absolute inset-0 flex items-center justify-center text-red-500 bg-red-50">
-            Error cargando mapa.
-          </div>
-        )}
-        {!isLoaded && !loadError && (
-          <div className="absolute inset-0 flex flex-col gap-2 items-center justify-center bg-slate-100 text-slate-400">
-            <MapPin className="w-8 h-8 animate-bounce" />
-            <span className="text-sm font-medium">Cargando mapa...</span>
-          </div>
-        )}
-        {isLoaded && (
-          <GoogleMap
-            mapContainerStyle={mapContainerStyle}
-            zoom={13}
-            center={defaultCenter}
-            onLoad={(map) => {
-              mapRef.current = map;
-              fitMapToBounds();
-            }}
-            options={{
-              disableDefaultUI: true,
-              zoomControl: true,
-              gestureHandling: 'greedy', // Permite hacer zoom con un solo dedo en móviles
-              maxZoom: 18, // Permitimos zoom profundo
-              styles: mapStyles
-            }}
-          >
-            {/* Ruta (Polyline) Alta Resolución */}
-            {directions && (
-              <Polyline
-                path={directions.routes[0]?.legs?.flatMap(leg => leg.steps.flatMap(step => step.path)) || []}
-                options={{
-                  strokeColor: '#3b82f6',
-                  strokeWeight: 6,
-                  strokeOpacity: 0.8,
-                }}
-              />
-            )}
-
-            {/* Marcador Origen: Restaurante (normal) o Punto de Recogida (mandadito) */}
-            {restaurantLocation && (
-              <OverlayView
-                position={restaurantLocation}
-                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              >
-                <motion.div 
-                  initial={{ scale: 0, y: 20 }}
-                  animate={{ scale: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.2 }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                >
-                  <div className="relative">
-                    <div className={`w-10 h-10 bg-white rounded-full shadow-lg border-[3px] ${esMandadito ? 'border-violet-500' : 'border-orange-500'} overflow-hidden flex items-center justify-center relative z-10`}>
-                      {esMandadito ? (
-                        <Package className="w-5 h-5 text-violet-500" />
-                      ) : restaurante?.logo_url ? (
-                        <img src={restaurante.logo_url} className="w-full h-full object-cover" alt="Restaurante" />
-                      ) : (
-                        <Store className="w-5 h-5 text-orange-500" />
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              </OverlayView>
-            )}
-
-            {/* Marcador Cliente */}
-            {clientLocation && (
-              <OverlayView
-                position={clientLocation}
-                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              >
-                <motion.div 
-                  initial={{ scale: 0, y: 20 }}
-                  animate={{ scale: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.4 }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                >
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-emerald-500 rounded-full shadow-lg border-[3px] border-white flex items-center justify-center relative z-10">
-                      <Home className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                </motion.div>
-              </OverlayView>
-            )}
-
-            {/* Marcador Repartidor (Moto) */}
-            {driverLocation && (
-              <OverlayView
-                position={driverLocation}
-                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              >
-                <motion.div 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.6 }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                >
-                  <div className="relative">
-                    <div className="w-12 h-12 bg-slate-800 rounded-full shadow-2xl border-[3px] border-white flex items-center justify-center z-10 relative">
-                      <Bike className="w-6 h-6 text-white" />
-                    </div>
-                    {/* Efecto de pulso para la moto */}
-                    <div className="absolute inset-0 bg-slate-800 rounded-full animate-ping opacity-20 z-0"></div>
-                  </div>
-                </motion.div>
-              </OverlayView>
-            )}
-          </GoogleMap>
-        )}
+      <div className="order-tracker-map w-full h-full md:w-auto md:flex-1 md:min-w-0 bg-slate-200 absolute md:relative inset-0 md:inset-auto z-0">
+        <TrackingMap origin={restaurantLocation} destination={clientLocation} driver={driverLocation} route={route} />
       </div>
 
       {/* Floating Status Pill (Mobile Only - visible when sheet is collapsed) */}
@@ -423,7 +76,7 @@ export function TrackerPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-4 left-4 right-4 md:hidden z-10 flex justify-center pointer-events-none"
+            className="absolute top-24 left-4 right-4 md:hidden z-10 flex justify-center pointer-events-none"
           >
             <div className="bg-white px-5 py-2.5 rounded-full shadow-lg border border-slate-100 flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${cancelado ? 'bg-red-500' : pedido?.estado === 'entregado' ? 'bg-emerald-500' : pedido?.estado === 'en_camino' ? 'bg-blue-500' : 'bg-orange-500 animate-pulse'}`} />
@@ -440,29 +93,21 @@ export function TrackerPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.2 }}
-        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-[-10px_0_30px_rgba(0,0,0,0.05)] z-20 flex flex-col absolute bottom-0 md:relative rounded-t-[32px] md:rounded-none h-[90vh] md:h-full md:w-1/3 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:translate-y-0 ${isExpanded ? 'translate-y-0' : 'translate-y-[55vh]'}`}
+        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-[-10px_0_30px_rgba(0,0,0,0.05)] z-20 flex flex-col absolute bottom-0 md:relative rounded-t-[32px] md:rounded-none h-[90dvh] md:h-full md:w-[380px] md:max-w-[48vw] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:translate-y-0 ${isExpanded ? 'translate-y-0' : 'translate-y-[55dvh]'}`}
       >
         
-        {/* Mobile Drag Handle */}
-        <div 
-          className="w-full flex justify-center items-center pt-4 pb-3 md:hidden shrink-0 cursor-pointer active:bg-slate-50 transition-colors rounded-t-[32px] relative"
-          onClick={() => setIsExpanded(!isExpanded)}
-          onTouchStart={(e) => { touchStartY.current = e.touches[0].clientY; }}
-          onTouchEnd={(e) => {
-            const touchEndY = e.changedTouches[0].clientY;
-            if (touchStartY.current - touchEndY > 30) setIsExpanded(true); // Deslizó arriba
-            if (touchEndY - touchStartY.current > 30) setIsExpanded(false); // Deslizó abajo
-          }}
-        >
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-          <div className="absolute right-6 bg-slate-50 p-1 rounded-full">
-            {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
-          </div>
-        </div>
+        <button type="button" aria-expanded={isExpanded} aria-controls="tracking-details" aria-label={isExpanded ? 'Mostrar más mapa' : 'Mostrar detalles del pedido'}
+          className="w-full flex justify-center items-center min-h-12 md:hidden shrink-0 rounded-t-[32px] relative"
+          onClick={() => setIsExpanded(value => !value)}>
+          <span className="text-sm font-medium">{isExpanded ? 'Mostrar más mapa' : 'Ver mi pedido'}</span>
+          <span className="absolute right-6">{isExpanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}</span>
+        </button>
 
         {/* Content (Scrollable) */}
-        <div className={`flex-1 p-5 md:p-6 custom-scrollbar ${isExpanded ? 'overflow-y-auto' : 'overflow-hidden md:overflow-y-auto'}`}>
+        <div id="tracking-details" className={`flex-1 min-h-0 p-5 md:p-6 custom-scrollbar ${isExpanded ? 'overflow-y-auto' : 'overflow-hidden md:overflow-y-auto'}`}>
           
+          {error && <div role="alert" className="mb-4 p-3 bg-orange-50 text-sm text-orange-950 rounded-xl"><p>{error}</p>
+            <button className="min-h-11 underline" onClick={retry}>Actualizar estado</button></div>}
           <div className="flex items-center justify-between mb-6 md:mt-2">
             <div className="flex items-center gap-4">
               {/* Icono principal: adaptado según tipo de pedido y estado */}
@@ -482,7 +127,7 @@ export function TrackerPage() {
                 ) : esMandadito ? (
                   <Package className="w-6 h-6" />
                 ) : restaurante?.logo_url ? (
-                  <img src={restaurante.logo_url} className="w-full h-full object-cover rounded-full" />
+                  <img src={restaurante.logo_url} alt="" className="w-full h-full object-cover rounded-full" />
                 ) : (
                   <span className="text-xl font-black text-slate-400">{pedido?.restaurante?.[0]}</span>
                 )}
@@ -520,12 +165,7 @@ export function TrackerPage() {
                       : 'Consultando el estado del pedido'}
                   </p>
                   
-                  {pedido?.estado === 'en_camino' && eta && (
-                    <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1 text-[10px] font-bold border border-blue-100 shadow-sm">
-                      <Clock className="w-3 h-3" />
-                      Llega en {eta}
-                    </span>
-                  )}
+
                 </div>
               </div>
             </div>
@@ -540,7 +180,7 @@ export function TrackerPage() {
             {/* Para mandaditos esperando mensajero: icono pulsante */}
             {esMandadito && !cancelado && pedido?.estado !== 'en_camino' && pedido?.estado !== 'entregado' && (
               <div className="w-16 h-16 shrink-0 mr-1 flex items-center justify-center">
-                <span className="text-4xl animate-bounce">📦</span>
+                <Package className="w-8 h-8 text-violet-600" aria-hidden="true" />
               </div>
             )}
           </div>
@@ -574,12 +214,12 @@ export function TrackerPage() {
               </div>
               {/* Etiquetas del timeline: "Recogiendo" para mandaditos, "Preparando" para restaurantes */}
               <div className="flex justify-between mt-2 px-1">
-                <span className={`text-[10px] font-bold ${currentStep >= 1 ? 'text-emerald-600' : 'text-slate-400'}`}>Recibido</span>
-                <span className={`text-[10px] font-bold ${currentStep >= 2 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <span className={`text-sm font-semibold ${currentStep >= 1 ? 'text-emerald-700' : 'text-slate-600'}`}>Recibido</span>
+                <span className={`text-sm font-semibold ${currentStep >= 2 ? 'text-emerald-700' : 'text-slate-600'}`}>
                   {esMandadito ? 'Recogiendo' : 'Preparando'}
                 </span>
-                <span className={`text-[10px] font-bold ${currentStep >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>{esRecogida ? 'Listo' : 'En camino'}</span>
-                <span className={`text-[10px] font-bold ${currentStep >= 4 ? 'text-emerald-600' : 'text-slate-400'}`}>Entregado</span>
+                <span className={`text-sm font-semibold ${currentStep >= 3 ? 'text-emerald-700' : 'text-slate-600'}`}>{esRecogida ? 'Listo' : 'En camino'}</span>
+                <span className={`text-sm font-semibold ${currentStep >= 4 ? 'text-emerald-700' : 'text-slate-600'}`}>Entregado</span>
               </div>
             </div>
           )}
@@ -587,7 +227,7 @@ export function TrackerPage() {
           {/* End Timeline Progress */}
           
           {/* Order Details Toggle */}
-          <div className="mt-4 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+          <div className={`mt-4 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm ${isExpanded ? '' : 'hidden md:block'}`}>
             <button 
               onClick={() => {
                 if (!showDetails) setIsExpanded(true);
@@ -625,17 +265,17 @@ export function TrackerPage() {
           </div>
           
           {repartidor && (
-             <div className="mt-6 md:mt-8 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+             <div className={`mt-6 md:mt-8 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm ${isExpanded ? '' : 'hidden md:block'}`}>
+               <h4 className="text-sm font-semibold text-slate-600 mb-3">
                  {esMandadito ? 'Tu Mensajero' : 'Tu Repartidor'}
                </h4>
                <div className="flex items-center gap-3">
                  <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
-                    <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${repartidor.nombre}&backgroundColor=1e293b`} className="w-full h-full" />
+                    <span aria-hidden="true" className="w-full h-full flex items-center justify-center font-semibold text-slate-800">{repartidor.nombre.split(/\s+/).filter(Boolean).slice(0,2).map(part => part[0]).join('')}</span>
                  </div>
                  <div>
                    <p className="font-black text-slate-800 leading-tight">{repartidor.nombre}</p>
-                   <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+                   <p className="text-sm text-slate-600 mt-0.5">
                      {esMandadito ? 'MENSAJERO ASIGNADO' : 'ASIGNADO A TU ORDEN'}
                    </p>
                  </div>
@@ -647,11 +287,14 @@ export function TrackerPage() {
         </div>
 
         {/* Action Buttons (Fijo abajo) */}
-        <div className="p-4 md:p-6 border-t border-slate-100 bg-white grid grid-cols-2 gap-3 shrink-0">
+        <div className={`p-4 md:p-6 border-t border-slate-100 bg-white grid-cols-2 gap-3 shrink-0 ${isExpanded ? 'grid' : 'hidden md:grid'}`}>
+          {cancelado || pedido.estado === 'entregado' ? <a href="/" className="col-span-2 min-h-11 flex items-center justify-center rounded-xl bg-slate-900 text-white font-semibold">Ver restaurantes</a> : <>
           <a 
             href={repartidor?.telefono ? `https://wa.me/52${repartidor.telefono}?text=Hola,%20soy%20el%20cliente%20del%20pedido%20${pedidoId?.split('-')[0]}` : '#'}
             target="_blank"
             rel="noopener noreferrer"
+            aria-disabled={!repartidor?.telefono}
+            tabIndex={repartidor?.telefono ? 0 : -1}
             onClick={(e) => { if(!repartidor?.telefono) e.preventDefault(); }}
             className={`flex items-center justify-center gap-2 py-3.5 rounded-xl transition-all ${
               repartidor?.telefono 
@@ -665,6 +308,8 @@ export function TrackerPage() {
           
           <a 
             href={repartidor?.telefono ? `tel:${repartidor.telefono}` : '#'}
+            aria-disabled={!repartidor?.telefono}
+            tabIndex={repartidor?.telefono ? 0 : -1}
             onClick={(e) => { if(!repartidor?.telefono) e.preventDefault(); }}
             className={`flex items-center justify-center gap-2 py-3.5 rounded-xl transition-all ${
               repartidor?.telefono 
@@ -675,6 +320,7 @@ export function TrackerPage() {
             <Phone className="w-5 h-5" />
             <span className="text-sm">Llamar</span>
           </a>
+          </>}
         </div>
       </motion.div>
     </motion.div>

@@ -1,0 +1,11 @@
+.order-tracker button:focus-visible,.order-tracker a:focus-visible {outline:3px solid #bd3818;outline-offset:3px;}
+@media (max-width:767px) {
+  .order-tracker .order-tracker-map {height:65dvh;}
+  .order-tracker[data-panel-expanded="true"] .order-tracker-map {height:10dvh;}
+  .order-tracker[data-panel-expanded="true"] .mapboxgl-ctrl-top-right,
+  .order-tracker[data-panel-expanded="true"] .tracking-map > button {display:none;}
+}
+@media (prefers-reduced-motion:reduce) {
+  .order-tracker [class*="transition-"] {transition:none;}
+  .order-tracker .animate-pulse,.order-tracker .animate-bounce {animation:none;}
+}
