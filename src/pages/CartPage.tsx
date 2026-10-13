@@ -13,6 +13,8 @@ import { canConfirmLocation, isDeliveryCoordinates, readSavedCoordinates } from 
 import type { DeliveryCoordinates, DeliveryLocation } from '../lib/deliveryLocation';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
 import { useCheckoutLoyalty } from '../hooks/useCheckoutLoyalty';
+import { useFirstDeliveryCoupon } from '../hooks/useFirstDeliveryCoupon';
+import { firstDeliverySaving, isFirstDeliveryCode } from '../lib/firstDeliveryCoupon';
 import { ACTIVE_ORDER_STATES } from '../utils/orderState';
 import { CheckoutHeader, CheckoutAction } from '../components/CheckoutChrome';
 import CheckoutStepScene from '../components/CheckoutStepScene';
@@ -177,6 +179,12 @@ export default function CartPage() {
 
   // VIP
   const [usarBeneficioNormal, setUsarBeneficioNormal] = useState(false);
+  const firstCoupon = useFirstDeliveryCoupon(cuponCliente, clienteTel, restaurante?.id, tipoEntrega);
+  useEffect(() => {
+    if (!firstCoupon.selected) return;
+    setCuponValido(firstCoupon.eligible); setDescuento(0);
+    setCostoEnvioFijoOverride(null); setCuponPlataformaIdManual(null); setUsarBeneficioNormal(false);
+  }, [firstCoupon.selected, firstCoupon.eligible, setCuponValido, setDescuento]);
 
   // Hooks de cálculo
   const { costoEnvioBase, fueraDeCobertura, calculandoEnvio } = useDeliveryCalculation(ubicacionGPS, tipoEntrega || 'tienda');
@@ -276,6 +284,7 @@ export default function CartPage() {
 
   const validarCuponBtn = async () => {
     if (!cuponCliente.trim()) return;
+    if (isFirstDeliveryCode(cuponCliente)) { firstCoupon.retry(); return; }
     setValidandoCupon(true);
     setCuponValido(false);
     setDescuento(0);
@@ -396,7 +405,7 @@ export default function CartPage() {
   const bolsaSubsidio = cantidadSubsidio * 8;
   
   // Solo aplicar el beneficio de envío gratis si ya establecieron su ubicación (para no arruinar la sorpresa en el resumen)
-  const isFreeDelivery = usarBeneficioNormal && datosCliente?.deliveryBenefit===true && ubicacionGPS !== null && tipoEntrega === 'domicilio';
+  const isFreeDelivery = !firstCoupon.selected && usarBeneficioNormal && datosCliente?.deliveryBenefit===true && ubicacionGPS !== null && tipoEntrega === 'domicilio';
   
   const tarifaBaseEnvio = tipoEntrega === 'tienda' ? 0 : datosCliente?.vipDeliveryFee ?? costoEnvioBase;
   const costoEnvioCalculado = tarifaBaseEnvio > 0 ? Math.max(0, tarifaBaseEnvio - bolsaSubsidio) : 0;
@@ -404,11 +413,13 @@ export default function CartPage() {
   const descuentoVip = 0; // Checkout currently accepts cash only; wallet redemption has its authenticated route.
 
   // Cupon manual aplicado
-  let descuentoTotal = cuponValido && descuento > 0 ? descuento : 0;
+  let descuentoTotal = !firstCoupon.selected && cuponValido && descuento > 0 ? descuento : 0;
   // Bug fix: Solo aplicar el override si es menor al costo calculado real (para que el cupón de envío no suba el precio)
   let costoEnvioFinal = (cuponValido && costoEnvioFijoOverride !== null && costoEnvioFijoOverride < costoEnvio) 
     ? costoEnvioFijoOverride 
     : costoEnvio;
+  const ahorroEstrella = firstDeliverySaving(costoEnvio, firstCoupon.eligible);
+  if (firstCoupon.selected) costoEnvioFinal = Math.round((costoEnvio - ahorroEstrella) * 100) / 100;
   const entregaConfirmada = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && canConfirmLocation(ubicacionGPS, direccionEntrega) && !fueraDeCobertura && !calculandoEnvio);
   const textoEnvio = !ubicacionGPS ? 'Por confirmar' : calculandoEnvio ? 'Calculando...' : fueraDeCobertura ? 'No disponible'
     : costoEnvioFinal === 0 ? 'Gratis' : `$${costoEnvioFinal.toFixed(2)}`;
@@ -532,7 +543,7 @@ export default function CartPage() {
       usar_saldo_vip: false,
       monto_saldo_vip: 0,
       pin_vip: null,
-      usar_beneficio_fidelidad: usarBeneficioNormal
+      usar_beneficio_fidelidad: !firstCoupon.selected && usarBeneficioNormal
     };
   };
 
@@ -552,6 +563,10 @@ export default function CartPage() {
 
   const handlePedir = async () => {
     if (!restaurante || !carrito.length || submittingRef.current) return;
+    if (firstCoupon.selected && !firstCoupon.eligible) {
+      showToast('Tu cupón Estrella', firstCoupon.message || 'Completa tus datos para comprobar el descuento.', 'error');
+      return;
+    }
     submittingRef.current = true;
     setProcesando(true);
     try {
@@ -823,16 +838,17 @@ export default function CartPage() {
                     type="text"
                     placeholder="CÓDIGO"
                     value={cuponCliente}
-                    onChange={e => { setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0); }}
+                    onChange={e => { setCuponCliente(e.target.value.toUpperCase()); setCuponValido(false); setDescuento(0); setCostoEnvioFijoOverride(null); setCuponPlataformaIdManual(null); }}
                     disabled={validandoCupon}
                     className="uppercase"
                   />
-                  <button onClick={validarCuponBtn} disabled={validandoCupon || !cuponCliente.trim()}>
-                    {validandoCupon ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Aplicar'}
+                  <button onClick={validarCuponBtn} disabled={validandoCupon || firstCoupon.checking || !cuponCliente.trim()}>
+                    {validandoCupon || firstCoupon.checking ? <Loader2 className="w-5 h-5 animate-spin"/> : firstCoupon.eligible ? 'Aplicado' : firstCoupon.failed ? 'Reintentar' : 'Aplicar'}
                   </button>
                 </div>
                 <AnimatePresence>
-                  {cuponValido && (
+                  {firstCoupon.selected && <p role="status" aria-live="polite" className="mt-3 text-sm leading-relaxed">{firstCoupon.message}</p>}
+                  {cuponValido && !firstCoupon.selected && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-2 flex items-center gap-2 text-[13px] font-bold text-green-700 bg-green-50 px-3 py-2 rounded-xl">
                       <CheckCircle2 size={14} className="text-green-600 shrink-0"/> Cupón aplicado · Ahorras ${descuento.toFixed(2)}
                     </motion.div>
@@ -1017,6 +1033,7 @@ export default function CartPage() {
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4">
                     <button 
                       onClick={() => setUsarBeneficioNormal(!usarBeneficioNormal)}
+                      disabled={firstCoupon.selected}
                       className={`w-full flex items-center justify-between px-3 py-3 rounded-2xl transition-all text-left border-2 ${usarBeneficioNormal ? 'bg-green-50/50 border-green-500' : 'bg-white border-slate-100 hover:border-slate-200'}`}
                     >
                       <div className="flex items-center gap-3">
@@ -1216,7 +1233,8 @@ export default function CartPage() {
             </div>
             <div className="checkout-summary-totals">
               <div><span>Productos</span><span>${subtotal.toFixed(2)}</span></div>
-              <div><span>{tipoEntrega === 'tienda' ? 'Recogida en sucursal' : 'Envío a domicilio'}</span><span>{tipoEntrega === 'tienda' ? 'Sin costo' : textoEnvio}</span></div>
+              <div><span>{tipoEntrega === 'tienda' ? 'Recogida en sucursal' : 'Envío a domicilio'}</span><span>{tipoEntrega === 'tienda' ? 'Sin costo' : ahorroEstrella > 0 ? '$' + costoEnvio.toFixed(2) : textoEnvio}</span></div>
+              {ahorroEstrella > 0 && <div><span>Estrella · ahorro en envío</span><span className="text-green-700">−${ahorroEstrella.toFixed(2)}</span></div>}
               {descuentoAplicable > 0 && <div><span>Descuento</span><span className="text-green-700">−${descuentoAplicable.toFixed(2)}</span></div>}
               <div className="checkout-grand-total"><span>{entregaConfirmada ? 'Total' : 'Productos, sin envío'}</span><span>${displayTotal.toFixed(2)}</span></div>
             </div>
