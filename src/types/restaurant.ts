@@ -46,4 +46,3 @@ export interface Restaurante {
   matriz_id?: string | null
   nombre_sucursal?: string | null
 }
-
