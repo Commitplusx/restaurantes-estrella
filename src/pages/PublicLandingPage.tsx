@@ -4,7 +4,7 @@ import type { MenuPromocion } from '../lib/supabase'
 import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { animate, motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import { useLoadScript, GoogleMap, OverlayView } from '@react-google-maps/api';
+import RestaurantMap from '../components/RestaurantMap';
 import { OnboardingFlow } from '../components/OnboardingFlow';
 import { BottomNav } from '../components/BottomNav';
 import { SearchView } from '../components/SearchView';
@@ -15,10 +15,6 @@ import LandingFoodCategories from '../components/LandingFoodCategories';
 import type { LandingFoodCategory } from '../components/LandingFoodCategories';
 import { isLandingBanner, type LandingBanner } from '../lib/landingBanner';
 
-const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
-import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
-
-const MAP_STYLES = UBER_EATS_MAP_STYLE;
 
 interface Restaurante {
   id: string
@@ -36,92 +32,6 @@ interface Restaurante {
   lng?: number
 }
 
-
-// Bottom Sheet draggable para la vista del mapa
-function MapBottomSheet({ nearbyRestaurants, estaAbierto }: { nearbyRestaurants: any[], estaAbierto: (r: any) => boolean }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const touchStartY = useRef(0);
-
-  return (
-    <div
-      className={`absolute left-0 right-0 z-10 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-        isExpanded ? 'bottom-0 max-h-[70vh]' : 'bottom-20'
-      }`}
-      onTouchStart={e => { touchStartY.current = e.touches[0].clientY; }}
-      onTouchEnd={e => {
-        const dy = touchStartY.current - e.changedTouches[0].clientY;
-        if (dy > 40) setIsExpanded(true);
-        if (dy < -40) setIsExpanded(false);
-      }}
-    >
-      {/* Handle */}
-      <div
-        className="w-full flex flex-col items-center pt-3 pb-2 cursor-pointer"
-        onClick={() => setIsExpanded(v => !v)}
-      >
-        <div className="w-10 h-1 bg-slate-200 rounded-full mb-2" />
-        <div className="flex items-center justify-between w-full px-5">
-          <p className="font-black text-slate-900 text-[15px]">Cerca de ti 📍</p>
-          <span className="text-[11px] font-bold text-slate-400">{nearbyRestaurants.length} restaurantes</span>
-        </div>
-      </div>
-
-      {/* Lista horizontal (siempre visible, scroll) */}
-      <div className={`overflow-y-auto transition-all duration-500 ${
-        isExpanded ? 'max-h-[55vh]' : 'max-h-[110px]'
-      }`}>
-        {/* Scroll horizontal de cards */}
-        <div className="flex gap-3 overflow-x-auto px-5 pb-4 no-scrollbar snap-x">
-          {nearbyRestaurants.map(res => (
-            <Link
-              key={res.id}
-              to={`/menu/${res.slug || res.id}`}
-              className="shrink-0 w-28 snap-start flex flex-col gap-1.5 active:scale-95 transition-transform"
-            >
-              <div className="w-full h-20 rounded-xl overflow-hidden bg-slate-100">
-                {res.foto_fachada_url
-                  ? <img src={res.foto_fachada_url} className="w-full h-full object-cover" alt={res.nombre} />
-                  : <div className="w-full h-full flex items-center justify-center"><Store size={20} className="text-slate-300" /></div>
-                }
-              </div>
-              <p className="font-bold text-[11px] text-slate-800 truncate leading-tight">{res.nombre}</p>
-              <p className={`text-[10px] font-semibold ${estaAbierto(res) ? 'text-emerald-500' : 'text-slate-400'}`}>
-                {estaAbierto(res) ? '● Abierto' : '● Cerrado'}
-              </p>
-            </Link>
-          ))}
-        </div>
-
-        {/* Lista vertical cuando está expandido */}
-        {isExpanded && (
-          <div className="px-5 pb-24 mt-2 flex flex-col gap-3">
-            {nearbyRestaurants.map(res => (
-              <Link
-                key={`v-${res.id}`}
-                to={`/menu/${res.slug || res.id}`}
-                className="flex gap-3 items-center py-2 border-b border-slate-50 active:bg-slate-50 rounded-xl px-1 transition-colors"
-              >
-                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                  {res.foto_fachada_url
-                    ? <img src={res.foto_fachada_url} className="w-full h-full object-cover" alt={res.nombre} />
-                    : <div className="w-full h-full flex items-center justify-center"><Store size={16} className="text-slate-300" /></div>
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900 text-[13px] truncate">{res.nombre}</p>
-                  <p className="text-[11px] text-slate-500 truncate">{res.categorias?.[0] || 'Restaurante'} · 25-35 min</p>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${
-                  estaAbierto(res) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
-                }`}>{estaAbierto(res) ? 'Abierto' : 'Cerrado'}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 const EMOJI_MAP_DATA: Record<string, string> = {
   'Hamburguesas': '🍔',
@@ -319,15 +229,8 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
 }
 
 
-const DEFAULT_CENTER = { lat: 16.2516, lng: -92.1332 };
-
 export function PublicLandingPage() {
   const isDesktop = useIsDesktop();
-  const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: LIBRARIES
-  });
-
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('estrella_onboarding_done'))
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
@@ -353,7 +256,7 @@ export function PublicLandingPage() {
     const saved = sessionStorage.getItem('est_ubicacion')
     return saved ? JSON.parse(saved) : null
   })
-  const [userAddress, setUserAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
+  const [userAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
   const [locationLoading, setLocationLoading] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
   const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
@@ -363,65 +266,7 @@ export function PublicLandingPage() {
   // Navigation & UI State
   const [activeNavTab, setActiveNavTab] = useState(location.state?.activeNavTab || 'home')
   
-  // Ref para el mapa de Google (usamos state para forzar re-render cuando cargue)
-  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
 
-  // Efecto para ajustar el zoom del mapa y mostrar todos los restaurantes
-  useEffect(() => {
-    if (!mapInstance || !window.google || !isGoogleMapsLoaded) return;
-    if (activeNavTab !== 'location') return; // SOLO ajustar cuando el mapa es visible (display: block)
-    
-    console.log('[MAPA] Iniciando cálculo de límites...');
-    
-    // Validar si el mapa tiene tamaño físico real en la pantalla
-    const mapDiv = mapInstance.getDiv();
-    console.log('[MAPA] Dimensiones físicas del contenedor:', mapDiv.clientWidth, 'x', mapDiv.clientHeight);
-    if (mapDiv.clientWidth === 0 || mapDiv.clientHeight === 0) {
-      console.warn('[MAPA] El contenedor mide 0x0, fitBounds no funcionará.');
-    }
-
-    const bounds = new window.google.maps.LatLngBounds();
-    let hasPoints = false;
-
-    if (userLocation) {
-      bounds.extend(userLocation);
-      hasPoints = true;
-    }
-    
-    const restaurantesConCoords = restaurantes.filter(r => r.lat && r.lng);
-    restaurantesConCoords.forEach(res => {
-      bounds.extend({ lat: Number(res.lat), lng: Number(res.lng) });
-      hasPoints = true;
-    });
-
-    console.log('[MAPA] Puntos a encuadrar:', restaurantesConCoords.length, 'Restaurantes, User:', !!userLocation);
-
-    if (hasPoints) {
-      setTimeout(() => {
-        // Si hay varios puntos (usuario + restaurantes, o multiples restaurantes)
-        if (restaurantesConCoords.length > 1 || (restaurantesConCoords.length === 1 && userLocation)) {
-          console.log('[MAPA] Ejecutando fitBounds con límites:', bounds.toJSON());
-          mapInstance.fitBounds(bounds, { bottom: 250, top: 20, left: 20, right: 20 });
-        } else if (restaurantesConCoords.length === 1) {
-          console.log('[MAPA] Ejecutando panTo y setZoom(13) para 1 solo restaurante');
-          // Si SOLO hay un restaurante en todo el mapa
-          mapInstance.panTo({ lat: Number(restaurantesConCoords[0].lat), lng: Number(restaurantesConCoords[0].lng) });
-          mapInstance.setZoom(13); // Zoom 13 es un poco más alejado para ver más de la ciudad
-        } else if (userLocation) {
-          console.log('[MAPA] Ejecutando panTo(user) y setZoom(14) para 1 solo usuario');
-          // Si SOLO está el usuario
-          mapInstance.panTo(userLocation);
-          mapInstance.setZoom(14);
-        }
-        
-        // Comprobar zoom final un momento después
-        setTimeout(() => {
-          console.log('[MAPA] Zoom resultante después de aplicar comandos:', mapInstance.getZoom());
-        }, 500);
-
-      }, 300);
-    }
-  }, [restaurantes, userLocation, activeNavTab, isGoogleMapsLoaded, mapInstance]);
   const [globalDeliveryType, setGlobalDeliveryType] = useState<'domicilio'|'recoger'>(() => {
     return (sessionStorage.getItem('est_delivery_type') as any) || 'domicilio';
   });
@@ -690,29 +535,6 @@ export function PublicLandingPage() {
     loadBanners()
   }, [])
 
-  // Auto-geocode si hay ubicación pero no hay dirección guardada
-  useEffect(() => {
-    if (isGoogleMapsLoaded && userLocation && !userAddress && window.google && window.google.maps) {
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ location: userLocation }, (results, status) => {
-        if (status === 'OK' && results && results.length > 0) {
-          let colonia = '';
-          for (let i = 0; i < results.length; i++) {
-            const sublocalityInfo = results[i].address_components.find((c: any) => 
-              c.types.includes('sublocality') || c.types.includes('sublocality_level_1') || c.types.includes('neighborhood')
-            );
-            if (sublocalityInfo) {
-              colonia = sublocalityInfo.long_name;
-              break;
-            }
-          }
-          if (!colonia) colonia = results[0].formatted_address.split(',')[0];
-          setUserAddress(colonia);
-          sessionStorage.setItem('est_direccion', colonia);
-        }
-      });
-    }
-  }, [isGoogleMapsLoaded, userLocation, userAddress])
 
   useEffect(() => {
     const channel = supabase
@@ -804,33 +626,6 @@ export function PublicLandingPage() {
           setUserLocation({ lat, lng });
           sessionStorage.setItem('est_ubicacion', JSON.stringify({ lat, lng }));
           
-          // Geocoding to get neighborhood
-          if (window.google && window.google.maps) {
-            const geocoder = new window.google.maps.Geocoder();
-            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-              if (status === 'OK' && results && results.length > 0) {
-                let colonia = '';
-                for (let i = 0; i < results.length; i++) {
-                  const addressComponents = results[i].address_components;
-                  const sublocalityInfo = addressComponents.find((c: any) => 
-                    c.types.includes('sublocality') || 
-                    c.types.includes('sublocality_level_1') || 
-                    c.types.includes('neighborhood')
-                  );
-                  if (sublocalityInfo) {
-                    colonia = sublocalityInfo.long_name;
-                    break;
-                  }
-                }
-                if (!colonia) {
-                  colonia = results[0].formatted_address.split(',')[0];
-                }
-                setUserAddress(colonia);
-                sessionStorage.setItem('est_direccion', colonia);
-              }
-            });
-          }
-
           setLocationLoading(false);
           if (onComplete) onComplete();
         },
@@ -977,15 +772,14 @@ export function PublicLandingPage() {
           }}
           address={userAddress}
           onLocation={() => {
-            if (window.matchMedia('(max-width: 767px)').matches) setActiveNavTab('location');
-            else requestLocation();
+            setActiveNavTab('location');
           }}
           onExplore={exploreRestaurants}
           activeOrderId={activeOrderId}
         />
       )}
       {/* Header Pegajoso Premium (Estilo Delivery App) */}
-      <header className={`eats-legacy-header ${activeNavTab === 'home' ? 'eats-home-legacy-header' : ''} fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white/90 backdrop-blur-xl shadow-[0_2px_24px_rgba(0,0,0,0.07)] border-b border-slate-100/60' : 'bg-[#f8f8f8]'} ${!showHeader ? '-translate-y-full' : 'translate-y-0'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2 ${activeNavTab === 'location' ? 'max-md:hidden' : ''}`}>
+      <header className={`eats-legacy-header ${activeNavTab === 'home' ? 'eats-home-legacy-header' : ''} fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white/90 backdrop-blur-xl shadow-[0_2px_24px_rgba(0,0,0,0.07)] border-b border-slate-100/60' : 'bg-[#f8f8f8]'} ${!showHeader ? '-translate-y-full' : 'translate-y-0'} pt-4 md:py-4 px-4 md:px-12 flex flex-col gap-3 md:gap-2 ${activeNavTab === 'location' ? 'hidden' : ''}`}>
         <div className="max-w-[1400px] mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-8">
            
            {/* Top Row (Address + Action) */}
@@ -1453,62 +1247,14 @@ export function PublicLandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.2 }}
-            className="md:hidden fixed inset-0 z-30 bg-slate-100 origin-bottom"
+            className="fixed inset-0 z-40 bg-slate-100 origin-bottom"
           >
-            {/* Mapa — ocupa TODA la pantalla */}
-            <div className="absolute inset-0">
-              {isGoogleMapsLoaded ? (
-                <GoogleMap
-                  mapContainerStyle={{ width: '100%', height: '100%' }}
-                  options={{ disableDefaultUI: true, gestureHandling: 'greedy', styles: MAP_STYLES }}
-                  onLoad={(map) => {
-                    map.setZoom(14);
-                    map.setCenter(userLocation || DEFAULT_CENTER);
-                    setMapInstance(map);
-                  }}
-                >
-                  {restaurantes.filter(r => r.lat && r.lng).map(res => (
-                    <OverlayView key={res.id} position={{ lat: Number(res.lat), lng: Number(res.lng) }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                      <Link to={`/menu/${res.slug || res.id}`} className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center">
-                        <div className="w-9 h-9 rounded-full border-2 border-white shadow-lg overflow-hidden bg-white">
-                          {res.foto_fachada_url
-                            ? <img src={res.foto_fachada_url} className="w-full h-full object-cover" alt={res.nombre} />
-                            : <div className="w-full h-full bg-red-500 flex items-center justify-center"><Store size={13} className="text-white" /></div>
-                          }
-                        </div>
-                        <div className="w-1.5 h-1.5 bg-slate-800 rounded-full mt-0.5 shadow" />
-                      </Link>
-                    </OverlayView>
-                  ))}
-                  {userLocation && (
-                    <OverlayView position={userLocation} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                      <div className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                        <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg" />
-                        <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-40" />
-                      </div>
-                    </OverlayView>
-                  )}
-                </GoogleMap>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center"><Loader2 size={32} className="animate-spin text-slate-400" /></div>
-              )}
-            </div>
-
-            {/* Botón GPS */}
-            <button onClick={() => requestLocation()} className="absolute right-4 top-36 z-10 w-11 h-11 bg-white rounded-full shadow-lg border border-slate-100 flex items-center justify-center active:scale-95 transition-transform">
-              {locationLoading ? <Loader2 size={17} className="animate-spin text-blue-600" /> : <MapPin size={17} className="text-slate-700" />}
-            </button>
-
-            {/* Bottom Sheet draggable */}
-            <MapBottomSheet
-              nearbyRestaurants={(userLocation
-                ? [...restaurantes.filter(r => r.lat && r.lng)].sort((a, b) =>
-                    calculaDistancia(userLocation.lat, userLocation.lng, Number(a.lat), Number(a.lng)) -
-                    calculaDistancia(userLocation.lat, userLocation.lng, Number(b.lat), Number(b.lng))
-                  )
-                : restaurantes
-              ).slice(0, 10)}
-              estaAbierto={estaAbierto}
+            <RestaurantMap
+              restaurants={restaurantes.map(restaurant => ({ ...restaurant, isOpen: estaAbierto(restaurant) }))}
+              userLocation={userLocation}
+              locationLoading={locationLoading}
+              onLocate={() => requestLocation()}
+              onShowList={() => setActiveNavTab('home')}
             />
           </motion.div>
         )}

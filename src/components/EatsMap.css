@@ -1,0 +1,110 @@
+.eats-map-surface {--map-ink:#1d1d1f;--map-orange:#bd3818;--map-paper:#f6f3ed;--map-muted:#625f58;background:var(--map-paper);}
+.eats-map-surface .mapboxgl-ctrl-group {border-radius:12px;overflow:hidden;box-shadow:0 3px 14px #29211616;}
+.eats-map-surface .mapboxgl-ctrl-group button {width:44px;height:44px;}
+.eats-map-surface .mapboxgl-popup-content {font:500 14px/1.5 Outfit,sans-serif;border-radius:12px;padding:14px 24px 14px 14px;}
+.eats-map-surface button:focus-visible {outline:3px solid var(--map-orange);outline-offset:3px;}
+.eats-map-marker {display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;background:none;border:none;padding:0;font-family:Outfit,sans-serif;color:var(--map-ink);}
+.eats-map-marker-face {width:48px;height:48px;display:grid;place-items:center;background:var(--map-ink);color:white;border:3px solid white;border-radius:16px;box-shadow:0 6px 15px #29211626;}
+.eats-map-marker--origin .eats-map-marker-face {background:var(--map-orange);}
+.eats-map-marker--destination .eats-map-marker-face {background:#246a52;}
+.eats-map-marker-face svg {width:25px;height:25px;}
+.eats-map-marker-label {font-size:13px;line-height:1.4;font-weight:600;background:white;border-radius:7px;padding:3px 8px;white-space:nowrap;box-shadow:0 2px 5px #29211613;}
+.eats-map-surface ::selection {background:#ffe1d2;color:var(--map-ink);}
+.eats-map-marker-face {animation:eats-marker-appear .3s cubic-bezier(.16,1,.3,1);}
+.eats-map-marker-face {transition:background .15s;}.eats-map-marker:hover .eats-map-marker-face {background:#3a3a3c;}
+@keyframes eats-marker-appear {from {opacity:.65;transform:translateY(5px) scale(.94);}to {opacity:1;transform:translateY(0) scale(1);}}
+@media (prefers-reduced-motion:reduce) {.eats-map-marker-face {animation:none;transition:background .1s;}}
+
+/* Neutral map lets each restaurant's own identity stand out. */
+.eats-discovery { --map-paper:#f1f2f1; --map-ink:#252528; --map-orange:#bd3818; --map-muted:#66676b; --map-line:#e4e4e7; --map-open:#276245; position:absolute; inset:0; width:100%; height:100%; isolation:isolate; font-family:Outfit,sans-serif; color:var(--map-ink); }
+.eats-discovery-canvas.mapboxgl-map { position:absolute; inset:0; width:100%; height:100%; }
+.eats-discovery h1,.eats-discovery h2,.eats-discovery h3,.eats-discovery p { margin:0; }
+.eats-discovery button,.eats-discovery a { -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.eats-discovery-header { position:absolute; z-index:2; inset:max(12px,env(safe-area-inset-top)) 12px auto; display:flex; align-items:center; gap:10px; padding:10px; border-radius:16px; background:white; box-shadow:0 5px 24px #22252b14; }
+.eats-discovery-header > div { flex:1; min-width:0; }
+.eats-discovery-header h1 { font-size:clamp(18px,4.9vw,22px); line-height:1.2; font-weight:800; letter-spacing:-.025em; display:flex; align-items:center; gap:7px; }
+.eats-discovery-header h1 svg { color:var(--map-orange); flex-shrink:0; }
+.eats-discovery-header p { font-size:13px; line-height:1.5; color:var(--map-muted); margin-top:3px; }
+.eats-discovery-header > img { width:30px; height:42px; object-fit:contain; margin-right:4px; }
+.eats-map-control { width:44px; height:44px; flex-shrink:0; display:grid; place-items:center; border-radius:50%; background:white; color:var(--map-ink); border:1px solid var(--map-line); cursor:pointer; }
+.eats-map-control:hover { background:#f2f2f4; }
+.eats-map-control:active { transform:scale(.96); }
+.eats-map-control:disabled { opacity:.5; cursor:default; }
+.eats-discovery-controls { position:absolute; z-index:2; top:max(112px,calc(env(safe-area-inset-top) + 112px)); right:16px; display:grid; gap:10px; }
+.eats-discovery-controls .eats-map-control { border:0; box-shadow:0 3px 14px #22252b18; }
+.eats-discovery-fallback { position:absolute; inset:0; z-index:1; background:var(--map-paper); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:110px 25px 300px; text-align:center; }
+.eats-discovery-fallback p { max-width:28ch; line-height:1.55; font-size:15px; }
+.eats-discovery-fallback button { min-height:44px; padding:6px 10px; text-decoration:underline; text-underline-offset:4px; }
+.eats-discovery-tray { position:absolute; z-index:2; bottom:max(102px,calc(env(safe-area-inset-bottom) + 96px)); left:12px; right:12px; background:white; border-radius:16px; padding:18px 0 14px; box-shadow:0 8px 30px #22252b1a; max-height:48%; display:flex; flex-direction:column; }
+.eats-discovery-tray-heading { padding:0 16px 12px; display:flex; align-items:center; flex-wrap:wrap; gap:12px; justify-content:space-between; }
+.eats-discovery-tray-heading h2 { font-size:19px; line-height:1.2; letter-spacing:-.025em; font-weight:800; }
+.eats-discovery-tray-heading p { display:flex; align-items:center; gap:4px; color:var(--map-muted); font-size:12px; line-height:1.5; margin-top:5px; }
+.eats-map-filters { display:flex; gap:3px; padding:3px; border-radius:12px; background:#f0f0f2; }
+.eats-map-filters button { min-height:44px; padding:0 10px; border-radius:9px; font-size:13px; font-weight:600; color:#515154; }
+.eats-map-filters button[aria-pressed=true] { background:var(--map-ink); color:white; }
+.eats-map-restaurant-list { display:flex; gap:12px; overflow:auto; padding:2px 16px 6px; scroll-snap-type:x mandatory; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#c7c7cc transparent; min-height:0; }
+.eats-map-restaurant { flex:0 0 284px; min-width:0; display:flex; align-items:center; gap:14px; text-align:left; padding:12px; border:0; border-radius:14px; scroll-snap-align:start; background:#f5f5f7; min-height:108px; }
+.eats-map-restaurant:hover { background:#ececef; }
+.eats-map-restaurant > span:nth-child(2) { flex:1; min-width:0; display:grid; gap:5px; }
+.eats-map-restaurant strong { font-size:16px; line-height:1.25; font-weight:750; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.eats-map-restaurant > span > span { font-size:12px; line-height:1.4; color:var(--map-muted); }
+.eats-map-restaurant > svg { display:none; }
+.eats-discovery-logo { position:relative; width:72px; height:72px; background:white; color:var(--map-orange); display:grid; place-items:center; border-radius:12px; flex-shrink:0; overflow:hidden; }
+.eats-discovery-logo img { width:100%; height:100%; object-fit:contain; background:white; }
+.eats-discovery .eats-open-status { color:var(--map-open); font-size:12px; line-height:1.4; font-weight:600; }
+.eats-discovery .eats-closed-status { color:#66676b; font-size:12px; line-height:1.4; }
+.eats-map-selected { position:relative; padding:2px 16px 0; overflow:auto; animation:eats-selection-enter .24s cubic-bezier(.16,1,.3,1); }
+.eats-map-selected-info { display:flex; align-items:center; gap:14px; padding-right:30px; }
+.eats-map-selected-info > div { min-width:0; }
+.eats-map-selected h3 { font-size:22px; line-height:1.2; font-weight:800; overflow-wrap:anywhere; }
+.eats-map-selected-info p { font-size:14px; line-height:1.4; color:var(--map-muted); margin:4px 0; }
+.eats-selected-close { position:absolute; top:0; right:8px; width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:var(--map-muted); }
+.eats-selected-close:hover { background:#f0f0f2; }
+.eats-map-address { display:flex; align-items:flex-start; gap:7px; margin-top:12px!important; font-size:13px; line-height:1.4; color:var(--map-muted); overflow-wrap:anywhere; }
+.eats-map-address svg { flex-shrink:0; margin-top:1px; }
+.eats-map-menu-link { display:flex; align-items:center; justify-content:space-between; min-height:48px; background:var(--map-ink); color:white; border-radius:12px; padding:10px 16px; margin-top:14px; font-weight:650; font-size:15px; }
+.eats-map-menu-link:hover { background:var(--map-orange); }
+.eats-map-empty { padding:0 16px 10px; font-size:14px; line-height:1.5; color:var(--map-muted); }
+.eats-map-show-all { min-height:44px; margin:0 16px 8px; text-align:left; text-decoration:underline; text-underline-offset:4px; color:var(--map-muted); font-size:13px; }
+.eats-restaurant-pin { z-index:1; width:48px; height:48px; }
+.eats-restaurant-pin .eats-map-marker-face { position:relative; background:white; color:var(--map-orange); width:48px; height:48px; border:3px solid white; border-radius:16px; box-shadow:0 4px 12px #22252b30; animation:none; transition:transform .24s cubic-bezier(.16,1,.3,1),border-color .2s; }
+.eats-restaurant-pin .eats-map-marker-face > svg { position:absolute; }
+.eats-restaurant-pin .eats-map-marker-face img { position:relative; width:100%; height:100%; object-fit:contain; border-radius:12px; background:white; }
+.eats-restaurant-pin .eats-map-marker-label { display:none; position:absolute; top:54px; left:50%; transform:translateX(-50%); max-width:140px; overflow:hidden; text-overflow:ellipsis; font-size:12px; line-height:1.35; background:var(--map-ink); color:white; }
+.eats-pin-status { position:absolute; bottom:-3px; right:-4px; width:13px; height:13px; border-radius:50%; border:3px solid white; background:#919197; }
+.eats-pin-status--open { background:#348358; }
+.eats-restaurant-pin[aria-pressed=true] { z-index:5; }
+.eats-restaurant-pin[aria-pressed=true] .eats-map-marker-face { border-color:var(--map-orange); transform:scale(1.1); }
+.eats-restaurant-pin[aria-pressed=true] .eats-map-marker-label,.eats-restaurant-pin:focus-visible .eats-map-marker-label { display:block; }
+.eats-restaurant-pin:hover .eats-map-marker-face { background:white; }
+.eats-map-cluster { z-index:2; min-width:54px; height:58px; padding:7px 10px; background:var(--map-ink); color:white; border:3px solid white; border-radius:18px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 4px 12px #22252b30; cursor:pointer; }
+.eats-map-cluster strong { font-size:21px; line-height:1; font-weight:750; }
+.eats-map-cluster span { font-size:12px; line-height:1.5; }
+.eats-map-cluster:hover { background:var(--map-orange); }
+.eats-location-pending { animation:eats-location-spin 1s linear infinite; }
+@keyframes eats-location-spin { to { transform:rotate(360deg); } }
+@keyframes eats-selection-enter { from { opacity:.5; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
+@media (min-width:768px) {
+  .eats-discovery-header { inset:24px auto auto 24px; width:340px; padding:12px; }
+  .eats-discovery-header h1 { font-size:20px; }
+  .eats-discovery-controls { top:24px; right:24px; }
+  .eats-discovery-tray { left:24px; right:auto; top:126px; bottom:24px; width:340px; max-height:none; padding-top:20px; }
+  .eats-discovery-tray-heading { align-items:flex-start; }
+  .eats-map-filters { width:100%; }
+  .eats-map-filters button { flex:1; }
+  .eats-map-restaurant-list { flex-direction:column; }
+  .eats-map-restaurant { flex-basis:auto; flex-shrink:0; min-height:96px; }
+  .eats-map-restaurant .eats-discovery-logo { width:60px; height:60px; }
+  .eats-map-selected { overflow:auto; }
+  .eats-discovery-fallback { padding:100px 60px 100px 420px; }
+}
+@media (max-width:359px) { .eats-map-restaurant { flex-basis:248px; gap:10px; } .eats-discovery-tray-heading h2 { font-size:18px; } }
+@media (max-height:600px) and (max-width:767px) {
+  .eats-discovery-header { padding:6px 8px; }
+  .eats-discovery-tray { bottom:86px; padding-top:12px; max-height:43%; }
+  .eats-discovery-tray-heading { padding-bottom:8px; }
+  .eats-discovery-tray-heading h2 { font-size:18px; }
+  .eats-map-restaurant { padding:7px; min-height:90px; }
+  .eats-discovery-controls { top:96px; }
+}
+@media (prefers-reduced-motion:reduce) { .eats-map-selected,.eats-location-pending { animation:none; } .eats-restaurant-pin .eats-map-marker-face { transition:none; } }
