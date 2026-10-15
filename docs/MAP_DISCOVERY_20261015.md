@@ -1,8 +1,10 @@
 # Descubrimiento de restaurantes con Mapbox
 
-Fecha: 15 de octubre de 2026. Entrega para revisión en la rama
+Fecha: 15 de octubre de 2026. Entrega inicialmente revisada en la rama
 `codex/mapbox-home-20261015` de `Commitplusx/restaurantes-estrella`.
-No incluye una integración a `main` ni un despliegue de producción.
+Kaleb autorizó después integrar este cambio a `main`. La integración de Git
+y el despliegue de Vercel se verifican por separado; un push no confirma que
+la web publicada ya sirva la nueva versión.
 
 ## Alcance
 
