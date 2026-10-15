@@ -5,6 +5,11 @@ import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { animate, motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import RestaurantMap from '../components/RestaurantMap';
+import { backendRestricted } from '../lib/backendAvailability';
+import { CatalogRequestError, requireCatalogResponse, parseCatalogRows, oneRestaurantPerBrand } from '../lib/catalogRequest';
+import type { CatalogRestaurant as Restaurante } from '../lib/catalogRequest';
+import { readSavedCoordinates } from '../lib/deliveryLocation';
+import './CatalogNotice.css';
 import { OnboardingFlow } from '../components/OnboardingFlow';
 import { BottomNav } from '../components/BottomNav';
 import { SearchView } from '../components/SearchView';
@@ -15,22 +20,6 @@ import LandingFoodCategories from '../components/LandingFoodCategories';
 import type { LandingFoodCategory } from '../components/LandingFoodCategories';
 import { isLandingBanner, type LandingBanner } from '../lib/landingBanner';
 
-
-interface Restaurante {
-  id: string
-  nombre: string
-  telefono: string
-  direccion?: string
-  foto_fachada_url?: string
-  hora_apertura?: string
-  hora_cierre?: string
-  horarios?: any
-  categorias?: string[]
-  slug?: string
-  activo?: boolean
-  lat?: number
-  lng?: number
-}
 
 
 const EMOJI_MAP_DATA: Record<string, string> = {
@@ -229,6 +218,8 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
 }
 
 
+
+
 export function PublicLandingPage() {
   const isDesktop = useIsDesktop();
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('estrella_onboarding_done'))
@@ -237,6 +228,10 @@ export function PublicLandingPage() {
   const [heroBanners, setHeroBanners] = useState<LandingBanner[]>([])
   const [activeCategories, setActiveCategories] = useState<LandingFoodCategory[]>([])
   const [loading, setLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
+  const catalogRequest = useRef<AbortController | null>(null)
+  const catalogBusy = useRef(false)
+  useEffect(() => () => { catalogRequest.current?.abort(); catalogRequest.current = null; catalogBusy.current = false; }, [])
   const [loadingPromos, setLoadingPromos] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState("")
@@ -254,9 +249,9 @@ export function PublicLandingPage() {
   
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(() => {
     const saved = sessionStorage.getItem('est_ubicacion')
-    return saved ? JSON.parse(saved) : null
+    return readSavedCoordinates(saved)
   })
-  const [userAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
+  const [userAddress, setUserAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
   const [locationLoading, setLocationLoading] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
   const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
@@ -266,7 +261,6 @@ export function PublicLandingPage() {
   // Navigation & UI State
   const [activeNavTab, setActiveNavTab] = useState(location.state?.activeNavTab || 'home')
   
-
   const [globalDeliveryType, setGlobalDeliveryType] = useState<'domicilio'|'recoger'>(() => {
     return (sessionStorage.getItem('est_delivery_type') as any) || 'domicilio';
   });
@@ -323,7 +317,7 @@ export function PublicLandingPage() {
   }, [activeOrderId]);
 
   useEffect(() => {
-    if (!activeOrderId) {
+    if (!activeOrderId || backendRestricted()) {
       setActiveOrderStatus(null);
       return;
     }
@@ -396,30 +390,59 @@ export function PublicLandingPage() {
     }
   }, [])
 
+  const loadRestaurants = useCallback(async (pageIndex: number) => {
+    if (catalogBusy.current) return;
+    catalogBusy.current = true;
+    const controller = new AbortController();
+    catalogRequest.current = controller;
+    const deadline = window.setTimeout(() => controller.abort(), 10_000);
+    try {
+      const result = await supabase.from('restaurantes')
+        .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng, matriz_id, nombre_sucursal, activo, perfil_completo')
+        .eq('activo', true).eq('perfil_completo', true)
+        .order('nombre').range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1).abortSignal(controller.signal);
+      const data = parseCatalogRows(requireCatalogResponse(result));
+      if (catalogRequest.current !== controller) return;
+      setHasMore(data.length === PAGE_SIZE);
+      setPage(pageIndex);
+      setCatalogError('');
+      if (pageIndex === 0) setRestaurantes(data);
+      else setRestaurantes(previous => [...previous.filter(row => !data.some(next => next.id === row.id)), ...data]);
+    } catch (cause: unknown) {
+      if (catalogRequest.current !== controller) return;
+      setCatalogError(cause instanceof CatalogRequestError ? cause.message : 'No pudimos cargar los restaurantes. Revisa tu conexión y vuelve a intentarlo.');
+      console.warn('catalog_request_failed', { status: cause instanceof CatalogRequestError ? cause.status : 0, code: cause instanceof CatalogRequestError ? cause.code : 'network' });
+    } finally {
+      window.clearTimeout(deadline);
+      if (catalogRequest.current === controller) {
+        catalogBusy.current = false; catalogRequest.current = null;
+        setLoading(false); setLoadingMore(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-          handleLoadMore();
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !catalogError) {
+          setLoadingMore(true);
+          void loadRestaurants(page + 1);
         }
       },
       { threshold: 0.1 }
     );
 
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
+    const target = observerTarget.current;
+    if (target) observer.observe(target);
 
     return () => {
-      if (observerTarget.current) {
-        observer.unobserve(observerTarget.current);
-      }
+      if (target) observer.unobserve(target);
     };
-  }, [observerTarget, hasMore, loading, loadingMore, page]);
+  }, [hasMore, loading, loadingMore, page, catalogError, loadRestaurants]);
 
   useEffect(() => {
     async function loadCats() {
-      const { data } = await supabase.from('restaurantes').select('categorias').eq('activo', true)
+      const { data } = await supabase.from('restaurantes').select('categorias').eq('activo', true).limit(500).abortSignal(AbortSignal.timeout(10_000))
       if (data) {
         const unique = new Set<string>()
         data.forEach(r => {
@@ -440,56 +463,6 @@ export function PublicLandingPage() {
     }
     loadCats()
   }, [])
-
-  async function loadRestaurants(pageIndex: number) {
-    try {
-      if (pageIndex === 0) {
-        setLoading(true)
-      } else {
-        setLoadingMore(true)
-      }
-
-      let query = supabase
-        .from('restaurantes')
-        .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
-        .eq('activo', true)
-        .is('matriz_id', null)
-        .order('nombre')
-        .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
-
-      const { data, error } = await query.eq('perfil_completo', true)
-      let finalData = data;
-      if (error && error.code === '42703') { 
-          const { data: fallbackData } = await supabase
-            .from('restaurantes')
-            .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng')
-            .eq('activo', true)
-            .is('matriz_id', null)
-            .order('nombre')
-            .range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1)
-          finalData = fallbackData;
-      } else if (error) {
-         console.error("Error fetching restaurants:", error)
-      }
-      
-      if (finalData) {
-        if (finalData.length < PAGE_SIZE) setHasMore(false)
-        if (pageIndex === 0) {
-          setRestaurantes(finalData)
-        } else {
-          setRestaurantes(prev => {
-            const newIds = finalData!.map(d => d.id)
-            return [...prev.filter(p => !newIds.includes(p.id)), ...finalData!]
-          })
-        }
-      }
-    } catch (err) {
-      console.error("Exception in loadRestaurants:", err)
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
 
   async function loadPromos() {
     setLoadingPromos(true)
@@ -533,44 +506,30 @@ export function PublicLandingPage() {
     loadRestaurants(0)
     loadPromos()
     loadBanners()
-  }, [])
-
+  }, [loadRestaurants])
 
   useEffect(() => {
+    if (loading || catalogError || backendRestricted()) return;
     const channel = supabase
       .channel('public:landing_restaurantes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes' }, (payload) => {
-        if (payload.eventType === 'UPDATE') {
-          const updatedRest = payload.new as Restaurante
-          setRestaurantes(prev => {
-            if (!updatedRest.activo) {
-              return prev.filter(r => r.id !== updatedRest.id)
-            }
-            const exists = prev.some(r => r.id === updatedRest.id)
-            if (exists) {
-              return prev.map(r => r.id === updatedRest.id ? { ...r, ...updatedRest } : r)
-            }
-            return [updatedRest, ...prev]
-          })
-        } else if (payload.eventType === 'INSERT') {
-          const newRest = payload.new as Restaurante
-          if (newRest.activo) {
-            setRestaurantes(prev => [newRest, ...prev])
-          }
-        } else if (payload.eventType === 'DELETE') {
+        if (payload.eventType === 'DELETE') {
           setRestaurantes(prev => prev.filter(r => r.id !== payload.old.id))
+          return
         }
+        try {
+          const next = parseCatalogRows([payload.new])[0]
+          setRestaurantes(previous => {
+            if (!next.activo || next.perfil_completo !== true) return previous.filter(r => r.id !== next.id)
+            return [next, ...previous.filter(r => r.id !== next.id)]
+          })
+        } catch { console.warn('catalog_event_invalid') }
+
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
-
-  const handleLoadMore = () => {
-    const nextPage = page + 1
-    setPage(nextPage)
-    loadRestaurants(nextPage)
-  }
+  }, [loading, catalogError])
 
   const estaAbierto = (res: Restaurante) => {
     const toMinutes = (timeStr: string): number => {
@@ -626,6 +585,8 @@ export function PublicLandingPage() {
           setUserLocation({ lat, lng });
           sessionStorage.setItem('est_ubicacion', JSON.stringify({ lat, lng }));
           
+          setUserAddress('Ubicación GPS');
+          sessionStorage.setItem('est_direccion', 'Ubicación GPS');
           setLocationLoading(false);
           if (onComplete) onComplete();
         },
@@ -709,7 +670,7 @@ export function PublicLandingPage() {
       });
     }
     
-    return result;
+    return oneRestaurantPerBrand(result);
   }, [restaurantes, search, selectedCategory, activeTab, userLocation]);
 
   const exploreRestaurants = useCallback(() => {
@@ -1081,6 +1042,11 @@ export function PublicLandingPage() {
         {/* Categorías Desktop (Horizontal Premium con Imágenes Reales) */}
         <LandingFoodCategories categories={activeCategories} selected={selectedCategory} onSelect={setSelectedCategory} />
 
+        {catalogError && <section className="eats-catalog-notice" role="status">
+          <Store size={24} aria-hidden="true" />
+          <div><h2>No pudimos actualizar los restaurantes</h2><p>{catalogError}</p>{restaurantes.length > 0 && <p>Conservamos la última lista que cargó. Confirma la disponibilidad antes de pedir.</p>}</div>
+          <button disabled={loading || loadingMore} onClick={() => { if (!restaurantes.length) setLoading(true); else setLoadingMore(true); void loadRestaurants(restaurantes.length ? page : 0); }}>Reintentar</button>
+        </section>}
         {/* Grid de Restaurantes */}
         {loading ? (
           isDesktop ? (
@@ -1092,7 +1058,7 @@ export function PublicLandingPage() {
               ))}
             </div>
           )
-        ) : displayRestaurants.length === 0 ? (
+        ) : catalogError && restaurantes.length === 0 ? null : displayRestaurants.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1250,7 +1216,7 @@ export function PublicLandingPage() {
             className="fixed inset-0 z-40 bg-slate-100 origin-bottom"
           >
             <RestaurantMap
-              restaurants={restaurantes.map(restaurant => ({ ...restaurant, isOpen: estaAbierto(restaurant) }))}
+              restaurants={restaurantes.map(restaurant => ({ ...restaurant, nombre: restaurant.nombre_sucursal ? `${restaurant.nombre} · ${restaurant.nombre_sucursal}` : restaurant.nombre, isOpen: estaAbierto(restaurant) }))}
               userLocation={userLocation}
               locationLoading={locationLoading}
               onLocate={() => requestLocation()}
@@ -1270,7 +1236,7 @@ export function PublicLandingPage() {
             transition={{ duration: 0.2 }}
             className="md:hidden fixed inset-0 z-30 origin-bottom"
           >
-            <SearchView restaurantes={restaurantes} estaAbierto={estaAbierto} activeCategories={activeCategories} />
+            <SearchView restaurantes={oneRestaurantPerBrand(restaurantes)} estaAbierto={estaAbierto} activeCategories={activeCategories} />
           </motion.div>
         )}
       </AnimatePresence>

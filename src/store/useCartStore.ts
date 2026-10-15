@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware'
 import type { CartItem, CheckoutStep, DeliveryType } from '../types'
 
 interface CartStore {
+  restaurantId: string | null;
+  setRestaurantId: (restaurantId: string) => void;
   // Estado
   carrito: { item: CartItem; cantidad: number }[];
   isCartOpen: boolean;
@@ -36,6 +38,8 @@ interface CartStore {
 export const useCartStore = create<CartStore>()(
   persist(
     (set) => ({
+      restaurantId: null,
+      setRestaurantId: (restaurantId) => set({ restaurantId }),
       carrito: [],
       isCartOpen: false,
       checkoutStep: 1,
@@ -106,11 +110,12 @@ export const useCartStore = create<CartStore>()(
           };
         }),
 
-      clearCart: () => set({ carrito: [], checkoutStep: 1, descuento: 0, cuponValido: false, cuponCliente: '' }),
+      clearCart: () => set({ restaurantId: null, carrito: [], checkoutStep: 1, descuento: 0, cuponValido: false, cuponCliente: '' }),
     }),
     {
       name: 'estrella-cart-storage',
       partialize: (state) => ({
+        restaurantId: state.restaurantId,
         carrito: state.carrito,
         checkoutStep: state.checkoutStep,
         tipoEntrega: state.tipoEntrega,

@@ -21,6 +21,8 @@ En local, la web está en `loyalty-estrella/estrella-eats`, que es un repositori
 | `/privacidad`, `/terminos` | `PrivacyPage.tsx`, `TermsPage.tsx` | Lectura de documentos con índice y enlaces |
 | `/login`, `/portal/*` | `LoginPage.tsx`, `PortalPage.tsx` | Acceso y operación del restaurante según sesión |
 
+La cuenta principal administra sus ubicaciones en **Sucursales**. Cada local tiene login con teléfono y contraseña generada; la cocina del grupo y los menús por local conservan su `restaurante_id`. Consulta [alta, accesos y contratos de sucursales](BRANCHES_20261015.md). El backend está publicado con `branch-access` v1 y las migraciones `20261015000003`/`004`, verificado con una marca temporal real y limpieza completa.
+
 Los dominios aliados se identifican en `App.tsx`; no deben alterar los patrones de email canónico del backend. `vercel.json` conserva el rewrite del menú a `api/seo-menu` y el fallback de la SPA a `index.html`.
 
 ## Estado y fronteras del checkout

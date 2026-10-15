@@ -41,7 +41,7 @@ function calcularPasosFaltantes(restaurante: Restaurante): string[] {
   return pasos
 }
 
-export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante; onUpdate?: () => void }) {
+export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { restaurante: Restaurante; onUpdate?: () => void; ownAccount?: boolean }) {
   const [formData, setFormData] = useState({
     nombre: restaurante.nombre || '',
     nombre_sucursal: restaurante.nombre_sucursal || '',
@@ -191,6 +191,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!ownAccount) return
     if (newPassword.length < 6) {
       setPasswordMsg({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' })
       return
@@ -297,10 +298,12 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
                 <input
                   type="text" required
                   value={formData.nombre}
+                  readOnly={Boolean(restaurante.matriz_id)}
                   onChange={e => setFormData({ ...formData, nombre: e.target.value })}
                   className="w-full p-3 border border-slate-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
                   placeholder="Ej. Tacos El Paisa"
                 />
+                {restaurante.matriz_id && <p className="text-sm text-slate-600 mt-2">La marca se administra desde la cuenta principal. Puedes cambiar el nombre de esta sucursal debajo.</p>}
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-700 block mb-1">Teléfono (WhatsApp para recibir pedidos)</label>
@@ -491,7 +494,8 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
           </div>
         </form>
 
-        {/* SEGURIDAD */}
+        {/* Security belongs to the signed-in account, not the location selected by a root owner. */}
+        {ownAccount &&
         <div className="mt-8 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
           <h2 className="text-lg font-black flex items-center gap-3 mb-6 text-slate-800">
             <div className="p-2 bg-red-50 rounded-xl"><Lock className="text-red-500" size={20} /></div>
@@ -526,7 +530,7 @@ export function PerfilView({ restaurante, onUpdate }: { restaurante: Restaurante
               {passwordMsg.text}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )

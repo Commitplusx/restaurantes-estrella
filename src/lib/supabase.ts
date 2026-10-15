@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import imageCompression from 'browser-image-compression'
+import { observeBackendResponse } from './backendAvailability'
 const url = import.meta.env.VITE_SUPABASE_URL as string
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
@@ -7,58 +8,20 @@ if (!url || !key) {
   throw new Error('Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en .env')
 }
 
-export const supabase = createClient(url, key)
+export const supabase = createClient(url, key, { global: { fetch: async (input, init) => {
+  const response = await fetch(input, init);
+  observeBackendResponse(response.status);
+  // A project restriction affects Realtime too. Do not keep opening sockets to
+  // a gateway that has explicitly refused service. Successful requests restore it.
+  if (response.status === 402) supabase.realtime.disconnect();
+  else if (response.ok && supabase.getChannels().length > 0) supabase.realtime.connect();
+  return response;
+} } });
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-export interface HorarioDia {
-  abre: string
-  cierra: string
-  activo: boolean
-}
-
-export interface HorariosRestaurante {
-  lunes?: HorarioDia
-  martes?: HorarioDia
-  miercoles?: HorarioDia
-  jueves?: HorarioDia
-  viernes?: HorarioDia
-  sabado?: HorarioDia
-  domingo?: HorarioDia
-}
-
-export interface Restaurante {
-  stripe_account_id?: string
-  mp_access_token?: string
-  mp_refresh_token?: string
-  mp_user_id?: string
-  id: string
-  nombre: string
-  telefono: string
-  direccion: string | null
-  activo: boolean
-  slug?: string
-  maps_url?: string | null
-  foto_fachada_url?: string
-  logo_url?: string
-  descripcion_corta?: string
-  correo?: string
-  hora_apertura?: string
-  hora_cierre?: string
-  horarios?: HorariosRestaurante
-  categorias?: string[]
-  perfil_completo?: boolean
-  acepta_pago_online?: boolean
-  es_socio?: boolean
-  programa_lealtad_activo?: boolean
-  lat?: number | null
-  lng?: number | null
-  envio_gratis_monto_minimo?: number
-  envio_gratis_tope?: number
-  es_matriz?: boolean
-  matriz_id?: string | null
-  nombre_sucursal?: string | null
-}
+import type { Restaurante } from '../types/restaurant'
+export type { Restaurante, HorarioDia, HorariosRestaurante } from '../types/restaurant'
 
 export interface MenuCategoria {
   id: string
@@ -169,8 +132,9 @@ export async function getMyRestaurante(): Promise<Restaurante | null> {
 
   const query = supabase
     .from('restaurantes')
-    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo, mp_access_token, acepta_pago_online, es_matriz, matriz_id, nombre_sucursal')
+    .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo, mp_access_token, acepta_pago_online, es_matriz, matriz_id, nombre_sucursal, lat, lng')
     .eq('admin_id', user.id)
+    .order('matriz_id', { ascending: true, nullsFirst: true })
     // Damos prioridad a las matrices en caso de que existan varias filas por error
     .order('es_matriz', { ascending: false, nullsFirst: false })
     .limit(1)

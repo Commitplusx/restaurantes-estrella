@@ -1,0 +1,588 @@
+.restaurant-login {
+  --login-ink: #19191b;
+  --login-muted: #686a70;
+  --login-line: #e7e7e8;
+  --login-accent: #f04a2d;
+  --login-accent-dark: #d83a21;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+  isolation: isolate;
+  color: var(--login-ink);
+  background:
+    radial-gradient(ellipse at 12% 82%, rgb(255 221 207 / 44%), transparent 31rem),
+    #f8f8f6;
+}
+
+.restaurant-login,
+.restaurant-login * {
+  box-sizing: border-box;
+}
+
+.restaurant-login__layout {
+  width: min(1160px, calc(100% - 64px));
+  min-height: 100vh;
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: 44px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(390px, 0.95fr);
+  align-items: center;
+  gap: clamp(48px, 8vw, 112px);
+}
+
+.restaurant-login__intro {
+  min-width: 0;
+  min-height: 580px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.restaurant-login__brand {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--login-ink);
+  text-decoration: none;
+}
+
+.restaurant-login__brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: var(--login-accent);
+  border-radius: 50%;
+  box-shadow: 0 8px 18px rgb(240 74 45 / 22%);
+}
+
+.restaurant-login__brand-name {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.065em;
+}
+
+.restaurant-login__brand-name span {
+  color: var(--login-accent);
+}
+
+.restaurant-login__message {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  margin: 76px 0 62px;
+}
+
+.restaurant-login__eyebrow {
+  margin: 0 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #46484e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+}
+
+.restaurant-login__eyebrow span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--login-accent);
+}
+
+.restaurant-login__message h1 {
+  margin: 0;
+  font-size: clamp(44px, 5vw, 68px);
+  line-height: 0.99;
+  letter-spacing: -0.065em;
+  font-weight: 900;
+}
+
+.restaurant-login__message h1 span {
+  color: var(--login-accent);
+}
+
+.restaurant-login__lead {
+  max-width: 440px;
+  margin: 23px 0 0;
+  color: #666970;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.restaurant-login__features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.restaurant-login__feature {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 14px;
+  border: 1px solid rgb(25 25 27 / 7%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 75%);
+  box-shadow: 0 8px 24px rgb(28 27 25 / 3%);
+}
+
+.restaurant-login__feature-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--login-accent);
+  border-radius: 12px;
+  background: #fff0e9;
+}
+
+.restaurant-login__feature strong,
+.restaurant-login__feature small {
+  display: block;
+}
+
+.restaurant-login__feature strong {
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 800;
+}
+
+.restaurant-login__feature small {
+  margin-top: 4px;
+  color: var(--login-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.restaurant-login__decor {
+  position: absolute;
+  inset: 0 -20px 0 auto;
+  width: 270px;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.6;
+}
+
+.restaurant-login__decor::before {
+  content: '';
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  right: -175px;
+  top: 50%;
+  border: 1px solid #f0c9ba;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.restaurant-login__decor-star {
+  position: absolute;
+  color: #f1c7b5;
+  line-height: 1;
+}
+
+.restaurant-login__decor-star--one {
+  right: 26px;
+  top: 31%;
+  font-size: 35px;
+}
+
+.restaurant-login__decor-star--two {
+  right: 78px;
+  bottom: 22%;
+  font-size: 18px;
+}
+
+.restaurant-login__form-side {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.restaurant-login__card {
+  width: 100%;
+  max-width: 490px;
+  margin: 0 auto;
+  padding: clamp(28px, 4vw, 42px);
+  border: 1px solid #e8e8e7;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgb(31 31 30 / 8%);
+}
+
+.restaurant-login__card-mark {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  color: var(--login-accent);
+  border-radius: 15px;
+  background: #fff0e9;
+}
+
+.restaurant-login__card-eyebrow {
+  margin: 24px 0 8px;
+  color: var(--login-accent-dark);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.15em;
+}
+
+.restaurant-login__card h2 {
+  margin: 0;
+  color: var(--login-ink);
+  font-size: clamp(27px, 3vw, 34px);
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+  font-weight: 900;
+}
+
+.restaurant-login__card-copy {
+  margin: 11px 0 27px;
+  color: var(--login-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.restaurant-login__form {
+  display: grid;
+  gap: 19px;
+}
+
+.restaurant-login__field {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.restaurant-login__field label {
+  color: #37383d;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.restaurant-login__field input {
+  width: 100%;
+  min-width: 0;
+  height: 54px;
+  padding: 0 15px;
+  color: var(--login-ink);
+  border: 1px solid #dedfe1;
+  border-radius: 14px;
+  outline: none;
+  background: #fbfbfa;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.restaurant-login__field input::placeholder {
+  color: #92949a;
+  font-weight: 450;
+}
+
+.restaurant-login__field input:focus {
+  border-color: var(--login-accent);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgb(240 74 45 / 11%);
+}
+
+.restaurant-login__password-wrap {
+  position: relative;
+}
+
+.restaurant-login__password-wrap input {
+  padding-left: 44px;
+  padding-right: 50px;
+}
+
+.restaurant-login__password-icon {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  color: #83858b;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.restaurant-login__password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: #777980;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.restaurant-login__password-toggle:hover {
+  color: var(--login-ink);
+  background: #f4f4f2;
+}
+
+.restaurant-login__password-toggle:focus-visible,
+.restaurant-login__submit:focus-visible,
+.restaurant-login__help a:focus-visible {
+  outline: 3px solid rgb(240 74 45 / 45%);
+  outline-offset: 3px;
+}
+
+.restaurant-login__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  color: #a83220;
+  border: 1px solid #f4c9be;
+  border-radius: 13px;
+  background: #fff4f0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.restaurant-login__error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.restaurant-login__submit {
+  min-height: 54px;
+  width: 100%;
+  margin-top: 3px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: white;
+  border: 0;
+  border-radius: 15px;
+  background: var(--login-ink);
+  box-shadow: 0 10px 22px rgb(25 25 27 / 16%);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.restaurant-login__submit:hover:not(:disabled) {
+  background: var(--login-accent);
+  box-shadow: 0 12px 24px rgb(240 74 45 / 24%);
+}
+
+.restaurant-login__submit:disabled {
+  cursor: wait;
+}
+
+.restaurant-login__submit.is-success {
+  background: #197c54;
+}
+
+.restaurant-login__spinner {
+  animation: restaurant-login-spin 850ms linear infinite;
+}
+
+@keyframes restaurant-login-spin {
+  to { transform: rotate(360deg); }
+}
+
+.restaurant-login__help {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #777980;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.restaurant-login__help a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--login-accent-dark);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.restaurant-login__help a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.restaurant-login__footnote {
+  margin: 18px 0 0;
+  color: #888a8f;
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .restaurant-login__layout {
+    width: min(100% - 48px, 680px);
+    grid-template-columns: minmax(0, 0.9fr) minmax(350px, 1fr);
+    gap: 30px;
+  }
+
+  .restaurant-login__message h1 {
+    font-size: clamp(40px, 5vw, 54px);
+  }
+
+  .restaurant-login__features {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .restaurant-login {
+    overflow: auto;
+    background:
+      radial-gradient(ellipse at 100% 0%, rgb(255 221 207 / 50%), transparent 23rem),
+      #f8f8f6;
+  }
+
+  .restaurant-login__layout {
+    width: min(100% - 32px, 480px);
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: max(22px, env(safe-area-inset-top)) 0 max(22px, env(safe-area-inset-bottom));
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 0;
+  }
+
+  .restaurant-login__intro {
+    min-height: auto;
+    padding: 0;
+  }
+
+  .restaurant-login__brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  .restaurant-login__brand-name {
+    font-size: 20px;
+  }
+
+  .restaurant-login__message {
+    margin: 35px 0 0;
+  }
+
+  .restaurant-login__eyebrow {
+    margin-bottom: 12px;
+    font-size: 9px;
+  }
+
+  .restaurant-login__message h1 {
+    font-size: clamp(34px, 10vw, 43px);
+    line-height: 1.02;
+  }
+
+  .restaurant-login__lead {
+    max-width: 360px;
+    margin-top: 11px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .restaurant-login__features,
+  .restaurant-login__decor {
+    display: none;
+  }
+
+  .restaurant-login__form-side {
+    margin-top: 22px;
+  }
+
+  .restaurant-login__card {
+    padding: 22px 20px 20px;
+    border-radius: 22px;
+    box-shadow: 0 14px 34px rgb(31 31 30 / 7%);
+  }
+
+  .restaurant-login__card-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+  }
+
+  .restaurant-login__card-eyebrow {
+    margin-top: 18px;
+  }
+
+  .restaurant-login__card h2 {
+    font-size: 27px;
+  }
+
+  .restaurant-login__card-copy {
+    margin: 8px 0 21px;
+    font-size: 13px;
+  }
+
+  .restaurant-login__form {
+    gap: 16px;
+  }
+
+  .restaurant-login__field input {
+    height: 52px;
+    font-size: 14px;
+  }
+
+  .restaurant-login__help {
+    margin-top: 19px;
+  }
+
+  .restaurant-login__footnote {
+    margin-top: 15px;
+  }
+}
+
+@media (max-width: 360px) {
+  .restaurant-login__layout {
+    width: calc(100% - 24px);
+  }
+
+  .restaurant-login__card {
+    padding: 20px 16px 18px;
+  }
+
+  .restaurant-login__message h1 {
+    font-size: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .restaurant-login *,
+  .restaurant-login *::before,
+  .restaurant-login *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

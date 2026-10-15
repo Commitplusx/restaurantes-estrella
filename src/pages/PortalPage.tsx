@@ -7,6 +7,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Suspense, lazy } from 'react'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
+import './restaurantPortal.css'
+import { isAwaitingKitchenOrder } from '../lib/kitchenOrderState'
+import { branchLabel, parseRestaurantBranches, RESTAURANT_PUBLIC_FIELDS } from '../lib/restaurantBranches'
+import './views/SucursalesView.css'
+
+type PortalTab = 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales'
 
 const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })))
 const MenuProductosView = lazy(() => import('./views/MenuProductosView').then(m => ({ default: m.MenuProductosView })))
@@ -17,15 +23,47 @@ const PerfilView = lazy(() => import('./views/PerfilView').then(m => ({ default:
 const PedidosView = lazy(() => import('./views/PedidosView').then(m => ({ default: m.PedidosView })))
 const SucursalesView = lazy(() => import('./views/SucursalesView').then(m => ({ default: m.SucursalesView })))
 
-export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales' }) {
+export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
   const { pedidoId } = useParams<{ pedidoId?: string }>()
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales'>(initialTab ?? 'dashboard')
+  const [managedBranches, setManagedBranches] = useState<Restaurante[]>([])
+  const [selectedBranchId, setSelectedBranchId] = useState('')
+  const [branchesError, setBranchesError] = useState('')
+  const [branchesVersion, setBranchesVersion] = useState(0)
+  const operatingRestaurant = managedBranches.find(branch => branch.id === selectedBranchId) || restaurante
+  const [activeTab, setActiveTab] = useState<PortalTab>(initialTab ?? 'dashboard')
+  const [pedidosMounted, setPedidosMounted] = useState(true)
   const [highlightedPedidoId, setHighlightedPedidoId] = useState<string | null>(pedidoId ?? null)
   const [loading, setLoading] = useState(true)
   const [networkError, setNetworkError] = useState(false)
   const [audioDesbloqueado, setAudioDesbloqueado] = useState(false)
   const audioCtxRef = useRef<AudioContext | null>(null)
+
+  const navigateTab = useCallback((tab: PortalTab) => {
+    if (tab === 'pedidos') setPedidosMounted(true)
+    setActiveTab(tab)
+  }, [])
+  const openOrders = useCallback(() => navigateTab('pedidos'), [navigateTab])
+
+  useEffect(() => {
+    if (!restaurante || restaurante.matriz_id) return
+    const controller = new AbortController()
+    const rootId = restaurante.id
+    async function load() {
+      try {
+        const { data, error } = await supabase.from('restaurantes').select(RESTAURANT_PUBLIC_FIELDS)
+          .eq('matriz_id', rootId).order('nombre_sucursal').limit(101)
+          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).returns<unknown>()
+        if (error) throw error
+        const branches = parseRestaurantBranches(data)
+        if (!controller.signal.aborted) { setManagedBranches(branches); setBranchesError('') }
+      } catch {
+        if (!controller.signal.aborted) setBranchesError('No pudimos cargar las sucursales. Reintenta antes de cambiar de ubicación.')
+      }
+    }
+    void load()
+    return () => controller.abort()
+  }, [restaurante, branchesVersion])
 
   // 🔊 Desbloquear audio en el primer clic del usuario (política del navegador)
   const desbloquearAudio = useCallback(() => {
@@ -111,15 +149,21 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
         
         let shouldRing = false;
 
-        if (payload.eventType === 'INSERT' && payload.new.estado !== 'pendiente_pago') {
+        if (payload.eventType === 'INSERT' && isAwaitingKitchenOrder(payload.new)) {
           shouldRing = true;
-        } else if (payload.eventType === 'UPDATE' && payload.old.estado === 'pendiente_pago' && payload.new.estado === 'pendiente') {
+        } else if (
+          payload.eventType === 'UPDATE' &&
+          payload.old.estado === 'pendiente_pago' &&
+          payload.new.estado === 'pendiente' &&
+          isAwaitingKitchenOrder(payload.new)
+        ) {
           shouldRing = true;
         }
 
         if (shouldRing) {
-          // 1. Reproducir timbre con Web Audio API (instantáneo, sin descarga externa)
-          tocarTimbre()
+          // PedidosView owns the continuous alarm once mounted; the portal only
+          // provides a one-shot sound while the restaurant is elsewhere.
+          if (!pedidosMounted) tocarTimbre()
           
           // 2. Notificación Push nativa
           if ('Notification' in window && Notification.permission === 'granted') {
@@ -129,7 +173,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
              })
              notif.onclick = () => {
                window.focus();
-               setActiveTab('pedidos');
+               navigateTab('pedidos');
                notif.close();
              }
           }
@@ -140,7 +184,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [restaurante, tocarTimbre])
+  }, [restaurante, pedidosMounted, navigateTab, tocarTimbre])
 
   useEffect(() => {
     if (!restaurante) return
@@ -296,7 +340,7 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-[100dvh] bg-white text-slate-900 font-sans selection:bg-orange-100 overflow-hidden w-full max-w-[100vw]">
+    <div className="restaurant-portal">
 
       {/* ── Banner: Audio no desbloqueado ── */}
       <AnimatePresence>
@@ -306,68 +350,72 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -60, opacity: 0 }}
             onClick={desbloquearAudio}
-            className="fixed top-0 left-0 right-0 z-[999] flex items-center justify-center gap-2 bg-amber-500 text-white text-sm font-bold py-2.5 px-4 shadow-lg cursor-pointer hover:bg-amber-600 transition-colors"
+            className="restaurant-portal__audio-notice"
           >
-            <BellRing size={16} className="animate-bounce" />
+            <BellRing size={16} />
             Toca aquí para activar las alertas de sonido de nuevos pedidos
           </motion.button>
         )}
       </AnimatePresence>
       
       {/* ── Sidebar (Desktop) ── */}
-      <aside className="hidden lg:flex flex-col w-[260px] xl:w-[280px] bg-gradient-to-b from-[#FFA08A] to-[#FF6B5B] p-5 xl:p-6 gap-2 z-10 text-white relative shadow-[4px_0_24px_rgba(255,107,91,0.2)] overflow-y-auto custom-scrollbar h-full">
+      <aside className="restaurant-portal__sidebar">
           
-          <div className="mb-8 mt-2 flex items-center justify-between">
-            <h1 className="text-2xl font-black tracking-tight">{restaurante.nombre.split(' ')[0]}.</h1>
+          <div className="restaurant-portal__brand">
+            <span className="restaurant-portal__brand-star" aria-hidden="true"><Star size={17} fill="currentColor" /></span>
+            <div>
+              <h1>Estrella<span>Eats</span></h1>
+              <p>Panel para restaurantes</p>
+            </div>
           </div>
 
           <NavButton 
             id="desktop-tour-dashboard"
             active={activeTab === 'dashboard'} icon={<LayoutDashboard size={20}/>} label="Dashboard" 
-            onClick={() => setActiveTab('dashboard')} 
+            onClick={() => navigateTab('dashboard')}
           />
           
-          <div className="text-[10px] font-black text-white/50 mt-6 mb-2 ml-4 uppercase tracking-widest">
+          <div className="restaurant-portal__section-label">
             Gestión de Menú
           </div>
           
           <NavButton 
             id="desktop-tour-pedidos"
             active={activeTab === 'pedidos'} icon={<BellRing size={20}/>} label="Pedidos Activos" 
-            onClick={() => setActiveTab('pedidos')} 
+            onClick={() => navigateTab('pedidos')}
           />
           
           <NavButton 
             id="desktop-tour-platillos"
             active={activeTab === 'productos'} icon={<Utensils size={20}/>} label="Platillos" 
-            onClick={() => setActiveTab('productos')} 
+            onClick={() => navigateTab('productos')}
           />
           <NavButton 
             id="desktop-tour-combos"
             active={activeTab === 'combos'} icon={<Package size={20}/>} label="Combos / Paquetes" 
-            onClick={() => setActiveTab('combos')} 
+            onClick={() => navigateTab('combos')}
           />
           <NavButton 
             id="desktop-tour-promos"
             active={activeTab === 'promos'} icon={<Tag size={20}/>} label="Promociones" 
-            onClick={() => setActiveTab('promos')} 
+            onClick={() => navigateTab('promos')}
           />
           <NavButton
             id="desktop-tour-cupones"
             active={activeTab === 'cupones'}
             icon={<Ticket size={20}/>}
             label="Cupones"
-            onClick={() => setActiveTab('cupones')}
+            onClick={() => navigateTab('cupones')}
           />
           
-          <div className="text-[10px] font-black text-white/50 mt-6 mb-2 ml-4 uppercase tracking-widest">
+          <div className="restaurant-portal__section-label">
             Ajustes
           </div>
           
           <NavButton 
             id="desktop-tour-perfil"
             active={activeTab === 'perfil'} icon={<Store size={20}/>} label="Perfil del Negocio" 
-            onClick={() => setActiveTab('perfil')} 
+            onClick={() => navigateTab('perfil')}
           />
 
           {/* Oculto temporalmente
@@ -380,58 +428,56 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
           )}
           */}
           
-          <div className="flex-1" />
+          <div className="restaurant-portal__sidebar-spacer" />
 
           {/* Ilustración Decorativa Premium - Socio Estrella */}
-          <div className="mb-4 p-5 rounded-3xl bg-white/10 border border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.05)] flex flex-col items-center text-center relative overflow-hidden backdrop-blur-md">
-            <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-sm mb-3 relative z-10 border border-slate-100">
-              <Star size={20} className="text-[#FF7A6A] fill-[#FF7A6A]" />
+          <div className="restaurant-portal__support">
+            <Star size={16} aria-hidden="true" />
+            <div>
+              <p>Socio Estrella</p>
+              <span>Estamos para ayudarte</span>
             </div>
-            <p className="text-sm font-bold text-white relative z-10">Socio Estrella</p>
-            <p className="text-[11px] text-white/70 mt-1 font-medium relative z-10">Soporte: +52 123 456</p>
           </div>
 
           {/* User Guide / Logout */}
-          <button onClick={handleLogout} className="mt-auto p-4 rounded-2xl bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-3 text-left border border-white/10 backdrop-blur-md">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <LogOut size={18} className="text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white leading-tight">Cerrar sesión</p>
-              <p className="text-[11px] text-white/70 mt-0.5">Salir del panel</p>
-            </div>
+          <button onClick={handleLogout} className="restaurant-portal__logout">
+            <LogOut size={17} aria-hidden="true" />
+            <span>Cerrar sesión</span>
           </button>
         </aside>
 
       {/* ── Main Content Area ── */}
-        <div className="flex-1 flex flex-col relative w-full overflow-hidden h-full">
+        <div className="restaurant-portal__main">
           
           {/* Top Header inside main content */}
-          <header id="tour-welcome" className="px-6 lg:px-8 py-6 flex items-center justify-between z-20 sticky top-0 bg-white/80 backdrop-blur-xl">
-            <div>
-              <h2 className="text-2xl lg:text-3xl font-bold text-slate-800">
+          <header id="tour-welcome" className="restaurant-portal__header">
+            <div className="restaurant-portal__page-heading">
+              <h2>
                 {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'pedidos' ? 'Pedidos Activos' : activeTab === 'productos' ? 'Platillos' : activeTab === 'combos' ? 'Combos' : activeTab === 'promos' ? 'Promociones' : activeTab === 'cupones' ? 'Cupones de Descuento' : activeTab === 'sucursales' ? 'Mis Sucursales' : 'Perfil'}
               </h2>
-              <div className="text-sm text-slate-400 font-medium mt-1">Inicio / {activeTab}</div>
+              <div className="restaurant-portal__breadcrumb">Estrella Eats <span>/</span> {activeTab}</div>
             </div>
             
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex flex-col items-end">
-                <span className="text-sm font-bold text-slate-800">{restaurante.nombre}</span>
-                <span className="text-[10px] font-bold text-[#FF7A6A] uppercase tracking-widest">Panel Conectado</span>
+            <div className="restaurant-portal__account">
+              <div className="restaurant-portal__restaurant-name">
+                <span>{restaurante.nombre}</span>
+                <small><i aria-hidden="true" /> Sesión del restaurante</small>
               </div>
-              <div className="w-12 h-12 rounded-[16px] bg-[#FFF0EE] flex items-center justify-center text-[#FF7A6A]">
-                <Store size={22} />
+              <div className="restaurant-portal__restaurant-avatar" aria-hidden="true">
+                <Store size={19} />
               </div>
             </div>
           </header>
 
-          <main className="flex-1 px-4 lg:px-8 pb-32 lg:pb-10 overflow-y-auto custom-scrollbar w-full">
-            <div className="max-w-5xl mx-auto">
+          <main className="restaurant-portal__content-scroll">
+            <div className="restaurant-portal__content">
+              {branchesError && <p role="alert">{branchesError} <button type="button" onClick={() => setBranchesVersion(value => value + 1)}>Reintentar</button></p>}
+              {managedBranches.length > 0 && activeTab !== 'sucursales' && activeTab !== 'pedidos' && operatingRestaurant && <div className="portal-branch-picker"><label htmlFor="portal-branch">Administrando</label><select id="portal-branch" value={operatingRestaurant.id} onChange={event => setSelectedBranchId(event.target.value)}>{[restaurante, ...managedBranches].map(branch => <option key={branch.id} value={branch.id}>{branchLabel(branch)}{branch.activo ? '' : ' · Pausada'}</option>)}</select></div>}
+              {managedBranches.length > 0 && activeTab === 'pedidos' && <p className="portal-branch-picker">Pedidos de todas tus sucursales. Cada orden indica dónde se prepara.</p>}
 
               {/* ── Banner: Perfil Incompleto ── Bug Fix 6: solo en dashboard ── */}
               {!restaurante.perfil_completo && activeTab === 'dashboard' && (
-                <div className="mb-6 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-[2rem] p-6 flex flex-col sm:flex-row gap-4 items-start">
+                <div className="restaurant-portal__profile-alert">
                   <div className="p-3 bg-amber-100 rounded-2xl shrink-0">
                     <AlertCircle className="text-amber-600" size={26} />
                   </div>
@@ -453,8 +499,8 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
                       </div>
                     </div>
                     <button
-                      onClick={() => setActiveTab('perfil')}
-                      className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-amber-500/30"
+                      onClick={() => navigateTab('perfil')}
+                      className="restaurant-portal__profile-action"
                     >
                       Completar Perfil →
                     </button>
@@ -462,49 +508,62 @@ export function PortalPage({ initialTab }: { initialTab?: 'dashboard' | 'pedidos
                 </div>
               )}
 
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.3 }}
-                  className="h-full"
-                >
+              {pedidosMounted && (
+                <div className={`restaurant-portal__orders-view${activeTab === 'pedidos' ? '' : ' is-hidden'}`} aria-hidden={activeTab !== 'pedidos'}>
                   <Suspense fallback={
-                    <div className="flex flex-col items-center justify-center h-64">
-                      <Loader2 className="animate-spin text-[#FF7A6A] w-10 h-10 mb-4" />
+                    <div className="restaurant-portal__loading">
+                      <Loader2 className="animate-spin" size={26} />
                     </div>
                   }>
-                    {activeTab === 'dashboard' && <DashboardView restaurante={restaurante} />}
-                    {activeTab === 'pedidos'   && <PedidosView restaurante={restaurante} highlightedPedidoId={highlightedPedidoId} onClearHighlight={() => setHighlightedPedidoId(null)} />}
-                    {activeTab === 'productos' && <MenuProductosView restaurante={restaurante} />}
-                    {activeTab === 'combos'    && <MenuCombosView restaurante={restaurante} />}
-                    {activeTab === 'promos'    && <MenuPromosView restaurante={restaurante} />}
-                    {activeTab === 'cupones'   && <CuponesView restaurante={restaurante} />}
-                    {activeTab === 'perfil'    && <PerfilView restaurante={restaurante} onUpdate={loadRestaurante} />}
-                    {activeTab === 'sucursales' && <SucursalesView restaurante={restaurante} />}
+                    <PedidosView key={`${restaurante.id}:${branchesVersion}`} restaurante={restaurante} highlightedPedidoId={highlightedPedidoId} onClearHighlight={() => setHighlightedPedidoId(null)} onOpenOrders={openOrders} />
                   </Suspense>
-                </motion.div>
+                </div>
+              )}
+
+              <AnimatePresence mode="wait">
+                {activeTab !== 'pedidos' && (
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.3 }}
+                    className="restaurant-portal__view-transition"
+                  >
+                    <Suspense fallback={
+                      <div className="restaurant-portal__loading">
+                        <Loader2 className="animate-spin" size={26} />
+                      </div>
+                    }>
+                      {activeTab === 'dashboard' && operatingRestaurant && <DashboardView key={operatingRestaurant.id} restaurante={operatingRestaurant} />}
+                      {activeTab === 'productos' && operatingRestaurant && <MenuProductosView key={operatingRestaurant.id} restaurante={operatingRestaurant} />}
+                      {activeTab === 'combos' && operatingRestaurant && <MenuCombosView key={operatingRestaurant.id} restaurante={operatingRestaurant} />}
+                      {activeTab === 'promos' && operatingRestaurant && <MenuPromosView key={operatingRestaurant.id} restaurante={operatingRestaurant} />}
+                      {activeTab === 'cupones' && operatingRestaurant && <CuponesView key={operatingRestaurant.id} restaurante={operatingRestaurant} />}
+                      {activeTab === 'perfil' && operatingRestaurant && <PerfilView key={operatingRestaurant.id} restaurante={operatingRestaurant} ownAccount={operatingRestaurant.id === restaurante.id} onUpdate={loadRestaurante} />}
+                      {activeTab === 'sucursales' && <SucursalesView restaurante={restaurante} onManage={branch => { setSelectedBranchId(branch.id); navigateTab('productos') }} onSaved={() => setBranchesVersion(value => value + 1)} />}
+                    </Suspense>
+                  </motion.div>
+                )}
               </AnimatePresence>
             </div>
           </main>
         </div>
       {/* ── Bottom Nav (Mobile) ── */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex justify-between overflow-x-auto">
-        <MobileNavBtn id="mobile-tour-dashboard" active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => setActiveTab('dashboard')} />
-        <MobileNavBtn id="mobile-tour-pedidos" active={activeTab === 'pedidos'} icon={<BellRing size={22}/>} label="Pedidos" onClick={() => setActiveTab('pedidos')} />
-        <MobileNavBtn id="mobile-tour-platillos" active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => setActiveTab('productos')} />
-        <MobileNavBtn id="mobile-tour-combos" active={activeTab === 'combos'} icon={<Package size={22}/>} label="Combos" onClick={() => setActiveTab('combos')} />
-        <MobileNavBtn id="mobile-tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => setActiveTab('promos')} />
-        <MobileNavBtn id="mobile-tour-cupones" active={activeTab === 'cupones'} icon={<Ticket size={22}/>} label="Cupones" onClick={() => setActiveTab('cupones')} />
-        <MobileNavBtn id="mobile-tour-perfil" active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => setActiveTab('perfil')} />
+      <nav className="restaurant-portal__mobile-nav" aria-label="Navegación del restaurante">
+        <MobileNavBtn id="mobile-tour-dashboard" active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22}/>} label="Inicio" onClick={() => navigateTab('dashboard')} />
+        <MobileNavBtn id="mobile-tour-pedidos" active={activeTab === 'pedidos'} icon={<BellRing size={22}/>} label="Pedidos" onClick={() => navigateTab('pedidos')} />
+        <MobileNavBtn id="mobile-tour-platillos" active={activeTab === 'productos'} icon={<Utensils size={22}/>} label="Platillos" onClick={() => navigateTab('productos')} />
+        <MobileNavBtn id="mobile-tour-combos" active={activeTab === 'combos'} icon={<Package size={22}/>} label="Combos" onClick={() => navigateTab('combos')} />
+        <MobileNavBtn id="mobile-tour-promos" active={activeTab === 'promos'} icon={<Tag size={22}/>} label="Promos" onClick={() => navigateTab('promos')} />
+        <MobileNavBtn id="mobile-tour-cupones" active={activeTab === 'cupones'} icon={<Ticket size={22}/>} label="Cupones" onClick={() => navigateTab('cupones')} />
+        <MobileNavBtn id="mobile-tour-perfil" active={activeTab === 'perfil'} icon={<Store size={22}/>} label="Perfil" onClick={() => navigateTab('perfil')} />
         {/* Oculto temporalmente
         {!restaurante.matriz_id && (
           <MobileNavBtn id="mobile-tour-sucursales" active={activeTab === 'sucursales'} icon={<Store size={22}/>} label="Sucursales" onClick={() => setActiveTab('sucursales')} />
         )}
         */}
-      </div>
+      </nav>
     </div>
   )
 }
@@ -514,12 +573,13 @@ function NavButton({ id, active, icon, label, onClick }: { id?: string, active: 
     <button 
       id={id}
       onClick={onClick}
-      className={`relative flex items-center gap-3 w-full px-4 py-3 rounded-[16px] transition-all duration-200 overflow-hidden ${active ? 'bg-white/20 shadow-[0_4px_12px_rgba(0,0,0,0.05)]' : 'hover:bg-white/10'}`}
+      aria-current={active ? 'page' : undefined}
+      className={`restaurant-portal__nav-button${active ? ' is-active' : ''}`}
     >
-      <span className={`relative z-10 transition-colors duration-200 ${active ? 'text-white' : 'text-white/70'}`}>
+      <span className="restaurant-portal__nav-icon">
         {icon}
       </span>
-      <span className={`relative z-10 font-bold text-sm tracking-tight transition-colors duration-200 ${active ? 'text-white' : 'text-white/80'}`}>
+      <span className="restaurant-portal__nav-label">
         {label}
       </span>
     </button>
@@ -531,12 +591,13 @@ function MobileNavBtn({ id, active, icon, label, onClick }: { id?: string, activ
     <button 
       id={id}
       onClick={onClick}
-      className="flex-1 flex flex-col items-center justify-center gap-1.5 py-1 transition-all"
+      aria-current={active ? 'page' : undefined}
+      className={`restaurant-portal__mobile-nav-button${active ? ' is-active' : ''}`}
     >
-      <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-[#FFF0EE] text-[#FF7A6A]' : 'text-slate-400'}`}>
+      <div className="restaurant-portal__mobile-nav-icon">
         {icon}
       </div>
-      <span className={`text-[9px] font-bold tracking-wider ${active ? 'text-[#FF7A6A]' : 'text-slate-400'}`}>
+      <span>
         {label}
       </span>
     </button>

@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react'
+import React, { useMemo, useRef, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BellRing, Store } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
 import { BottomSheet } from '../../components/BottomSheet'
+import { createKitchenAlarm } from '../../lib/kitchenAlarm'
+import {
+  createKitchenOrderFeed,
+  isActiveKitchenOrder,
+  isAwaitingKitchenOrder,
+  kitchenOrderId,
+} from '../../lib/kitchenOrderState'
+import type { KitchenOrderSnapshot } from '../../lib/kitchenOrderState'
+import { shouldNotifyRestaurantOrder } from '../../lib/orderNotificationPolicy'
+import './PedidosView.css'
 
 // Componente Genérico Anti-Doble Toque
 function ActionButton({ onClick, children, className, loadingText = "Cargando..." }: {
@@ -47,16 +57,49 @@ function ActionButton({ onClick, children, className, loadingText = "Cargando...
   );
 }
 
-export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight }: { restaurante: Restaurante, highlightedPedidoId?: string | null, onClearHighlight?: () => void }) {
-  const [pedidos, setPedidos] = useState<any[]>([])
+export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight, onOpenOrders }: { restaurante: Restaurante, highlightedPedidoId?: string | null, onClearHighlight?: () => void, onOpenOrders?: () => void }) {
+  const [pedidos, setPedidos] = useState<KitchenOrderSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [kitchenError, setKitchenError] = useState<string | null>(null)
-  const [pedidoToPrepare, setPedidoToPrepare] = useState<any>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [pedidoToPrepare, setPedidoToPrepare] = useState<KitchenOrderSnapshot | null>(null)
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'denied'
   )
+  const [activeStage, setActiveStage] = useState<'new' | 'cooking' | 'ready'>('new')
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const previousTitleRef = useRef<string | null>(null)
+  const wakeInFlightRef = useRef(false)
+  const orderLoadRequestRef = useRef(0)
+  const [orderFeed] = useState(createKitchenOrderFeed)
   // Incrementar este valor fuerza la reconexión del canal de Supabase Realtime
   const [channelKey, setChannelKey] = useState(0)
+
+  const loadPedidos = React.useCallback(async (ids: string[]): Promise<void> => {
+    const requestId = ++orderLoadRequestRef.current
+    const revision = orderFeed.revision()
+    try {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('*, restaurantes(nombre,nombre_sucursal)')
+        .in('restaurante_id', ids)
+        .or('and(or(estado.is.null,estado.not.in.(entregado,cancelado,rechazado,pendiente_pago)),or(estado_cocina.is.null,estado_cocina.in.(pendiente,en_cocina,listo_para_recoger)))')
+        .order('created_at', { ascending: false })
+      if (requestId !== orderLoadRequestRef.current) return
+      if (error || !data) throw new Error('kitchen_load_failed')
+      orderFeed.reconcile(data, revision)
+      setPedidos(orderFeed.activeOrders())
+      setLoadError(null)
+    } catch {
+      if (requestId === orderLoadRequestRef.current) {
+        setLoadError('No pudimos actualizar los pedidos. La vista conserva la última información recibida.')
+      }
+    } finally {
+      if (requestId === orderLoadRequestRef.current) setLoading(false)
+    }
+  }, [orderFeed])
+
+  useEffect(() => () => { orderLoadRequestRef.current += 1 }, [orderFeed])
 
   // Scroll al pedido resaltado cuando carga
   useEffect(() => {
@@ -78,22 +121,29 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
 
   // Cargar IDs vinculados (matriz + sucursales) al montar
   useEffect(() => {
-    if (!restaurante) return
+    if (!restaurante.id) return
+    let cancelled = false
     const init = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('restaurantes')
         .select('id')
         .eq('matriz_id', restaurante.id)
+      if (cancelled) return
+      if (error) {
+        setKitchenError('No pudimos consultar las sucursales. Vuelve a cargar el panel para incluir sus pedidos.')
+      }
       
       const ids = [restaurante.id, ...(data?.map(s => s.id) || [])]
       setLinkedIds(ids)
       await loadPedidos(ids)
     }
     init()
-  }, [restaurante.id])
+    return () => { cancelled = true }
+  }, [restaurante.id, loadPedidos])
 
   useEffect(() => {
-    if (!restaurante || linkedIds.length === 0) return
+    if (!restaurante.id || linkedIds.length === 0) return
+    let disposed = false
 
     // channelKey en las deps garantiza que al subir (wake-up) el canal se destruye
     // y se vuelve a crear con .subscribe() fresco.
@@ -103,32 +153,30 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=in.(${linkedIds.join(',')})` },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            if (payload.new.estado === 'pendiente_pago') return;
-            setPedidos((prev) => [payload.new, ...prev])
-          } else if (payload.eventType === 'UPDATE') {
-            setPedidos((prev) => {
-              if (payload.new.estado === 'pendiente_pago') {
-                return prev.filter(p => p.id !== payload.new.id);
-              }
-              const exists = prev.find(p => p.id === payload.new.id);
-              if (exists) {
-                return prev.map((p) => (p.id === payload.new.id ? payload.new : p));
-              } else {
-                return [payload.new, ...prev];
-              }
-            });
-          } else if (payload.eventType === 'DELETE') {
-            setPedidos((prev) => prev.filter((p) => p.id !== payload.old.id))
+          if (disposed) return
+          const incoming = payload.eventType === 'DELETE' ? payload.old : payload.new
+          const orderId = kitchenOrderId(incoming)
+          if (!orderId) return
+          if (payload.eventType === 'DELETE') {
+            orderFeed.remove(orderId)
+            setPedidos(orderFeed.activeOrders())
+            return
+          }
+          if (orderFeed.apply(incoming)) {
+            setPedidos(orderFeed.activeOrders())
           }
         }
       )
-      .subscribe()
+      .subscribe(status => {
+        // Refresh after subscribing so orders arriving during reconnect are read.
+        if (status === 'SUBSCRIBED' && !disposed) void loadPedidos(linkedIds)
+      })
 
     return () => {
+      disposed = true
       supabase.removeChannel(channel)
     }
-  }, [restaurante.id, linkedIds, channelKey])
+  }, [restaurante.id, linkedIds, channelKey, orderFeed, loadPedidos])
 
   // ─── Wake-up: reconectar canales y recargar pedidos cuando la pestaña vuelve ───
   // Browsers throttle WebSockets + timers when a tab is hidden. When the tab
@@ -138,13 +186,16 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     if (linkedIds.length === 0) return
 
     const handleWakeUp = async () => {
-      if (document.hidden) return  // tab going to sleep – nothing to do
-
-      // 1. Refetch pedidos from DB (catch events missed while sleeping)
-      await loadPedidos(linkedIds)
-
-      // 2. Bump channelKey → React destroys + recreates the Supabase channel
-      setChannelKey(k => k + 1)
+      if (document.hidden || wakeInFlightRef.current) return
+      wakeInFlightRef.current = true
+      try {
+        // Refresh before the alarm effect evaluates pending orders. Restarting
+        // from stale local state here can ring for an order already accepted.
+        await loadPedidos(linkedIds)
+        setChannelKey(k => k + 1)
+      } finally {
+        wakeInFlightRef.current = false
+      }
     }
 
     document.addEventListener('visibilitychange', handleWakeUp)
@@ -154,27 +205,12 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
       document.removeEventListener('visibilitychange', handleWakeUp)
       window.removeEventListener('focus', handleWakeUp)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkedIds])
+  }, [linkedIds, loadPedidos])
 
-  const loadPedidos = async (ids: string[]) => {
-    const { data } = await supabase
-      .from('pedidos')
-      .select('*, restaurantes(nombre)')
-      .in('restaurante_id', ids)
-      // Solo mostramos pedidos activos en base al estado de la cocina
-      .in('estado_cocina', ['pendiente', 'en_cocina', 'listo_para_recoger'])
-      .neq('estado', 'pendiente_pago')
-      .order('created_at', { ascending: false })
-
-    if (data) setPedidos(data)
-    setLoading(false)
-  }
-
-  // ─── Alarma continua: título dinámico + sonido cada 4s ─────────────────────
+  // ─── Alarma continua mientras existan pedidos que cocina no ha aceptado ───
   const playBellSound = React.useCallback(() => {
     try {
-      const audioElement = document.getElementById('alarm-audio') as HTMLAudioElement;
+      const audioElement = audioRef.current;
       if (audioElement) {
         audioElement.currentTime = 0;
         const playPromise = audioElement.play();
@@ -187,73 +223,78 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     }
   }, [])
 
-  // Ref para el intervalo – permite reiniciarlo desde el wake-up handler
-  const alarmIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const startAlarm = React.useCallback(() => {
-    if (alarmIntervalRef.current) return  // ya está corriendo
-    playBellSound()
-    alarmIntervalRef.current = setInterval(() => {
-      playBellSound()
-    }, 4000)
-  }, [playBellSound])
-
-  const stopAlarm = React.useCallback(() => {
-    if (alarmIntervalRef.current) {
-      clearInterval(alarmIntervalRef.current)
-      alarmIntervalRef.current = null
-    }
+  const stopBellSound = React.useCallback(() => {
+    const audioElement = audioRef.current
+    if (!audioElement) return
+    audioElement.pause()
+    audioElement.currentTime = 0
   }, [])
 
+  const kitchenAlarm = useMemo(() => createKitchenAlarm(
+    playBellSound,
+    stopBellSound,
+    {
+      schedule: (callback, intervalMs) => window.setInterval(callback, intervalMs),
+      cancel: (handle) => window.clearInterval(handle),
+    },
+  ), [playBellSound, stopBellSound])
+
+  const startAlarm = React.useCallback(() => kitchenAlarm.start(), [kitchenAlarm])
+  const stopAlarm = React.useCallback(() => kitchenAlarm.stop(), [kitchenAlarm])
+
+  // The portal keeps this monitor mounted between tabs; dispose its timer/audio when the portal exits.
+  useEffect(() => () => {
+    kitchenAlarm.dispose()
+    if (previousTitleRef.current !== null) {
+      document.title = previousTitleRef.current
+      previousTitleRef.current = null
+    }
+  }, [kitchenAlarm])
+
   useEffect(() => {
-    const pendientes = pedidos.filter(p => p.estado_cocina === 'pendiente' || p.estado_cocina == null)
+    const pendientes = pedidos.filter(isAwaitingKitchenOrder)
 
     if (pendientes.length > 0) {
+      if (previousTitleRef.current === null) previousTitleRef.current = document.title
       document.title = `(${pendientes.length}) ¡NUEVO PEDIDO! 🔔`
       if (notifPermission === 'granted') startAlarm()
+      else stopAlarm()
     } else {
-      document.title = 'Estrella Restaurantes'
-      stopAlarm()
-    }
-
-    return () => {
-      // No detener la alarma en el cleanup: queremos que siga sonando
-      // aunque el efecto re-corra. stopAlarm() se llama cuando pendientes===0.
-    }
-  }, [pedidos, notifPermission, startAlarm, stopAlarm])
-
-  // Reiniciar alarma cuando la pestaña despierta (los setInterval se throttlean)
-  useEffect(() => {
-    const onWake = () => {
-      if (document.hidden) return
-      const pendientes = pedidos.filter(p => p.estado_cocina === 'pendiente' || p.estado_cocina == null)
-      if (pendientes.length > 0 && notifPermission === 'granted') {
-        stopAlarm()   // matar el intervalo viejo throttleado
-        startAlarm()  // arrancar uno nuevo limpio
+      if (previousTitleRef.current !== null) {
+        document.title = previousTitleRef.current
+        previousTitleRef.current = null
       }
-    }
-    document.addEventListener('visibilitychange', onWake)
-    window.addEventListener('focus', onWake)
-    return () => {
-      document.removeEventListener('visibilitychange', onWake)
-      window.removeEventListener('focus', onWake)
+      stopAlarm()
     }
   }, [pedidos, notifPermission, startAlarm, stopAlarm])
 
   // Enviar Notificación Push real al detectar nuevos pedidos (usando un listener al websocket)
   useEffect(() => {
-    if (!restaurante || linkedIds.length === 0) return
+    if (!restaurante.id || linkedIds.length === 0) return
     const channel = supabase
       .channel(`public:pedidos:notif:${restaurante.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `restaurante_id=in.(${linkedIds.join(',')})` },
-        () => {
+        { event: '*', schema: 'public', table: 'pedidos', filter: `restaurante_id=in.(${linkedIds.join(',')})` },
+        (payload) => {
+          // The portal-level listener handles the primary restaurant; this channel
+          // covers only linked branches so the owner never gets duplicate notices.
+          if (!shouldNotifyRestaurantOrder({
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old,
+          }, restaurante.id) || !isAwaitingKitchenOrder(payload.new)) return
           if (notifPermission === 'granted' && 'Notification' in window) {
-            new Notification('¡NUEVO PEDIDO!', {
-              body: `Tienes un nuevo pedido a las ${new Date().toLocaleTimeString()}. ¡Revísalo ahora!`,
+            const notification = new Notification('¡Nuevo pedido!', {
+              body: 'Hay una orden nueva para tu restaurante. Revisa el monitor de cocina.',
               icon: '/favicon.ico'
             })
+            notification.onclick = () => {
+              window.focus()
+              setActiveStage('new')
+              onOpenOrders?.()
+              notification.close()
+            }
           }
         }
       )
@@ -262,14 +303,14 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [restaurante.id, notifPermission, linkedIds])
+  }, [restaurante.id, notifPermission, linkedIds, onOpenOrders])
 
   // Desbloqueo de audio universal para Celulares/Tablets (iOS Safari / Chrome Android)
   // Los navegadores móviles bloquean el audio automático. Este truco lo "desbloquea"
   // de forma invisible en el primer toque a la pantalla.
   useEffect(() => {
     const unlockAudio = () => {
-      const audio = document.getElementById('alarm-audio') as HTMLAudioElement;
+      const audio = audioRef.current
       if (audio) {
         // Reproducir y pausar instantáneamente en silencio total
         const prevVolume = audio.volume;
@@ -303,10 +344,6 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
 
 
   const requestNotifications = async () => {
-    // Hacemos sonar el timbre de forma SÍNCRONA al momento del clic
-    // Esto garantiza que el navegador no bloquee el audio por ser una promesa asíncrona.
-    playBellSound()
-
     if ('Notification' in window) {
       const perm = await Notification.requestPermission()
       setNotifPermission(perm)
@@ -341,11 +378,9 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
       if (data.id !== id || data.estado_cocina !== nuevoEstado || typeof data.estado !== 'string' || typeof data.updated_at !== 'string') throw new Error('No se confirmó el cambio en cocina. Vuelve a consultar el pedido.');
       const updatedAt = Date.parse(data.updated_at);
       if (!Number.isFinite(updatedAt)) throw new Error('No se confirmó la fecha del cambio en cocina.');
-      setPedidos(previous => previous.map(order => {
-        if (order.id !== id) return order;
-        if (order.updated_at && Date.parse(order.updated_at) > updatedAt) return order;
-        return {...order, ...data};
-      }));
+      const updatedOrder = {...current, ...data}
+      orderFeed.apply(updatedOrder)
+      setPedidos(orderFeed.activeOrders())
       setPedidoToPrepare(null);
     } catch (error: unknown) {
       setKitchenError(error instanceof Error ? error.message : 'No se pudo actualizar el pedido.');
@@ -354,50 +389,66 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   };
 
   // Ahora las columnas se filtran reaccionando también al estado del repartidor (Global)
-  const pedidosActivos = pedidos.filter(p => p.estado !== 'cancelado')
+  const pedidosActivos = pedidos.filter(isActiveKitchenOrder)
   
-  const nuevos = pedidosActivos.filter(p => p.estado_cocina === 'pendiente' || p.estado_cocina == null)
+  const nuevos = pedidosActivos.filter(isAwaitingKitchenOrder)
   const enCocina = pedidosActivos.filter(p => p.estado_cocina === 'en_cocina')
   // Un pedido desaparece de Listos si el repartidor ya marcó "en_camino" (lo recogió) o si se entregó.
-  const listos = pedidosActivos.filter(p => p.estado_cocina === 'listo_para_recoger' && !['en_camino', 'entregado'].includes(p.estado))
+  const listos = pedidosActivos.filter(p => p.estado_cocina === 'listo_para_recoger' && !['en_camino', 'entregado'].includes(p.estado ?? ''))
 
   if (loading) {
     return <div className="p-8 text-slate-400">Cargando pedidos...</div>
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {kitchenError && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-800">{kitchenError}</p>}
+    <div className="kitchen-monitor">
+      {loadError && <p role="alert" className="kitchen-monitor__error">{loadError} <button type="button" onClick={() => void loadPedidos(linkedIds)}>Reintentar</button></p>}
+      {kitchenError && <p role="alert" className="kitchen-monitor__error">{kitchenError}</p>}
       {/* Audio oculto */}
-      <audio id="alarm-audio" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
+      <audio ref={audioRef} className="kitchen-monitor__audio" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
 
       {/* Barra superior */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <h3 className="text-base font-bold text-slate-700">Monitor de Cocina</h3>
-        <div className="flex items-center gap-2">
+      <div className="kitchen-monitor__toolbar">
+        <div>
+          <p className="kitchen-monitor__eyebrow">Operación en tiempo real</p>
+          <h3>Monitor de cocina</h3>
+        </div>
+        <div className="kitchen-monitor__tools">
           {notifPermission !== 'granted' && (
             <button
               onClick={requestNotifications}
-              className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg font-semibold hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+              className="kitchen-monitor__tool-button kitchen-monitor__tool-button--primary"
             >
-              <BellRing size={13} /> Activar alarma
+              <BellRing size={15} /> <span>Activar alarma</span>
             </button>
           )}
-          <button onClick={playBellSound} className="text-xs text-slate-400 flex items-center gap-1.5 hover:text-slate-600 transition-colors">
-            <BellRing size={13} /> Probar
+          <button onClick={playBellSound} className="kitchen-monitor__tool-button">
+            <BellRing size={15} /> <span>Probar sonido</span>
           </button>
         </div>
       </div>
 
+      <div className="kitchen-stage-tabs" role="group" aria-label="Etapas de pedidos">
+        <button type="button" aria-pressed={activeStage === 'new'} className={activeStage === 'new' ? 'is-active' : ''} onClick={() => setActiveStage('new')}>
+          Nuevos <span>{nuevos.length}</span>
+        </button>
+        <button type="button" aria-pressed={activeStage === 'cooking'} className={activeStage === 'cooking' ? 'is-active' : ''} onClick={() => setActiveStage('cooking')}>
+          En cocina <span>{enCocina.length}</span>
+        </button>
+        <button type="button" aria-pressed={activeStage === 'ready'} className={activeStage === 'ready' ? 'is-active' : ''} onClick={() => setActiveStage('ready')}>
+          Listos <span>{listos.length}</span>
+        </button>
+      </div>
+
       {/* Kanban: 3 columnas con altura fija y scroll interno */}
-      <div className="grid grid-cols-3 gap-3 flex-1 min-h-0">
+      <div className="kitchen-board">
 
         {/* ─── Nuevos ─── */}
         <KanbanCol
+          stage="new"
+          isActiveMobile={activeStage === 'new'}
           title="Nuevos"
           count={nuevos.length}
-          headerCls="text-blue-700 bg-blue-600"
-          colCls="border-blue-100 bg-blue-50/40"
         >
           <AnimatePresence>
             {nuevos.map(p => (
@@ -410,16 +461,16 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
                 isHighlighted={p.id === highlightedPedidoId}
               />
             ))}
-            {nuevos.length === 0 && <EmptyCol />}
+            {nuevos.length === 0 && <EmptyCol label="No hay pedidos nuevos" actionLabel={enCocina.length > 0 ? 'Ver en cocina' : listos.length > 0 ? 'Ver pedidos listos' : undefined} onAction={() => setActiveStage(enCocina.length > 0 ? 'cooking' : 'ready')} />}
           </AnimatePresence>
         </KanbanCol>
 
         {/* ─── En Cocina ─── */}
         <KanbanCol
+          stage="cooking"
+          isActiveMobile={activeStage === 'cooking'}
           title="En Cocina"
           count={enCocina.length}
-          headerCls="text-orange-700 bg-orange-500"
-          colCls="border-orange-100 bg-orange-50/30"
         >
           <AnimatePresence>
             {enCocina.map(p => (
@@ -432,16 +483,16 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
                 isHighlighted={p.id === highlightedPedidoId}
               />
             ))}
-            {enCocina.length === 0 && <EmptyCol />}
+            {enCocina.length === 0 && <EmptyCol label="Aún no hay pedidos en cocina" />}
           </AnimatePresence>
         </KanbanCol>
 
         {/* ─── Listos ─── */}
         <KanbanCol
+          stage="ready"
+          isActiveMobile={activeStage === 'ready'}
           title="Listos"
           count={listos.length}
-          headerCls="text-emerald-700 bg-emerald-500"
-          colCls="border-emerald-100 bg-emerald-50/30"
         >
           <AnimatePresence>
             {listos.map(p => {
@@ -456,7 +507,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
                 />
               )
             })}
-            {listos.length === 0 && <EmptyCol />}
+            {listos.length === 0 && <EmptyCol label="No hay pedidos listos" />}
           </AnimatePresence>
         </KanbanCol>
 
@@ -473,7 +524,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
               <button
                 key={mins}
                 onClick={() => { if (pedidoToPrepare) updateEstado(pedidoToPrepare.id, 'en_cocina', mins) }}
-                className="bg-white border-2 border-slate-100 hover:border-orange-400 hover:bg-orange-50 text-slate-700 hover:text-orange-600 font-black py-3 rounded-xl text-sm transition-all"
+                className="kitchen-time-choice"
               >
                 {mins} min
               </button>
@@ -486,25 +537,25 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
 }
 
 /* ─── Columna Kanban ─────────────────────────────────────── */
-function KanbanCol({ title, count, headerCls, colCls, children }: {
+function KanbanCol({ title, count, children, stage, isActiveMobile }: {
   title: string
   count: number
-  headerCls: string
-  colCls: string
   children: React.ReactNode
+  stage: 'new' | 'cooking' | 'ready'
+  isActiveMobile: boolean
 }) {
   return (
-    <div className={`flex flex-col rounded-xl border overflow-hidden ${colCls}`}>
+    <section className={`kitchen-board__column kitchen-board__column--${stage}${isActiveMobile ? ' is-active-mobile' : ''}`} aria-label={`${title}: ${count} pedidos`}>
       {/* Cabecera */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-white/60 border-b border-inherit shrink-0">
-        <span className="text-xs font-bold text-slate-700 flex-1 truncate">{title}</span>
-        <span className={`text-white text-[10px] font-black px-1.5 py-0.5 rounded-md ${headerCls}`}>{count}</span>
+      <div className="kitchen-board__column-heading">
+        <span>{title}</span>
+        <span className="kitchen-board__count">{count}</span>
       </div>
       {/* Scroll interno */}
-      <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-2 custom-scrollbar">
+      <div className="kitchen-board__orders">
         {children}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -543,7 +594,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
       
       const parts = line.split(/(\*[^*]+\*)/g);
       return (
-        <p key={idx} className="text-[13px] text-slate-700 leading-snug">
+        <p key={idx} className="kitchen-order-card__description-line leading-snug">
           {parts.map((part, i) => {
             if (part.startsWith('*') && part.endsWith('*')) {
               return <strong key={i} className="font-bold text-slate-900">{part.slice(1, -1)}</strong>;
@@ -562,45 +613,45 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
       layout
-      className={`group bg-white rounded-xl border shadow-sm hover:shadow-md overflow-hidden transition-all duration-300 ${
+      className={`kitchen-order-card group ${
         isHighlighted
-          ? 'border-orange-400 ring-4 ring-orange-400/20 shadow-orange-500/10'
-          : 'border-slate-200/60'
+          ? 'is-highlighted'
+          : ''
       }`}
     >
       {/* ── Header: folio + hora + total ── */}
-      <div className="flex items-center gap-2 px-3 pt-3 pb-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
+      <div className="kitchen-order-card__header">
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-black tracking-wider text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
+            <span className="kitchen-order-card__reference font-black tracking-wider bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
               #{pedido?.wb_message_id || pedido?.id?.replace(/-/g,'').slice(-5).toUpperCase() || '—'}
             </span>
-            <span className="text-[11px] font-semibold text-slate-400">{hora}</span>
+            <span className="kitchen-order-card__time font-semibold">{hora}</span>
           </div>
           {pedido.restaurantes?.nombre && (
-            <span className="text-[10px] font-bold text-indigo-500 truncate mt-0.5">
-              {pedido.restaurantes.nombre}
+            <span className="kitchen-order-card__restaurant font-bold truncate mt-0.5">
+              {pedido.restaurantes.nombre_sucursal || pedido.restaurantes.nombre}
             </span>
           )}
         </div>
         <div className="ml-auto flex flex-col items-end">
-          <span className="text-base font-black text-emerald-600">${pedido.total}</span>
+          <span className="kitchen-order-card__total">${pedido.total}</span>
         </div>
       </div>
 
       {/* ── Nombre cliente + estado repartidor ── */}
-      <div className="px-3 pt-2 pb-1.5 flex flex-col gap-1.5">
+      <div className="kitchen-order-card__customer-row">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <div className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-              <span className="text-[10px] text-orange-600 font-black">
+              <span className="kitchen-order-card__initial text-orange-600 font-black">
                 {(pedido.cliente_nombre || 'C').charAt(0).toUpperCase()}
               </span>
             </div>
-            <p className="text-[14px] font-bold text-slate-800 truncate">{pedido.cliente_nombre || 'Cliente Web'}</p>
+            <p className="kitchen-order-card__customer font-bold truncate">{pedido.cliente_nombre || 'Cliente Web'}</p>
           </div>
           {driverLabel && (
-            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full shrink-0">
+            <span className="kitchen-order-card__driver-label font-bold bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full shrink-0">
               {driverLabel}
             </span>
           )}
@@ -608,7 +659,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
       </div>
 
       {/* ── Detalles (WhatsApp Text o Items) ── */}
-      <div className="px-3 pb-2">
+      <div className="kitchen-order-card__details">
         {pedido.descripcion ? (
           <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-2.5 mt-1.5 shadow-inner">
             {renderMarkdown(pedido.descripcion)}
@@ -616,9 +667,9 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
         ) : items.length > 0 ? (
           <div className="space-y-1.5 mt-1.5">
             {items.map((item: any, idx: number) => (
-              <div key={idx} className="bg-slate-50 border border-slate-100 rounded-lg p-2 transition-colors hover:bg-slate-100">
-                <p className="text-[13px] font-bold text-slate-800 leading-snug">
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-orange-100 text-orange-600 text-[11px] mr-1.5">
+              <div key={idx} className="kitchen-order-card__item bg-slate-50 border border-slate-100 rounded-lg p-2 transition-colors hover:bg-slate-100">
+                <p className="kitchen-order-card__item-name font-bold leading-snug">
+                  <span className="kitchen-order-card__quantity inline-flex items-center justify-center w-5 h-5 rounded bg-orange-100 text-orange-600 mr-1.5">
                     {item.cantidad}x
                   </span>
                   {item.nombre}
@@ -626,7 +677,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
                 {item.opcionesSeleccionadas?.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1 ml-6.5">
                     {item.opcionesSeleccionadas.map((opc: any, i: number) => (
-                      <span key={i} className="text-[10px] font-medium text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
+                      <span key={i} className="kitchen-order-card__option font-medium text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-sm">
                         {opc.opcion}{opc.precio_extra > 0 ? ` +$${opc.precio_extra}` : ''}
                       </span>
                     ))}
@@ -642,7 +693,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
           <div className="mt-2.5 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-2 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></div>
-              <span className="text-[11px] font-bold tracking-wide text-orange-800 uppercase">PIN de Entrega</span>
+              <span className="kitchen-order-card__pin-label font-bold tracking-wide text-orange-800 uppercase">PIN de Entrega</span>
             </div>
             <span className="text-lg font-black text-orange-600 tracking-[0.25em] bg-white px-2 rounded-md shadow-sm border border-orange-100">{pedido.pickup_pin}</span>
           </div>
@@ -653,12 +704,12 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
       <div className="px-3 pb-3 pt-1">
         {onAction ? <ActionButton
           onClick={onAction}
-          className={`w-full py-2.5 rounded-xl font-bold text-[13px] text-white shadow-sm hover:shadow transition-all active:scale-[0.98] ${
+          className={`kitchen-order-card__action ${
             actionColor.includes('orange') 
-              ? 'bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500' 
+              ? 'kitchen-order-card__action--orange'
               : actionColor.includes('emerald')
-                ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-600 hover:to-emerald-500'
-                : 'bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-800 hover:to-slate-700'
+                ? 'kitchen-order-card__action--green'
+                : 'kitchen-order-card__action--dark'
           }`}
           loadingText="Procesando..."
         >
@@ -670,11 +721,12 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
 }
 
 /* ─── Estado vacío ───────────────────────────────────────── */
-function EmptyCol() {
+function EmptyCol({ label = 'Vacío', actionLabel, onAction }: { label?: string, actionLabel?: string, onAction?: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-8 opacity-40">
-      <Store size={20} className="text-slate-400 mb-1" />
-      <p className="text-[10px] font-medium text-slate-400">Vacío</p>
+    <div className="kitchen-board__empty">
+      <Store size={20} aria-hidden="true" />
+      <p className="kitchen-board__empty-label">{label}</p>
+      {actionLabel && onAction && <button className="kitchen-board__empty-action" onClick={onAction}>{actionLabel}</button>}
     </div>
   )
 }

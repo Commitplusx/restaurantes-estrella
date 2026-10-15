@@ -1,0 +1,30 @@
+.restaurant-branches { max-width:1120px; margin:0 auto; color:#1e1e20; }
+.restaurant-branches__heading { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; margin-bottom:28px; }
+.restaurant-branches h3 { font-size:clamp(22px,3vw,30px); line-height:1.2; font-weight:750; letter-spacing:-.025em; }
+.restaurant-branches__heading p { color:#62626b; max-width:58ch; margin-top:10px; font-size:15px; line-height:1.6; }
+.branch-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 15px; border:1px solid #dedee4; background:white; border-radius:12px; color:#29292e; font:inherit; font-size:14px; font-weight:650; text-decoration:none; white-space:nowrap; cursor:pointer; }
+.branch-button:hover { background:#f5f5f7; }.branch-button--primary { background:#202022; color:white; border-color:#202022; }.branch-button--primary:hover { background:#3a3a3d; }
+.branch-button:disabled { opacity:.55; cursor:wait; }
+.restaurant-branches :is(button,input,textarea,select):focus-visible { outline:3px solid #e74425; outline-offset:3px; }
+.restaurant-branches__error { display:flex; gap:10px; align-items:center; padding:16px; margin:16px 0; border:1px solid #efb8ae; background:#fff3ef; border-radius:12px; color:#962710; }
+.restaurant-branches__error button { min-height:44px; text-decoration:underline; margin-left:auto; }.restaurant-branches__notice { padding:14px 0; color:#14694e; }
+.branch-list { background:white; border:1px solid #e3e3e9; border-radius:16px; overflow:hidden; }
+.branch-row { display:flex; align-items:center; gap:20px; padding:24px; }.branch-row + .branch-row { border-top:1px solid #ebebef; }
+.branch-row__icon { display:grid; place-items:center; width:52px; height:52px; flex-shrink:0; border-radius:14px; color:#dc3d1b; background:#fff1eb; }
+.branch-row__copy { min-width:0; flex:1; }.branch-row__title { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.branch-row h4 { font-size:18px; font-weight:700; overflow-wrap:anywhere; }.branch-row__title span { font-size:12px; padding:3px 8px; background:#eeeef2; border-radius:6px; color:#62626b; }.branch-row__title span[data-active="true"] { color:#176448; background:#e8f6ee; }
+.branch-row small { color:#62626b; font-size:12px; }.branch-row p { display:flex; gap:7px; color:#62626b; font-size:14px; margin-top:6px; overflow-wrap:anywhere; }.branch-row p svg { flex-shrink:0; margin-top:2px; }.branch-row__actions { display:flex; gap:8px; flex-wrap:wrap; }
+.branch-list__empty { display:flex; align-items:center; gap:10px; padding:24px; color:#62626b; font-size:14px; }
+.branch-editor { background:white; border:1px solid #e3e3e9; border-radius:16px; padding:24px; margin-bottom:24px; }.branch-editor h4 { font-size:21px; font-weight:700; margin-bottom:20px; }
+.branch-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-bottom:18px; }.branch-editor__grid label { display:flex; flex-direction:column; gap:7px; font-size:14px; font-weight:600; }.branch-editor__wide { grid-column:1/-1; }
+.branch-editor :is(input:not([type="checkbox"]),textarea) { width:100%; min-width:0; min-height:46px; padding:11px 13px; border:1px solid #d8d8df; border-radius:10px; color:#222; background:#fafafc; font:inherit; font-weight:400; }.branch-editor input::placeholder { color:#76767e; }
+.branch-editor small,.branch-editor__hint { color:#62626b; font-size:13px; line-height:1.5; font-weight:400; }.branch-editor__check { display:flex; align-items:center; gap:10px; min-height:44px; margin-top:16px; font-size:14px; }.branch-editor__check input { width:18px; height:18px; accent-color:#e74425; }.branch-editor__hint { max-width:70ch; margin:8px 0 20px; }.branch-editor__actions { display:flex; justify-content:flex-end; gap:10px; }
+.portal-branch-picker { display:flex; align-items:center; gap:10px; max-width:100%; padding:0 0 20px; }.portal-branch-picker label { font-size:14px; font-weight:600; }.portal-branch-picker select { max-width:100%; min-width:0; min-height:44px; border:1px solid #dcdce3; padding:8px 12px; background:white; border-radius:10px; font:inherit; font-size:14px; }
+.branch-access { padding:24px; margin:20px 0; border:1px solid #dedee4; border-radius:16px; background:white; max-width:680px; }
+.branch-access header,.branch-access h4 { display:flex; align-items:center; gap:10px; }.branch-access header { justify-content:space-between; margin-bottom:14px; }.branch-access h4 { font-size:19px; font-weight:700; }
+.branch-access header button,.branch-access__password button { min-width:44px; height:44px; display:grid; place-items:center; flex-shrink:0; }
+.branch-access p { font-size:14px; color:#62626b; line-height:1.6; margin:12px 0; }.branch-access a { text-decoration:underline; text-underline-offset:3px; color:#25252a; }
+.branch-access label { display:block; margin:18px 0; font-size:14px; font-weight:600; }.branch-access input { display:block; margin-top:7px; width:100%; min-width:0; min-height:46px; border:1px solid #dedee4; background:#fafafc; border-radius:10px; padding:10px; font-size:16px; font-weight:400; }
+.branch-access__password { display:flex; align-items:center; gap:5px; }.branch-access__loading { display:flex; align-items:center; gap:10px; margin:16px 0; }
+@media(max-width:760px) { .restaurant-branches__heading { flex-direction:column; gap:16px; }.branch-row { flex-wrap:wrap; gap:12px; padding:18px; }.branch-row__actions { flex-basis:100%; }.branch-row__actions .branch-button:first-child { flex:1; }.branch-editor { padding:18px; }.portal-branch-picker { align-items:flex-start; flex-direction:column; }.portal-branch-picker select { width:100%; } }
+@media(max-width:480px) { .branch-editor__grid { grid-template-columns:minmax(0,1fr); }.branch-editor__actions .branch-button { flex:1; }.branch-row__icon { display:none; }.branch-button { white-space:normal; } }

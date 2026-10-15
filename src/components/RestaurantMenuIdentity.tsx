@@ -31,6 +31,7 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
       <div className="menu-identity-copy">
         <div className="menu-identity-title"><h1 id="restaurant-menu-title">{restaurant.nombre}</h1><span className="menu-open-state" data-open={open}>{open ? 'Abierto' : 'Cerrado'}</span></div>
         <p className="menu-restaurant-categories">{restaurant.categorias?.join(' · ') || 'Restaurante'}</p>
+        {(restaurant.matriz_id || hasBranches) && <p className="menu-restaurant-categories"><MapPin size={15} aria-hidden="true" /> {restaurant.nombre_sucursal || 'Sucursal principal'}</p>}
         {restaurant.descripcion_corta && <p className="menu-restaurant-description">{restaurant.descripcion_corta}</p>}
         <div className="menu-identity-meta">
           {opening && closing && <span><Clock size={16} aria-hidden="true" /> {opening} – {closing}</span>}

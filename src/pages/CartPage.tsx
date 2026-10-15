@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { cartRestaurantOrigin } from '../lib/restaurantBranches';
 import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { 
@@ -45,8 +46,8 @@ interface OpcionSeleccionada {
 interface Restaurante {
   id: string;
   nombre: string;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   activo: boolean;
   acepta_pago_online: boolean;
   maps_url: string;
@@ -100,6 +101,8 @@ export default function CartPage() {
 
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
   const [loading, setLoading] = useState(true);
+  const [restaurantError, setRestaurantError] = useState('');
+  const [restaurantRetry, setRestaurantRetry] = useState(0);
   
   const carrito = useCartStore(state => state.carrito as { item: CartItem, cantidad: number }[]);
   const _clearCart = useCartStore(state => state.clearCart);
@@ -238,31 +241,43 @@ export default function CartPage() {
 
   // Cargar info del restaurante
   useEffect(() => {
+    let current = true;
+    const controller = new AbortController();
     const loadRestaurante = async () => {
-      if (!id) return;
-      
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-      const orQuery = isUUID 
-        ? `id.eq.${id},slug.ilike.${id}` 
-        : `slug.ilike.${id}`;
-        
-      const { data, error } = await supabase.from('restaurantes')
-        .select('*')
-        .or(orQuery)
-        .limit(1)
-        .maybeSingle();
-
-      if (error) console.error("Error cargando restaurante:", error);
-
-      if (data) {
-        setRestaurante(data);
-      } else {
-        console.warn("No se encontró el restaurante con el ID/slug:", id);
-      }
-      setLoading(false);
+      setLoading(true); setRestaurantError('');
+      try {
+        if (!id) throw new Error('No encontramos el restaurante. Vuelve al menú para elegir uno.');
+        const cartOwner = cartRestaurantOrigin(useCartStore.getState().restaurantId, sessionStorage.getItem('est_carrito_restaurante'));
+        if (id === 'global') {
+          if (useCartStore.getState().carrito.length === 0) return;
+          if (!cartOwner) throw new Error('Este pedido viene de una versión anterior y no podemos identificar su sucursal. Empieza un pedido nuevo para confirmar el menú y los precios actuales.');
+          navigate(`/menu/${cartOwner}/carrito`, {replace:true});
+          return;
+        }
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        const query = supabase.from('restaurantes').select('id,nombre,nombre_sucursal,matriz_id,lat,lng,activo,foto_fachada_url');
+        const {data, error} = await query.eq(isUUID ? 'id' : 'slug', id).limit(1)
+          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).maybeSingle();
+        if (!current) return;
+        if (error) throw new Error('No pudimos cargar el restaurante. Revisa tu conexión e intenta de nuevo; tu carrito sigue aquí.');
+        const raw: unknown = data;
+        if (!raw || typeof raw !== 'object' || !('id' in raw) || typeof raw.id !== 'string' || !('nombre' in raw) || typeof raw.nombre !== 'string')
+          throw new Error('No encontramos el restaurante. Vuelve al menú para elegir uno.');
+        if (useCartStore.getState().carrito.length > 0 && cartOwner !== raw.id) throw new Error('Tu pedido pertenece a otra ubicación. Vuelve al menú de la sucursal donde lo empezaste.');
+        if (cartOwner === raw.id) useCartStore.getState().setRestaurantId(raw.id);
+        const branchName = 'nombre_sucursal' in raw && typeof raw.nombre_sucursal === 'string' ? raw.nombre_sucursal : '';
+        setRestaurante({id: raw.id, nombre: branchName ? `${raw.nombre} · ${branchName}` : raw.nombre,
+          lat: 'lat' in raw && typeof raw.lat === 'number' && Number.isFinite(raw.lat) ? raw.lat : null,
+          lng: 'lng' in raw && typeof raw.lng === 'number' && Number.isFinite(raw.lng) ? raw.lng : null,
+          activo: 'activo' in raw && raw.activo === true,
+          foto_fachada_url: 'foto_fachada_url' in raw && typeof raw.foto_fachada_url === 'string' ? raw.foto_fachada_url : '', maps_url: '', acepta_pago_online: false});
+      } catch (error: unknown) {
+        if (current) setRestaurantError(error instanceof Error ? error.message : 'No pudimos cargar el restaurante. Intenta de nuevo.');
+      } finally { if (current) setLoading(false); }
     };
-    loadRestaurante();
-  }, [id]);
+    void loadRestaurante();
+    return () => {current = false; controller.abort();};
+  }, [id, restaurantRetry, navigate]);
 
   // Only the current phone's successful lookup may activate its benefit.
   useEffect(() => {
@@ -629,6 +644,15 @@ export default function CartPage() {
     </div>
   );
 
+  if (restaurantError) return <div className="checkout-page"><main className="checkout-empty">
+    <h1>Tu carrito sigue aquí.</h1><p role="alert">{restaurantError}</p>
+    <button className="checkout-primary" onClick={() => setRestaurantRetry(value => value + 1)}>Volver a intentar</button>
+    <button className="checkout-primary" onClick={() => {
+      const origin = cartRestaurantOrigin(useCartStore.getState().restaurantId, sessionStorage.getItem('est_carrito_restaurante'));
+      if (origin) navigate(`/menu/${origin}`);
+      else { _clearCart(); navigate(id && id !== 'global' ? `/menu/${id}` : '/'); }
+    }}>Volver al menú</button>
+  </main></div>;
   // El carrito vacío conserva el mismo marco visual del checkout.
   if (carrito.length === 0) {
     const handleGoBack = () => {

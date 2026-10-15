@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { motion } from 'framer-motion';
-import { AlertCircle, ChevronLeft, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { AlertCircle, Loader2, LocateFixed, MapPin, Search, X, ArrowRight, Check } from 'lucide-react';
+import { applyEatsMapTheme } from '../lib/eatsMapTheme';
+import './EatsMap.css';
+import './DeliveryLocationPicker.css';
 import {
   AddressLookupError, canConfirmLocation, isDeliveryCoordinates, isPublicMapboxToken, requestAddresses,
 } from '../lib/deliveryLocation';
 import type { AddressResult, DeliveryCoordinates, DeliveryLocation, MapboxAddressConfig } from '../lib/deliveryLocation';
 
 interface Props {
+  purpose?: 'delivery' | 'restaurant';
   initialLocation: DeliveryLocation | null;
   restaurantLocation: DeliveryCoordinates | null;
   onConfirm: (location: DeliveryLocation) => void;
@@ -23,7 +27,9 @@ const hasToken = isPublicMapboxToken(config.accessToken);
 const canSearch = hasToken && config.permanentGeocoding;
 const defaultCenter: DeliveryCoordinates = { lat: 16.2516, lng: -92.1332 };
 
-export default function DeliveryLocationPicker({ initialLocation, restaurantLocation, onConfirm, onClose }: Props) {
+export default function DeliveryLocationPicker({ purpose = 'delivery', initialLocation, restaurantLocation, onConfirm, onClose }: Props) {
+  const isRestaurant = purpose === 'restaurant';
+  const reducedMotion = useReducedMotion();
   const [point, setPoint] = useState<DeliveryCoordinates | null>(initialLocation);
   const [address, setAddress] = useState(initialLocation?.address || '');
   const [query, setQuery] = useState('');
@@ -138,12 +144,15 @@ export default function DeliveryLocationPicker({ initialLocation, restaurantLoca
         dragRotate: false,
         touchPitch: false,
         attributionControl: true,
+        language: 'es',
+        locale: { 'NavigationControl.ZoomIn': 'Acercar mapa', 'NavigationControl.ZoomOut': 'Alejar mapa' },
       });
       mapRef.current = instance;
       instance.touchZoomRotate.disableRotation();
       instance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
       instance.on('load', () => {
         clearTimeout(timeout);
+        if (instance && !disposed && !failed) applyEatsMapTheme(instance);
         if (!disposed && !failed) setMapState('ready');
         instance?.resize();
       });
@@ -246,70 +255,54 @@ export default function DeliveryLocationPicker({ initialLocation, restaurantLoca
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] lg:bg-slate-900/60 lg:flex lg:items-center lg:justify-center"
+      className="delivery-location-overlay"
       onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
       <motion.div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="delivery-location-title" tabIndex={-1}
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-        className="fixed inset-0 h-[100dvh] bg-slate-100 flex flex-col outline-none lg:static lg:inset-auto lg:w-[960px] lg:h-[640px] lg:max-h-[90dvh] lg:rounded-3xl lg:overflow-hidden lg:shadow-2xl lg:flex-row">
-        <div className="flex-1 min-h-[180px] relative overflow-hidden">
-          <div ref={containerRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-label="Mapa del punto de entrega" />
-          <div className="lg:hidden absolute top-0 left-0 right-16 z-20 flex items-center gap-3 px-4 pt-[max(16px,env(safe-area-inset-top))] pb-4 pointer-events-none">
-            <button onClick={onClose} aria-label="Cerrar ubicación" className="pointer-events-auto w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-md focus-visible:ring-2 focus-visible:ring-blue-600">
-              <ChevronLeft size={22} className="text-slate-800" />
-            </button>
-            <span className="font-bold text-[17px] text-slate-900 bg-white/95 rounded-lg px-3 py-2">Elige tu ubicación</span>
-          </div>
+        initial={reducedMotion ? false : { y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={reducedMotion ? { opacity: 0 } : { y: 24, opacity: 0 }}
+        transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.16, 1, 0.3, 1] }} className="delivery-location-dialog">
+        <div className="delivery-location-map eats-map-surface">
+          <div ref={containerRef} className="delivery-location-canvas" aria-label={isRestaurant ? 'Mapa de la sucursal' : 'Mapa del punto de entrega'} />
+          <div className="delivery-map-heading"><MapPin size={17} aria-hidden="true" /><span>Elige dónde recibir tu pedido</span></div>
           {mapState === 'ready' && <>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none flex flex-col items-center" aria-hidden="true">
-              <div className="w-12 h-12 bg-[#1D4ED8] rounded-full flex items-center justify-center shadow-lg border-4 border-white"><MapPin size={24} className="text-white" /></div>
-              <div className="w-[3px] h-4 bg-[#1D4ED8] rounded-full -mt-0.5" />
-            </div>
-            {!point && <p className="absolute top-1/2 mt-6 left-1/2 -translate-x-1/2 bg-white text-slate-800 rounded-lg px-3 py-2 text-sm shadow-sm whitespace-nowrap pointer-events-none">Mueve el mapa hasta tu puerta</p>}
+            <div className="delivery-location-pin" aria-hidden="true"><span><MapPin size={27} /></span><i /><strong>{isRestaurant ? 'Tu sucursal' : 'Tu entrega'}</strong></div>
+            <p className="delivery-map-hint">{point ? (isRestaurant ? 'Revisa que el pin esté en la entrada del local' : 'Revisa que el pin esté justo en tu puerta') : 'Mueve el mapa o toca la ubicación exacta'}</p>
           </>}
-          {mapState !== 'ready' && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-100 px-8 text-center" role="status">
-            {mapState === 'loading' ? <><Loader2 className="animate-spin text-blue-700" size={32} /><p className="text-slate-700">Cargando el mapa…</p></>
-              : <><AlertCircle className="text-slate-600" size={28} /><p className="text-slate-800 font-semibold">El mapa no está disponible</p><p className="text-sm text-slate-600 max-w-xs">Puedes usar tu GPS y escribir la dirección de entrega.</p>
-                {mapState === 'failed' && <button onClick={() => { firstCenterRef.current = point || restaurantLocation || defaultCenter; setMapState('loading'); setMapAttempt(value => value + 1); }} className="min-h-11 px-4 font-semibold text-blue-700 underline focus-visible:ring-2 focus-visible:ring-blue-600">Reintentar mapa</button>}
+          {mapState !== 'ready' && <div className="delivery-map-message" role="status">
+            {mapState === 'loading' ? <><Loader2 className="delivery-spinner" size={30} /><h3>Cargando tu mapa…</h3><p>{isRestaurant ? 'Ubica la entrada de tu sucursal.' : 'Ubica la puerta donde recibirás tu pedido.'}</p></>
+              : <><AlertCircle size={30} /><h3>El mapa no está disponible</h3><p>Puedes usar tu GPS y escribir la dirección.</p>
+                {mapState === 'failed' && <button onClick={() => { firstCenterRef.current = point || restaurantLocation || defaultCenter; setMapState('loading'); setMapAttempt(value => value + 1); }}>Reintentar mapa</button>}
               </>}
           </div>}
-          <button onClick={locate} disabled={locating} aria-label="Usar mi ubicación GPS"
-            className="absolute bottom-12 right-4 z-20 w-12 h-12 bg-[#1D4ED8] text-white rounded-full shadow-lg flex items-center justify-center disabled:opacity-60 focus-visible:ring-4 focus-visible:ring-blue-300">
-            {locating ? <Loader2 size={22} className="animate-spin" /> : <LocateFixed size={22} />}
+          <button onClick={locate} disabled={locating} aria-label="Usar mi ubicación GPS" className="delivery-gps">
+            {locating ? <Loader2 size={19} className="delivery-spinner" /> : <LocateFixed size={19} />}<span>{locating ? 'Ubicando…' : 'Usar mi ubicación'}</span>
           </button>
         </div>
-        <div className="bg-white lg:w-[360px] rounded-t-3xl lg:rounded-none p-5 pb-[max(20px,env(safe-area-inset-bottom))] flex flex-col min-h-0 max-h-[62dvh] lg:max-h-none">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 id="delivery-location-title" className="font-bold text-lg text-slate-900">¿Dónde te lo entregamos?</h2>
-            <button onClick={onClose} aria-label="Cerrar selector de ubicación" className="w-11 h-11 shrink-0 bg-slate-100 rounded-full flex items-center justify-center focus-visible:ring-2 focus-visible:ring-blue-600"><X size={18} /></button>
-          </div>
-          <div className="overflow-y-auto min-h-0 flex-1 space-y-4 pr-1">
-            {canSearch && <div>
-              <label htmlFor="delivery-address-search" className="block text-sm font-semibold text-slate-800 mb-2">Buscar calle y número</label>
-              <form onSubmit={event => { event.preventDefault(); void lookup(); }} className="flex gap-2">
-                <input id="delivery-address-search" value={query} maxLength={256} placeholder="Ej. 1a Calle Sur, Comitán" autoComplete="off"
-                  onChange={event => { cancelRequests(); setQuery(event.target.value); setResults([]); setMessage(''); }}
-                  className="min-w-0 flex-1 rounded-xl bg-slate-100 px-3 py-3 text-base text-slate-900 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-600" />
-                <button type="submit" disabled={searching || query.trim().length < 3} aria-label="Buscar dirección" className="w-12 shrink-0 rounded-xl bg-blue-700 text-white flex items-center justify-center disabled:opacity-40 focus-visible:ring-4 focus-visible:ring-blue-300">
-                  {searching ? <Loader2 size={20} className="animate-spin" /> : <Search size={20} />}
-                </button>
+        <div className="delivery-location-panel">
+          <div className="delivery-location-heading"><h2 id="delivery-location-title">{isRestaurant ? 'Ubica tu sucursal' : <>¿Dónde te lo <br />entregamos?</>}</h2><button onClick={onClose} aria-label="Cerrar selector de ubicación" className="delivery-location-close"><X size={20} /></button></div>
+          <p className="delivery-location-intro">{isRestaurant ? 'Marca la entrada del local y escribe su dirección para que clientes y repartidores lo encuentren.' : 'Pon el pin en tu puerta y déjanos la dirección. Así será más fácil encontrarte.'}</p>
+          <div className="delivery-location-fields">
+            {canSearch && <div className="delivery-field">
+              <label htmlFor="delivery-address-search">Busca tu dirección</label>
+              <form onSubmit={event => { event.preventDefault(); void lookup(); }} className="delivery-search">
+                <Search size={18} aria-hidden="true" />
+                <input id="delivery-address-search" value={query} maxLength={256} placeholder="Calle, número o colonia" autoComplete="off"
+                  onChange={event => { cancelRequests(); setQuery(event.target.value); setResults([]); setMessage(''); }} />
+                <button type="submit" disabled={searching || query.trim().length < 3} aria-label="Buscar dirección">{searching ? <Loader2 size={19} className="delivery-spinner" /> : <ArrowRight size={19} />}</button>
               </form>
-              {results.length > 0 && <ul aria-label="Direcciones encontradas" className="mt-2 divide-y divide-slate-200">
-                {results.map(result => <li key={result.id}><button onClick={() => choosePoint(result, result.address)} className="text-left w-full min-h-12 py-3 text-sm text-slate-800 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-600">{result.address}</button></li>)}
+              {results.length > 0 && <ul aria-label="Direcciones encontradas" className="delivery-search-results">
+                {results.map(result => <li key={result.id}><button onClick={() => choosePoint(result, result.address)}><MapPin size={17} aria-hidden="true" /><span>{result.address}</span></button></li>)}
               </ul>}
             </div>}
-            <div>
-              <label htmlFor="delivery-street-address" className="block text-sm font-semibold text-slate-800 mb-2">Calle, número y colonia</label>
-              <textarea id="delivery-street-address" rows={2} value={address} maxLength={300} autoComplete="street-address" placeholder="Escribe la dirección de tu puerta"
-                onChange={event => { cancelRequests(); manualAddressRef.current = true; setAddress(event.target.value); setMessage(''); }}
-                className="w-full resize-none rounded-xl bg-slate-100 px-3 py-3 text-base text-slate-900 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-600" />
-              {canSearch && point && <button onClick={() => void lookup(true)} disabled={searching} className="min-h-11 text-sm font-semibold text-blue-700 underline disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-600">Consultar dirección del pin</button>}
+            <div className="delivery-field">
+              <label htmlFor="delivery-street-address">Calle, número y colonia</label>
+              <textarea id="delivery-street-address" rows={3} value={address} maxLength={300} autoComplete="street-address" placeholder="Ej. 1a Calle Sur #12, Centro"
+                onChange={event => { cancelRequests(); manualAddressRef.current = true; setAddress(event.target.value); setMessage(''); }} />
+              {canSearch && point && <button onClick={() => void lookup(true)} disabled={searching} className="delivery-pin-address"><MapPin size={15} />Usar la dirección de este pin</button>}
             </div>
-            <p className="text-sm text-slate-600">{point ? 'Revisa que el pin esté en tu puerta y que la dirección coincida.' : 'Toca el mapa, muévelo hasta tu puerta o usa el botón de GPS.'}</p>
-            {point && <p className="text-xs text-slate-500 tabular-nums">Punto seleccionado: {point.lat.toFixed(5)}, {point.lng.toFixed(5)}</p>}
-            {message && <p role="alert" className="text-sm text-red-700 leading-relaxed">{message}</p>}
+            <div className="delivery-point-state" data-selected={Boolean(point)}>{point ? <Check size={17} aria-hidden="true" /> : <MapPin size={17} aria-hidden="true" />}<span>{point ? 'Punto de entrega elegido. Revisa la dirección.' : 'Falta elegir tu punto en el mapa.'}</span></div>
+            {message && <p role="alert" className="delivery-location-error">{message}</p>}
           </div>
-          <button onClick={confirm} disabled={!canConfirmLocation(point, address) || searching || locating}
-            className="mt-4 w-full bg-[#1D4ED8] text-white min-h-14 py-4 rounded-xl font-bold text-base disabled:opacity-40 hover:bg-blue-700 transition-colors focus-visible:ring-4 focus-visible:ring-blue-300">Confirmar ubicación</button>
+          <div className="delivery-confirm-area"><button onClick={confirm} disabled={!canConfirmLocation(point, address) || searching || locating} className="delivery-location-confirm"><span>Confirmar ubicación</span><ArrowRight size={20} /></button></div>
         </div>
       </motion.div>
     </motion.div>
