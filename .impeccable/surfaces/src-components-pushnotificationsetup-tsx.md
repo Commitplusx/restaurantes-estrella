@@ -25,7 +25,7 @@ FORM: Extensión del estilo web solicitada por el usuario junto con la reparaci�
 
 SIGNATURE INTERACTION: Permiso nativo solicitado desde el clic antes del primer await. Progreso por fases con plazos, límite global de 45s, cancelación y promesas nativas compartidas durante reintentos. Un role=status persistente anuncia fase, error y éxito sin duplicar la copia visual. Reduced motion reduce la entrada y detiene el spinner.
 
-FINISH: Doce pruebas Deno tipadas, ESLint de módulos nuevos y build final aprobados. Activación real en localhost llegó al éxito; captura móvil de permiso pertenece a la vista DEV y solo prueba presentación. Finish reviewer devolvió ship después de corregir anuncio de éxito y capturas móviles. Sin envío push de prueba, entrega en teléfono, lector de pantalla físico ni Safari/iOS físico comprobados. Publicación pendiente de evidencia separada.
+FINISH: Doce pruebas Deno tipadas, ESLint de módulos nuevos y build final aprobados. Activación real en localhost llegó al éxito; captura móvil de permiso pertenece a la vista DEV y solo prueba presentación. Finish reviewer devolvió ship después de corregir anuncio de éxito y capturas móviles. Sin envío push de prueba, entrega en teléfono, lector de pantalla físico ni Safari/iOS físico comprobados. Publicado en main con commit funcional cd946f9, Vercel success y módulos del dominio verificados; recibo en la documentación enlazada.
 
 ## Runtime contract
 

@@ -8,11 +8,15 @@ Esta es una extensión ordinaria de la identidad observada: blanco, Outfit, tint
 
 | Superficie | Estado de esta entrega al documentar |
 | --- | --- |
-| Bienvenida, avisos de privacidad y activación push | Implementados y verificados localmente; publicación pendiente de evidencia separada |
+| Bienvenida, avisos de privacidad y activación push | Publicados en `main` y comprobados en los módulos de `estrella-eats.mx`; recibo abajo |
 | Supabase y servicio de envío push | Se utiliza el contrato existente de `push_subscriptions`; sin migración ni despliegue de backend en esta entrega |
 | Entrega de una notificación a un teléfono | No comprobada |
 
-Una compilación aprobada, una captura local o el permiso del navegador no prueban publicación ni entrega push. El recibo de commit, Vercel y dominio se añade cuando se confirme esa publicación.
+Una compilación aprobada, una captura local o el permiso del navegador no prueban publicación ni entrega push. El recibo siguiente acredita publicación del código; la activación real documentada abajo sigue siendo de localhost y no acredita recepción física.
+
+## Recibo de publicación
+
+El commit funcional `cd946f97d87634ba16e2400cb7e8f18dc72957ba` se subió a `main` de `Commitplusx/restaurantes-estrella`. GitHub/Vercel confirmó `success` para [7VQgNU3Nw22THqvwyEWKGWkVKxF4](https://vercel.com/deiffs-projects/restaurantes-estrella/7VQgNU3Nw22THqvwyEWKGWkVKxF4). A las `2026-10-16T15:35:04.135Z`, la lectura HTTPS sin caché de `https://estrella-eats.mx` devolvió `/assets/index-CwPca5Zf.js` y `PublicLandingPage-Ul6nW4as.js`, con bienvenida, estados de activación y sin rutas de vista previa DEV. Evidencia privada: `web-publication.json` y `public-ui-assets.json`. Un commit documental posterior puede cambiar los identificadores del bundle sin alterar el código funcional revisado.
 
 ## Uso y continuidad visual
 

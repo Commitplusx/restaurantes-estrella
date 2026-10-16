@@ -33,4 +33,4 @@ FINISH: Revisión local de 322×844, 1440×875 y geometría de 1024×600; sin ov
 
 Logo y foto son activos existentes reutilizados; el vídeo y los artes antiguos con texto dejan de intervenir. Imagen fallida muestra fallback de icono. `/bienvenida` es una ruta DEV que monta el componente real y permite reabrir; completar también cambia la preferencia local.
 
-Estado al cierre documental: local, publicación pendiente de evidencia separada. Contratos, capturas y límites: `docs/WELCOME_AND_NOTIFICATIONS_20261016.md`.
+Estado al cierre documental: publicado en `main` con el commit funcional `cd946f9`, Vercel success y módulos del dominio verificados. La prueba interactiva y las capturas son locales. Contratos, recibo y límites: `docs/WELCOME_AND_NOTIFICATIONS_20261016.md`.
