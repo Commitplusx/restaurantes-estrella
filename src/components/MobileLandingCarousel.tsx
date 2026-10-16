@@ -15,6 +15,7 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
   const carousel = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: carousel, offset: ['start end', 'end start'] });
   const photoY = useTransform(scrollYProgress, [0, 1], [-38, 38]);
+  const photoScale = useTransform(scrollYProgress, [0, 1], [1.015, 1.075]);
   const captionY = useTransform(scrollYProgress, [0, 1], [18, -22]);
   const gesture = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
@@ -81,7 +82,7 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
         }}>
         <div className="eats-carousel-track" style={{ transform: reducedMotion ? undefined : `translateX(-${activeIndex * 100}%)` }}>
           <div className="eats-carousel-slide" data-active={activeIndex === 0} role="group" aria-roledescription="diapositiva" aria-label={`1 de ${count}`} aria-hidden={activeIndex !== 0} inert={activeIndex !== 0}>
-            <motion.div className="eats-carousel-photo-plane" style={{ y: enabled ? photoY : 0 }}><ParallaxMedia depth={7}><img className="eats-carousel-table" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" draggable={false} /></ParallaxMedia></motion.div>
+            <motion.div className="eats-carousel-photo-plane" style={{ y: enabled ? photoY : 0, scale: enabled ? photoScale : 1 }}><ParallaxMedia depth={7} cinematic><img className="eats-carousel-table" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" draggable={false} /></ParallaxMedia></motion.div>
             <motion.div className="eats-photo-caption" style={{ y: enabled ? captionY : 0 }}><strong>¿Tacos o<br />hamburguesa?</strong></motion.div>
           </div>
           {banners.map((banner, position) => {

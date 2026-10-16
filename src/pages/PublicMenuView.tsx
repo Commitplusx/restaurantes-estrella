@@ -1531,7 +1531,7 @@ export function PublicMenuView() {
                 setOpeningCart(true);
               }}
             >
-              <span className="menu-cart-icon"><ShoppingBag size={22} aria-hidden="true" /><span className="menu-cart-count"><AnimatedCount value={cartCount} /></span></span>
+              <span className="menu-cart-icon" data-cart-motion-target><ShoppingBag size={22} aria-hidden="true" /><span className="menu-cart-count"><AnimatedCount value={cartCount} /></span></span>
               <span className="menu-cart-label"><strong>Ver mi pedido</strong><small>Productos · ${carrito.reduce((sum, entry) => sum + entry.item.precio * entry.cantidad, 0).toFixed(2)}</small></span>
               <ArrowRight size={20} aria-hidden="true" />
             </motion.button>

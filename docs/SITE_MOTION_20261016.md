@@ -4,7 +4,7 @@
 
 Ampliación local de la web cliente de Estrella Eats: tercer paso de bienvenida, profundidad de fotografía y transiciones de contenido en home, menú, carrito, selección de sucursal e información pública. Se conserva la identidad existente: blanco, Outfit, tinta, naranja Estrella, logo y fotografía actuales. No se añadieron activos, dependencias ni promesas comerciales; `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` conservan su alcance previo.
 
-Al cierre de la revisión local, el código está **sin commit y pendiente de publicación**, sobre `HEAD 3900976`, en `C:/Users/Kaleb/.codex/tmp/eats-branches-release-20261015`. El usuario autorizó publicar posteriormente; aún falta registrar el commit y el recibo verificado de GitHub/Vercel. La evidencia de este documento corresponde a localhost. No acredita despliegue en Vercel, staging o producción. No hubo cambios de SQL, runtime del worker, roles, WABA ni APK.
+La ampliación de scroll y ofertas revisada sobre `3900976` se publicó después en `main` con `85800f653c7223345264e1418a3440ec7a9cf0e2`. Vercel `EPPqApb5jAt18E6FQWJQmz8A3wSN` terminó en success; la comprobación del dominio a `2026-10-16T16:39:44Z` registró todos los controles true en `public-motion-assets.json`, incluidos `index-CCLydwut.js` y `PublicLandingPage-DlW5WVgh.js`. La extensión más reciente de los tres momentos descritos al final está **sin commit y pendiente de publicación**, sobre esa base, en `C:/Users/Kaleb/.codex/tmp/eats-branches-release-20261015`. Su publicación ya está autorizada, pero requiere su propio commit y recibo verificado. La evidencia interactiva es local; no hubo cambios de SQL, runtime del worker, roles, WABA ni APK.
 
 [WELCOME_AND_NOTIFICATIONS_20261016.md](WELCOME_AND_NOTIFICATIONS_20261016.md) conserva el recibo histórico del release funcional `cd946f9`: bienvenida de **dos** pasos y avisos publicados. Ese recibo no publica ni certifica la ampliación aquí descrita.
 
@@ -99,4 +99,28 @@ Capturas finales abiertas en `C:/Users/Kaleb/.codex/private-backups/promotion-ru
 - `pro-scroll-offers-desktop.png` — 1276×716.
 - `pro-scroll-offers-mobile.png` — 386×835.
 
-El detector de esta ampliación se ejecutó **una vez**, antes del fix del arte: `pro-scroll-detector.json`, código 0, con avisos orientativos de tokens. No se ejecutó de nuevo después de ese fix. La QA anterior de bienvenida de tres pasos y sus 27 pruebas conserva su alcance separado. No se crearon pedidos ni se ejecutaron OTP, push, cobros o escrituras reales. Esta revisión cierra el trabajo local; la publicación autorizada queda pendiente de su recibo verificable.
+El detector de esta ampliación se ejecutó **una vez**, antes del fix del arte: `pro-scroll-detector.json`, código 0, con avisos orientativos de tokens. No se ejecutó de nuevo después de ese fix. La QA anterior de bienvenida de tres pasos y sus 27 pruebas conserva su alcance separado. No se crearon pedidos ni se ejecutaron OTP, push, cobros o escrituras reales. La publicación posterior de esta ampliación se registra en «Alcance y estado»; ese recibo no cubre la extensión siguiente.
+
+## Extensión local posterior: fotografía, restaurante → menú y producto → carrito
+
+El usuario pidió más ideas de movimiento y autorizó implementar la recomendación de tres momentos: fotografía focal, continuidad de imagen entre restaurante y menú, y producto hacia el carrito. Es una extensión ordinaria de la misma identidad, sin cambios de SQL, API, dependencias ni activos. `PRODUCT.md`, `DESIGN.md`, su sidecar y el recibo histórico de bienvenida conservan su contenido y alcance; no se introducen reglas visuales globales.
+
+La fotografía del hero añade máscara focal y una opción cinematográfica en `ParallaxMedia`: giro por puntero acotado a 1.44 grados y escala por scroll de 1.015 a 1.09 en PC, o hasta 1.075 en móvil. El arte de las ofertas conserva su marco completo sin ese zoom.
+
+`SiteJourneyProvider.tsx`, `RestaurantMotionLink.tsx`, `lib/siteJourney.ts` y `hooks/useSiteJourney.ts` conectan la imagen del restaurante con la identidad real del menú de destino. El enlace navega inmediatamente y conserva clics con modificadores. La capa visual usa la imagen pública con `contain`; error o plazo de 1500ms cancelan la capa, sin cancelar la navegación.
+
+El vuelo de producto se dispara únicamente cuando aumenta la cantidad confirmada en la tarjeta. Abrir opciones no lo inicia. Usa la posición real del carrito en el DOM, recorre un arco de 620ms con límite superior de 12px, permite como máximo tres elementos visibles y vence a los 1200ms. Error, finalización y vencimiento limpian la capa. Los elementos decorativos son inert, `aria-hidden` y no reciben eventos del puntero. Movimiento reducido omite vuelos, escala y giro.
+
+Aprobaron el build y ESLint. Las **33 pruebas Deno con comprobación de tipos** aprobaron en dos ejecuciones separadas: las seis de `landingPromotions_test.ts` y las 27 de los cuatro archivos de regresión anteriores. Se usaron `--no-lock --unstable-sloppy-imports --config tests/deno.web.json`; la invocación combinada encontró un conflicto de tipado del grafo de módulos por extensión duplicada. Las ejecuciones separadas conservaron la comprobación de tipos y no añadieron supresiones. La integración de fuentes en el workspace original se comparó normalizando CRLF/LF y aprobó su build, preservando cambios ajenos; log privado `journey-original-build.log`. El detector `journey-detector.json` se ejecutó una vez y terminó con código 0.
+
+La QA interactiva final usó localhost en un origen distinto al del usuario. En PC, dos unidades de «4 piezas» a $95 dieron $190; abrir opciones generó cero vuelos, y confirmar «Pierna» a $50 dejó tres unidades/$240 y un vuelo. En móvil se verificaron cuatro unidades/$335; con movimiento reducido, cinco/$430 y cero vuelos. Al terminar había cero capas decorativas y el documento medía 386px dentro del viewport de 390px. Los productos de esa QA se retiraron desde el primer paso del checkout hasta vaciar su carrito; no se crearon pedidos ni se ejecutaron OTP, mensajes o cobros.
+
+La primera tentativa en el origen del usuario encontró un vencimiento de CDP ante una confirmación nativa existente y se abandonó esa pestaña. Esa tentativa no acredita cancelación verificada ni que el carrito del usuario haya quedado intacto; la QA final en el origen separado no resuelve esa limitación.
+
+Capturas finales abiertas en `C:/Users/Kaleb/.codex/private-backups/promotion-rules-20261016/`, revisadas en viewports nominales de PC 1440×900 y móvil 390×844 (las dimensiones del archivo pueden diferir):
+
+- `journey-home-desktop.png` y `journey-home-mobile.png`.
+- `journey-cart-desktop-flight.png` y `journey-cart-mobile-flight.png`.
+- `journey-menu-mobile.png` y `journey-restaurant-mobile-transition.png`.
+
+Una revisión nueva, `journey_motion_finish_review`, comparó las seis capturas y las fuentes finales y devolvió disposición **ship**, sin hallazgos que exigieran corrección. Su alcance son estos tres momentos y la evidencia local indicada; no demuestra FPS físicos ni cobertura de Safari/iOS en hardware. La extensión permanece pendiente del recibo de su publicación autorizada.

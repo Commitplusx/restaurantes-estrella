@@ -1,5 +1,11 @@
 .eats-parallax-media { position: relative; width: 100%; height: 100%; min-width: 0; }
 .eats-parallax-media-layer { width: 100%; height: 100%; }
+.eats-parallax-media[data-cinematic=true] { perspective: 900px; }
+.eats-parallax-media[data-cinematic=true] .eats-parallax-media-layer { transform-style: preserve-3d; }
+.eats-journey-layer { position: fixed; inset: 0; z-index: 90; pointer-events: none; overflow: hidden; }
+.eats-restaurant-journey { position: absolute; border-radius: 16px; overflow: hidden; background: #f5f5f7; transform-origin: center; box-shadow: 0 12px 32px #1d1d1f26; }
+.eats-product-journey { position: absolute; left: 0; top: 0; width: 72px; height: 72px; border-radius: 16px; overflow: hidden; background: white; box-shadow: 0 8px 24px #1d1d1f26; }
+.eats-journey-layer img { width: 100%; height: 100%; object-fit: contain; }
 .eats-parallax-media-layer > img { width: 100%; height: 100%; object-fit: inherit; }
 .desktop-restaurant-photo > .eats-parallax-media { position: absolute; inset: 0; }
 .desktop-restaurant-photo .eats-parallax-media-layer > img { object-fit: contain; padding: 10px; }

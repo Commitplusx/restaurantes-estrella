@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useId, type MouseEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { RestaurantMotionLink } from './RestaurantMotionLink';
 import { motion } from 'framer-motion';
 import { Heart, ChevronLeft, ChevronRight, Store } from 'lucide-react';
 import './desktopRestaurantList.css';
@@ -64,7 +64,7 @@ function DesktopRestaurantCard({
 
   return (
     <article className="desktop-restaurant-card" data-open={isAbierto}>
-    <Link to={`/menu/${res.slug || res.id}`} className="desktop-restaurant-link" aria-label={`Ver menú de ${res.nombre}`}>
+    <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url} to={`/menu/${res.slug || res.id}`} className="desktop-restaurant-link" aria-label={`Ver menú de ${res.nombre}`}>
       {/* Foto */}
       <div className="desktop-restaurant-photo">
         {res.foto_fachada_url && res.foto_fachada_url !== failedImage ? (
@@ -112,7 +112,7 @@ function DesktopRestaurantCard({
           4.8
         </span>
       </div>
-    </Link>
+    </RestaurantMotionLink>
     <button type="button" className="desktop-restaurant-favorite" aria-pressed={isFav}
       aria-label={`${isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}: ${res.nombre}`}
       onClick={event => toggleFav(event, res.id)}>

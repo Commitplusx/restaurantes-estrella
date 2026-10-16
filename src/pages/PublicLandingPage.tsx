@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } fr
 import { supabase } from '../lib/supabase'
 import { groupLandingPromotions, parseLandingPromotions, type LandingPromotion } from '../lib/landingPromotions';
 import { ParallaxMedia, ScrollDepthGroup, ScrollLayer } from '../components/ParallaxMedia';
+import { RestaurantMotionLink } from '../components/RestaurantMotionLink';
 import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { animate, motion, AnimatePresence } from 'framer-motion'
@@ -86,7 +87,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
   // Si horizontal es true (scroll lateral), mostramos diseño de Tarjeta (Bloque Vertical)
   if (horizontal) {
     return (
-      <Link to={`/menu/${res.slug || res.id}`} className="eats-mobile-row-card flex flex-col group relative bg-white rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-slate-100/60 transition-all duration-300 w-[150px] sm:w-[180px] md:w-full outline-none overflow-hidden hover:-translate-y-0.5">
+      <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url} to={`/menu/${res.slug || res.id}`} className="eats-mobile-row-card flex flex-col group relative bg-white rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-slate-100/60 transition-all duration-300 w-[150px] sm:w-[180px] md:w-full outline-none overflow-hidden hover:-translate-y-0.5">
          <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden isolate">
             {res.foto_fachada_url ? (
               <>
@@ -124,14 +125,14 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
                </div>
             </div>
          </div>
-      </Link>
+      </RestaurantMotionLink>
     )
   }
 
   // Si horizontal es false (lista vertical), mostramos layout List-Item en Móvil, y Grid Card en Desktop
   return (
     <ScrollLayer distance={26} tilt={.35}>
-    <Link to={`/menu/${res.slug || res.id}`} className="eats-mobile-restaurant-card group relative flex md:flex-col items-center md:items-start bg-white rounded-2xl md:rounded-[22px] p-3 md:p-0 shadow-[0_2px_16px_rgba(0,0,0,0.05)] md:shadow-[0_4px_24px_rgba(0,0,0,0.07)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-100/70 gap-3 transition-all duration-300 outline-none w-full md:hover:-translate-y-1 overflow-hidden">
+    <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url} to={`/menu/${res.slug || res.id}`} className="eats-mobile-restaurant-card group relative flex md:flex-col items-center md:items-start bg-white rounded-2xl md:rounded-[22px] p-3 md:p-0 shadow-[0_2px_16px_rgba(0,0,0,0.05)] md:shadow-[0_4px_24px_rgba(0,0,0,0.07)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-100/70 gap-3 transition-all duration-300 outline-none w-full md:hover:-translate-y-1 overflow-hidden">
        
        {/* Imagen a la izquierda en móvil, arriba en desktop */}
        <div className="relative shrink-0 w-[72px] h-[72px] md:w-full md:aspect-[16/9] md:h-auto rounded-[12px] md:rounded-none overflow-hidden bg-slate-100 isolate">
@@ -218,7 +219,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
             </motion.div>
           </motion.button>
        </div>
-    </Link>
+    </RestaurantMotionLink>
     </ScrollLayer>
   )
 }

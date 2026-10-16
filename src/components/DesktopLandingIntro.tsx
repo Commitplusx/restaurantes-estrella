@@ -60,6 +60,7 @@ export function DesktopLandingHero({ onExplore, deliveryType, banners }: Desktop
   const { enabled } = useSiteMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start 15%', 'end start'] });
   const photoY = useTransform(scrollYProgress, [0, 1], [-54, 54]);
+  const photoScale = useTransform(scrollYProgress, [0, 1], [1.015, 1.09]);
   const copyY = useTransform(scrollYProgress, [0, 1], [0, -60]);
   const captionY = useTransform(scrollYProgress, [0, 1], [0, -76]);
   const sealY = useTransform(scrollYProgress, [0, 1], [0, -95]);
@@ -80,9 +81,9 @@ export function DesktopLandingHero({ onExplore, deliveryType, banners }: Desktop
       </motion.div>
       <div className="eats-hero-visual">
         {isDesktop ? <>
-        <div className="eats-hero-photo-depth"><motion.div className="eats-hero-photo-plane" style={{ y: enabled ? photoY : 0 }}><ParallaxMedia depth={12}>
+        <motion.div className="eats-hero-photo-depth" initial={enabled ? { clipPath: 'inset(5% 0 0 8% round 24px)' } : false} animate={{ clipPath: 'inset(0% 0 0 0% round 24px)' }} transition={{ duration: .8, ease: [.16, 1, .3, 1] }}><motion.div className="eats-hero-photo-plane" style={{ y: enabled ? photoY : 0, scale: enabled ? photoScale : 1 }}><ParallaxMedia depth={12} cinematic>
           <img className="eats-hero-photo" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" />
-        </ParallaxMedia></motion.div></div>
+        </ParallaxMedia></motion.div></motion.div>
         <motion.div className="eats-photo-caption" style={{ y: enabled ? captionY : 0, rotate: -3 }}><span>¿QUÉ VAS A PEDIR?</span><strong>¿Tacos o<br />hamburguesa?</strong><ArrowDown size={23} aria-hidden="true" /></motion.div>
         <motion.div className="eats-local-seal" style={{ y: enabled ? sealY : 0, rotate: enabled ? sealRotate : 12 }} aria-hidden="true"><svg viewBox="0 0 100 100"><defs><path id="eats-seal-path" d="M50 50m-35 0a35 35 0 1 1 70 0a35 35 0 1 1-70 0" /></defs><text><textPath href="#eats-seal-path">COMITÁN · ESTRELLA EATS · </textPath></text></svg><span>✦</span></motion.div>
         </> : <MobileLandingCarousel banners={banners} />}

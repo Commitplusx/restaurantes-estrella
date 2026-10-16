@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Clock, MapPin, Store, ChevronDown } from 'lucide-react';
 import type { Restaurante, HorariosRestaurante } from '../lib/supabase';
 import { motion } from 'framer-motion';
 import { useSiteMotion } from '../hooks/useSiteMotion';
 import { SITE_EASE } from '../lib/siteMotion';
+import { useSiteJourney } from '../hooks/useSiteJourney';
+import { visibleJourneyBounds } from '../lib/siteJourney';
 
 const weekdays: (keyof HorariosRestaurante)[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
@@ -15,6 +17,12 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
 }) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const { enabled } = useSiteMotion();
+  const { arriveRestaurant, incomingRestaurantId } = useSiteJourney();
+  const identityImage = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const bounds = identityImage.current && visibleJourneyBounds(identityImage.current);
+    if (bounds) arriveRestaurant(restaurant.id, bounds);
+  }, [restaurant.id, arriveRestaurant]);
   const image = restaurant.logo_url || restaurant.foto_fachada_url;
   const today = restaurant.horarios?.[weekdays[new Date().getDay()]];
   const opening = today?.activo ? today.abre : restaurant.hora_apertura?.slice(0, 5);
@@ -28,8 +36,8 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
     ? restaurant.direccion : 'Ver ubicación';
 
   return (
-    <motion.section key={restaurant.id} className="menu-identity" aria-labelledby="restaurant-menu-title" initial={{ opacity: .55, x: enabled ? 24 : 0 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: enabled ? .45 : .1, ease: SITE_EASE }}>
-      <div className="menu-identity-image">
+    <motion.section key={restaurant.id} className="menu-identity" aria-labelledby="restaurant-menu-title" initial={{ opacity: incomingRestaurantId === restaurant.id ? 1 : .55, x: enabled && incomingRestaurantId !== restaurant.id ? 24 : 0 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: enabled ? .45 : .1, ease: SITE_EASE }}>
+      <div ref={identityImage} className="menu-identity-image">
         {image && failedImage !== image ? <img src={image} alt="" onError={() => setFailedImage(image)} /> : <Store size={32} aria-hidden="true" />}
       </div>
       <div className="menu-identity-copy">

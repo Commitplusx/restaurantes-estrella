@@ -4,8 +4,8 @@ import { useSiteMotion } from '../hooks/useSiteMotion';
 import { ScrollDepthContext } from '../lib/scrollDepth';
 
 /** Only the visual layer moves; its parent link/button remains a stable target. */
-export function ParallaxMedia({ children, className = '', depth = 6, foreground }: {
-  children: ReactNode; className?: string; depth?: number; foreground?: ReactNode;
+export function ParallaxMedia({ children, className = '', depth = 6, foreground, cinematic = false }: {
+  children: ReactNode; className?: string; depth?: number; foreground?: ReactNode; cinematic?: boolean;
 }) {
   const { enabled } = useSiteMotion();
   const pointerX = useMotionValue(0), pointerY = useMotionValue(0);
@@ -17,6 +17,8 @@ export function ParallaxMedia({ children, className = '', depth = 6, foreground 
   const mediaY = useTransform(() => y.get() + (Math.max(0, Math.min(1, progress.get())) - .5) * 2 * (group?.distance ?? 0));
   const foregroundX = useTransform(x, value => value * -.5);
   const foregroundY = useTransform(mediaY, value => value * -.5);
+  const rotateX = useTransform(y, value => value * -.12);
+  const rotateY = useTransform(x, value => value * .12);
   const move = (event: PointerEvent<HTMLDivElement>) => {
     if (!enabled || event.pointerType !== 'mouse') return;
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -24,8 +26,8 @@ export function ParallaxMedia({ children, className = '', depth = 6, foreground 
     pointerY.set(Math.max(-depth, Math.min(depth, ((event.clientY - bounds.top) / bounds.height * 2 - 1) * depth)));
   };
   const reset = () => { pointerX.set(0); pointerY.set(0); };
-  return <div className={`eats-parallax-media ${className}`} onPointerMove={move} onPointerLeave={reset}>
-    <motion.div className="eats-parallax-media-layer" style={{ x: enabled ? x : 0, y: enabled ? mediaY : 0 }}>{children}</motion.div>
+  return <div className={`eats-parallax-media ${className}`} data-cinematic={cinematic || undefined} onPointerMove={move} onPointerLeave={reset}>
+    <motion.div className="eats-parallax-media-layer" style={{ x: enabled ? x : 0, y: enabled ? mediaY : 0, rotateX: enabled && cinematic ? rotateX : 0, rotateY: enabled && cinematic ? rotateY : 0 }}>{children}</motion.div>
     {foreground && <motion.div className="eats-parallax-foreground" style={{ x: enabled ? foregroundX : 0, y: enabled ? foregroundY : 0 }}>{foreground}</motion.div>}
   </div>;
 }
