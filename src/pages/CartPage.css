@@ -165,3 +165,12 @@
   .checkout-page *, .checkout-page *::before, .checkout-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .checkout-page .checkout-confetti { display: none; }
 }
+.checkout-promotion-rules { display: flex; align-items: flex-start; gap: 12px; padding: 20px; margin-bottom: 24px; background: #fff4ed; border-radius: 14px; color: #9b2e10; overflow-wrap: anywhere; }
+.checkout-promotion-rules > svg { flex-shrink: 0; margin-top: 3px; }
+.checkout-promotion-rules h2 { font-size: 16px; margin: 0 0 8px; font-weight: 750; }
+.checkout-promotion-rules p, .checkout-promotion-rules li { font-size: 13px; line-height: 1.6; }
+.checkout-promotion-rules ul { list-style: none; margin: 12px 0; padding: 0; }
+.checkout-promotion-rules li + li { margin-top: 8px; }
+.checkout-promotion-rules li strong, .checkout-promotion-rules li span { display: block; }
+.checkout-promotion-rules button { display: inline-block; text-align: left; min-height: 44px; margin: 10px 16px 0 0; text-decoration: underline; text-underline-offset: 4px; font-size: 13px; font-weight: 700; }
+.checkout-promotion-rules button:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 4px; }

@@ -15,6 +15,7 @@ import type { DeliveryCoordinates, DeliveryLocation } from '../lib/deliveryLocat
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation';
 import { useCheckoutLoyalty } from '../hooks/useCheckoutLoyalty';
 import { useFirstDeliveryCoupon } from '../hooks/useFirstDeliveryCoupon';
+import { checkPromotionEligibility, usePromotionEligibility } from '../hooks/usePromotionEligibility';
 import { firstDeliverySaving, isFirstDeliveryCode } from '../lib/firstDeliveryCoupon';
 import { ACTIVE_ORDER_STATES } from '../utils/orderState';
 import { CheckoutHeader, CheckoutAction } from '../components/CheckoutChrome';
@@ -121,6 +122,8 @@ export default function CartPage() {
 
   const tipoEntrega = useCartStore(state => state.tipoEntrega);
   const setTipoEntrega = useCartStore(state => state.setTipoEntrega);
+  const promotionIds = carrito.filter(line => line.item.tipo === 'promo').map(line => line.item.id);
+  const promotionEligibility = usePromotionEligibility(restaurante?.id, promotionIds, tipoEntrega);
   
   const direccionEntrega = useCartStore(state => state.direccionEntrega);
   const setDireccionEntrega = useCartStore(state => state.setDireccionEntrega);
@@ -598,6 +601,12 @@ export default function CartPage() {
         return;
       }
       if (tipoEntrega === 'domicilio' && (!canConfirmLocation(ubicacionGPS, direccionEntrega) || fueraDeCobertura || calculandoEnvio)) throw new Error('Confirma una dirección y ubicación dentro de la cobertura y espera la cotización.');
+      if (!tipoEntrega || !restaurante) throw new Error('Elige cómo recibir tu pedido.');
+      const promotionIssues = await checkPromotionEligibility(restaurante.id, promotionIds, tipoEntrega);
+      if (promotionIssues.length) {
+        promotionEligibility.retry();
+        throw new Error(promotionIssues.map(issue => `${issue.title}: ${issue.message}`).join(' '));
+      }
       const payload = generarPayloadPedido();
       pendingCheckoutRef.current = {payload, carrito: structuredClone(carrito)};
       const data = await checkoutRequest({action: 'request-client-otp', telefono: phone, idempotency_key: payload.idempotency_key});
@@ -722,6 +731,7 @@ export default function CartPage() {
   const getBotonText = () => {
     if (checkoutStep === 1) return 'Continuar con la entrega';
     if (checkoutStep === 2) {
+      if (promotionEligibility.blocked) return promotionEligibility.status === 'loading' ? 'Revisando promociones...' : 'Revisa tus promociones';
       if (checkingLoyalty) return 'Verificando...';
       if (!clienteNombre.trim() || clienteTel.replace(/\D/g, '').length !== 10) return 'Faltan tus datos';
       if (!tipoEntrega) return 'Elige cómo recibirlo';
@@ -729,6 +739,7 @@ export default function CartPage() {
       return 'Continuar al pago';
     }
     if (checkoutStep === 3) {
+      if (promotionEligibility.blocked) return promotionEligibility.status === 'loading' ? 'Revisando promociones...' : 'Revisa tus promociones';
       if (!metodoPago) return 'Selecciona cómo pagar';
       if (metodoPago === 'efectivo' && (!montoEfectivo || parseFloat(montoEfectivo) < total)) return 'Indica con cuánto pagas';
       return procesando ? 'Enviando código...' : 'Verificar y pedir';
@@ -741,11 +752,11 @@ export default function CartPage() {
     if (checkoutStep === 2) {
       const datosValidos = clienteTel.replace(/\D/g, '').length === 10 && clienteNombre.trim().length > 0;
       const entregaValida = tipoEntrega === 'tienda' || (tipoEntrega === 'domicilio' && canConfirmLocation(ubicacionGPS, direccionEntrega) && !fueraDeCobertura && !calculandoEnvio);
-      return datosValidos && entregaValida;
+      return datosValidos && entregaValida && !promotionEligibility.blocked;
     }
     if (checkoutStep === 3) {
       const pagoValido = metodoPago !== null && (metodoPago !== 'efectivo' || parseFloat(montoEfectivo || '0') >= total);
-      return pagoValido && entregaConfirmada && clienteNombre.trim().length > 0 && /^\d{10}$/.test(clienteTel.replace(/\D/g, ''));
+      return pagoValido && entregaConfirmada && !promotionEligibility.blocked && clienteNombre.trim().length > 0 && /^\d{10}$/.test(clienteTel.replace(/\D/g, ''));
     }
     return false;
   };
@@ -771,6 +782,11 @@ export default function CartPage() {
     if (checkoutStep === 3) { handlePedir(); return; }
     setTelError(false);
     if (checkoutStep === 2 && !isStepValid()) {
+      if (promotionEligibility.blocked) {
+        showToast('Revisa tus promociones', promotionEligibility.message || promotionEligibility.issues[0]?.message || 'Estamos comprobando las reglas. Espera un momento.', 'error');
+        document.getElementById('promotion-cart-rules')?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+        return;
+      }
       const invalidContact = clienteTel.replace(/\D/g, '').length !== 10 || !clienteNombre.trim();
       setTelError(clienteTel.replace(/\D/g, '').length !== 10);
       showToast('Revisa tu pedido', invalidContact ? 'Completa tu nombre y teléfono.' : 'Confirma una dirección dentro de cobertura y espera la cotización.', 'error');
@@ -804,6 +820,24 @@ export default function CartPage() {
 
           {/* LEFT COLUMN — checkout steps */}
           <div className="checkout-content">
+          {promotionIds.length > 0 && promotionEligibility.blocked && (
+            <section id="promotion-cart-rules" className="checkout-promotion-rules" aria-live="polite" aria-label="Reglas de tus promociones">
+              <Tag size={20} aria-hidden="true" />
+              <div>
+                <h2>{promotionEligibility.status === 'loading' ? 'Estamos revisando tus promociones' : 'Tu promoción tiene condiciones'}</h2>
+                {promotionEligibility.status === 'error' ? <><p>{promotionEligibility.message}</p><button type="button" onClick={promotionEligibility.retry}>Volver a comprobar</button></>
+                  : promotionEligibility.status === 'loading' ? <p>Comprobamos la modalidad y la vigencia antes de continuar.</p>
+                  : <><ul>{promotionEligibility.issues.map(issue => <li key={issue.id}><strong>{issue.title}</strong><span>{issue.message}</span></li>)}</ul>
+                    <p>Puedes cambiar la entrega abajo o quitar estas promociones. Conservaremos el resto de tu pedido.</p>
+                    <button type="button" onClick={() => {
+                      const invalidIds = new Set(promotionEligibility.issues.map(issue => issue.id));
+                      useCartStore.setState(state => ({ carrito: state.carrito.filter(line => line.item.tipo !== 'promo' || !invalidIds.has(line.item.id)) }));
+                    }}>Quitar promociones que no aplican</button>
+                    {checkoutStep !== 2 && <button type="button" onClick={() => changeStep(2, checkoutStep > 2 ? -1 : 1)}>Cambiar entrega</button>}
+                  </>}
+              </div>
+            </section>
+          )}
           <div className="checkout-step-viewport">
           <AnimatePresence mode="wait" initial={false} custom={stepDirection} onExitComplete={handleStepExited}>
           <CheckoutStepScene key={checkoutStep} step={checkoutStep} direction={stepDirection} onEntered={handleStepEntered}>

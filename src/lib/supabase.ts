@@ -78,6 +78,7 @@ export interface MenuPromocion {
   activa: boolean
   aplica_subsidio?: boolean
   dias_aplicacion?: string[]
+  tipos_pedido?: ('tienda' | 'domicilio')[]
   opciones?: OpcionGrupo[]
 }
 

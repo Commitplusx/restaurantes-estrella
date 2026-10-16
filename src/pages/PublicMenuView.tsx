@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 import MenuProductCard from '../components/MenuProductCard';
+import { promotionDeliveryLabel } from '../lib/promotionRules';
 import RestaurantMenuIdentity from '../components/RestaurantMenuIdentity';
 import RestaurantBranchPicker from '../components/RestaurantBranchPicker';
 import { useRestaurantFamily } from '../hooks/useRestaurantFamily';
@@ -1405,7 +1406,7 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.24, delay: Math.min(index * 0.03, 0.12), ease: [.22, 1, .36, 1] }}
                     >
-                      <MenuProductCard name={promo.titulo} description={promo.descripcion} price={promo.precio_especial} image={promo.foto_url} badge="Promoción"
+                      <MenuProductCard name={promo.titulo} description={promo.descripcion} price={promo.precio_especial} image={promo.foto_url} badge={promo.tipos_pedido?.length === 1 ? promotionDeliveryLabel(promo.tipos_pedido) : 'Promoción'}
                         quantity={carrito.filter(entry => entry.item.id === promo.id && entry.item.tipo === 'promo').reduce((sum, entry) => sum + entry.cantidad, 0)}
                         customizable={Boolean(promo.opciones?.length)}
                         onDetails={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo' })}

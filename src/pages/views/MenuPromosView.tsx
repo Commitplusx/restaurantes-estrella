@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag, Settings2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, Calendar, Image as ImageIcon, Loader2, Tag, Settings2, Store, Bike, Check } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BottomSheet } from '../../components/BottomSheet'
 import { OpcionesEditor } from '../../components/OpcionesEditor'
 import { supabase, subirFoto } from '../../lib/supabase'
 import type { Restaurante, MenuPromocion } from '../../lib/supabase'
 import { parseMenuOptionProducts, validateOptionGroups, type MenuOptionProduct } from '../../lib/menuOptions'
+import { PROMOTION_DELIVERIES, promotionDeliveries, promotionDeliveryLabel } from '../../lib/promotionRules'
+import './MenuPromosView.css'
 
 const DIAS_SEMANA = [
   { id: 'lun', label: 'Lun' },
@@ -101,9 +103,9 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
 
   const handleOpenModal = (item?: MenuPromocion) => {
     if (item) {
-      setEditingItem(item)
+      setEditingItem({ ...item, tipos_pedido: item.tipos_pedido ?? [...PROMOTION_DELIVERIES] })
     } else {
-      setEditingItem({ restaurante_id: restaurante.id, activa: true, aplica_subsidio: false, dias_aplicacion: DIAS_SEMANA.map(d => d.id) })
+      setEditingItem({ restaurante_id: restaurante.id, activa: true, aplica_subsidio: false, dias_aplicacion: DIAS_SEMANA.map(d => d.id), tipos_pedido: [...PROMOTION_DELIVERIES] })
     }
     setIsModalOpen(true)
   }
@@ -128,6 +130,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
       if (typeof editingItem.precio_especial !== 'number' || !Number.isFinite(editingItem.precio_especial) || editingItem.precio_especial < 0) throw new Error('Escribe un precio válido para la promoción.')
       const days = editingItem.dias_aplicacion ?? DIAS_SEMANA.map(day => day.id)
       if (!days.length || days.some(day => !DIAS_SEMANA.some(allowed => allowed.id === day))) throw new Error('Selecciona los días en que aplica la promoción.')
+      const deliveryModes = promotionDeliveries(editingItem.tipos_pedido)
       const payload = {
         restaurante_id: restaurante.id,
         titulo: editingItem.titulo.trim(),
@@ -138,6 +141,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
         activa: editingItem.activa ?? true,
         aplica_subsidio: editingItem.aplica_subsidio ?? false,
         dias_aplicacion: days,
+        tipos_pedido: deliveryModes,
         opciones: options,
       }
       const result = editingItem.id
@@ -186,7 +190,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-2 tracking-tight">Promociones</h1>
-          <p className="text-slate-500 font-medium">Ofertas temporales para atraer clientes.</p>
+          <p className="text-slate-600 font-medium">Define la oferta y decide dónde y cuándo pueden pedirla.</p>
         </div>
         <button 
           className="w-full sm:w-auto px-6 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-2xl shadow-lg shadow-[#FF7A6A]/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group" 
@@ -231,11 +235,15 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
                   <h3 className="m-0 text-lg font-black text-slate-800 tracking-tight truncate">{promo.titulo}</h3>
                 </div>
                 <p className="m-0 mb-auto text-sm text-slate-500 font-medium line-clamp-2">{promo.descripcion}</p>
+                <div className="promotion-rule-summary">
+                  <span><Store size={14} aria-hidden="true" />{promotionDeliveryLabel(promo.tipos_pedido)}</span>
+                  <span><Calendar size={14} aria-hidden="true" />{!promo.dias_aplicacion?.length || promo.dias_aplicacion.length === 7 ? 'Todos los días' : DIAS_SEMANA.filter(day => promo.dias_aplicacion?.includes(day.id)).map(day => day.label).join(' · ')}</span>
+                </div>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-3">
                   <p className="m-0 font-black text-[#FF7A6A] text-xl">${Number(promo.precio_especial).toFixed(2)}</p>
                   {promo.fecha_fin && (
                     <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FFF0EE] text-[#FF7A6A] text-[10px] font-bold uppercase tracking-wider border border-[#FFF0EE]">
-                      <Calendar size={12} /> Válido hasta {new Date(promo.fecha_fin).toLocaleDateString()}
+                      <Calendar size={12} /> Hasta {new Date(`${promo.fecha_fin}T12:00:00`).toLocaleDateString('es-MX')}
                     </span>
                   )}
                 </div>
@@ -286,8 +294,29 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
           
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Descripción</label>
-            <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium min-h-[80px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Válido solo en consumo en restaurante..." />
+            <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 outline-none transition-colors text-slate-800 font-medium min-h-[80px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Cuenta qué incluye y qué la hace especial." />
           </div>
+
+          <fieldset className="promotion-delivery-rules">
+            <legend>¿Dónde aplica?</legend>
+            <p>Activa una o ambas modalidades. El carrito comprobará esta regla antes de confirmar.</p>
+            <div className="promotion-delivery-options">
+              {PROMOTION_DELIVERIES.map(mode => {
+                const selected = (editingItem.tipos_pedido ?? PROMOTION_DELIVERIES).includes(mode)
+                const Icon = mode === 'tienda' ? Store : Bike
+                return <label key={mode} data-selected={selected}>
+                  <input type="checkbox" checked={selected} onChange={event => setEditingItem(previous => ({ ...previous,
+                    tipos_pedido: event.target.checked ? PROMOTION_DELIVERIES.filter(value => value === mode || previous.tipos_pedido?.includes(value)) : (previous.tipos_pedido ?? PROMOTION_DELIVERIES).filter(value => value !== mode),
+                  }))} />
+                  <Icon size={22} aria-hidden="true" />
+                  <span><strong>{mode === 'tienda' ? 'Recoger en sucursal' : 'A domicilio'}</strong><small>{mode === 'tienda' ? 'El cliente pasa por su pedido.' : 'Se entrega en su dirección.'}</small></span>
+                  {selected && <Check className="promotion-delivery-check" size={17} aria-hidden="true" />}
+                </label>
+              })}
+            </div>
+            {editingItem.tipos_pedido?.length === 0 ? <p role="alert" className="promotion-rule-error">Elige al menos una modalidad para guardar.</p>
+              : <p className="promotion-rule-preview">{promotionDeliveryLabel(editingItem.tipos_pedido)} · Hora local de Comitán.</p>}
+          </fieldset>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
@@ -311,6 +340,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
                   <button
                     key={dia.id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => {
                       let newDias;
                       if (currentDias.includes(dia.id)) {
@@ -397,7 +427,7 @@ export function MenuPromosView({ restaurante }: { restaurante: Restaurante }) {
             </div>
           </div>
 
-          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving || uploadingImage || editingItem.dias_aplicacion?.length === 0}>
+          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-blue-500 shadow-xl shadow-slate-900/20 hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving || uploadingImage || editingItem.dias_aplicacion?.length === 0 || editingItem.tipos_pedido?.length === 0}>
             {saving ? (
               <>
                 <Loader2 size={20} className="animate-spin" />
