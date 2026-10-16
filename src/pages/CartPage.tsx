@@ -22,6 +22,7 @@ import { CheckoutHeader, CheckoutAction } from '../components/CheckoutChrome';
 import CheckoutStepScene from '../components/CheckoutStepScene';
 import type { CheckoutStepDirection } from '../components/CheckoutStepScene';
 import './CartPage.css';
+import { AnimatedCount, AnimatedMoney } from '../components/AnimatedCount';
 
 // Interfaces
 interface CartItem {
@@ -172,10 +173,6 @@ export default function CartPage() {
   const submittingRef = useRef(false);
   const [isExiting, setIsExiting] = useState(false);
 
-  const subtotalInitial = carrito.reduce((sum, p) => sum + (p.item.precio * p.cantidad), 0);
-  const prevTotalRef = useRef(subtotalInitial);
-  const [displayTotal, setDisplayTotal] = useState(subtotalInitial);
-  
   const [confettiActive, setConfettiActive] = useState(false);
   const prevIsFreeDelivery = useRef(false);
 
@@ -468,30 +465,15 @@ export default function CartPage() {
   // Ahorro total (para mostrar en la UI premium)
   const ahorroTotal = descuentoAplicable + (isFreeDelivery || (cuponValido && costoEnvioFijoOverride !== null) ? Math.max(0, costoEnvioBase - costoEnvioFinal) : 0);
 
-  // Animar el total cuando cambia
+  // Keep the amount derived from the cart; only its visual presentation animates.
+  const previousCashTotal = useRef(total);
   useEffect(() => {
-    const from = prevTotalRef.current;
-    const to = total;
-    if (from === to) return;
-    
-    const duration = 400;
-    const start = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const progress = Math.min(elapsed / duration, 1);
-      // easeOut cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayTotal(from + (to - from) * eased);
-      if (progress < 1) requestAnimationFrame(tick);
-      else { setDisplayTotal(to); prevTotalRef.current = to; }
-    };
-    requestAnimationFrame(tick);
-    
-    // Bug 5 fix: Si el monto en efectivo es menor al nuevo total, resetearlo
-    if (montoEfectivo && parseFloat(montoEfectivo) < to) {
+    if (previousCashTotal.current === total) return;
+    previousCashTotal.current = total;
+    if (montoEfectivo && parseFloat(montoEfectivo) < total) {
       setMontoEfectivo('');
     }
-  }, [total]);
+  }, [total, montoEfectivo]);
 
   // Confetti cuando se desbloquea envío gratis
   useEffect(() => {
@@ -669,7 +651,7 @@ export default function CartPage() {
     };
 
     return (
-      <MotionConfig reducedMotion="user">
+      <MotionConfig>
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: isExiting ? 0 : 1, scale: isExiting ? 0.98 : 1 }}
@@ -803,7 +785,7 @@ export default function CartPage() {
   const orderQuantity = carrito.reduce((count, entry) => count + entry.cantidad, 0);
 
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig>
     <motion.div className="checkout-page" initial={{ opacity: 0 }} animate={{ opacity: isExiting ? 0 : 1 }} transition={{ duration: .24, ease: [.22, 1, .36, 1] }} onAnimationComplete={() => {
       if (isExiting) navigate(id === 'global' ? '/' : `/menu/${id}`);
     }}>
@@ -876,7 +858,7 @@ export default function CartPage() {
                       )}
                       <div className="checkout-quantity">
                         <button type="button" aria-label={'Reducir cantidad de ' + p.item.nombre} onClick={() => removeFromCart(p.item.cartItemId)}><Minus size={15} aria-hidden="true" /></button>
-                        <span>{p.cantidad}</span>
+                        <span><AnimatedCount value={p.cantidad} /></span>
                         <button type="button" aria-label={'Aumentar cantidad de ' + p.item.nombre} onClick={() => addToCart(p.item)}><Plus size={15} aria-hidden="true" /></button>
                       </div>
                       <p className="checkout-item-unit">${p.item.precio.toFixed(2)} por producto</p>
@@ -1196,12 +1178,12 @@ export default function CartPage() {
                 <div className="flex justify-between items-center px-5 py-6 border-b-2 border-dashed border-slate-200/70 bg-gradient-to-b from-white to-slate-50/50">
                   <span className="font-black text-[18px] text-slate-900 tracking-tight">Total</span>
                   <motion.span
-                    key={Math.round(displayTotal)}
+                    key={total}
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className="font-black text-[32px] text-[#FA4A0C] leading-none tabular-nums tracking-tighter drop-shadow-sm"
                   >
-                    ${displayTotal.toFixed(2)}
+                    ${total.toFixed(2)}
                   </motion.span>
                 </div>
 
@@ -1294,7 +1276,7 @@ export default function CartPage() {
               <div><span>{tipoEntrega === 'tienda' ? 'Recogida en sucursal' : 'Envío a domicilio'}</span><span>{tipoEntrega === 'tienda' ? 'Sin costo' : ahorroEstrella > 0 ? '$' + costoEnvio.toFixed(2) : textoEnvio}</span></div>
               {ahorroEstrella > 0 && <div><span>Estrella · ahorro en envío</span><span className="text-green-700">−${ahorroEstrella.toFixed(2)}</span></div>}
               {descuentoAplicable > 0 && <div><span>Descuento</span><span className="text-green-700">−${descuentoAplicable.toFixed(2)}</span></div>}
-              <div className="checkout-grand-total"><span>{entregaConfirmada ? 'Total' : 'Productos, sin envío'}</span><span>${displayTotal.toFixed(2)}</span></div>
+              <div className="checkout-grand-total"><span>{entregaConfirmada ? 'Total' : 'Productos, sin envío'}</span><AnimatedMoney value={total} /></div>
             </div>
             <CheckoutAction label={getBotonText()} onClick={handleContinue} disabled={actionDisabled} busy={procesando || checkingLoyalty} />
             <p className="checkout-action-note">{actionNote}</p>
@@ -1308,7 +1290,7 @@ export default function CartPage() {
         {/* BOTÓN FIJO MOBILE ONLY */}
         <div className="checkout-mobile-bar">
           <div className="checkout-mobile-bar-inner">
-            <div className="checkout-mobile-price"><span>{entregaConfirmada ? 'Total del pedido' : 'Productos, sin envío'}</span><strong>${displayTotal.toFixed(2)}</strong></div>
+            <div className="checkout-mobile-price"><span>{entregaConfirmada ? 'Total del pedido' : 'Productos, sin envío'}</span><strong><AnimatedMoney value={total} /></strong></div>
             <CheckoutAction label={getBotonText()} onClick={handleContinue} disabled={actionDisabled} busy={procesando || checkingLoyalty} />
           </div>
         </div>{/* END MOBILE BUTTON */}

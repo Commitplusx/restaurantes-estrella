@@ -1,9 +1,12 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import type { MenuPromocion } from '../lib/supabase'
+import { groupLandingPromotions, parseLandingPromotions, type LandingPromotion } from '../lib/landingPromotions';
+import { ParallaxMedia, ScrollDepthGroup, ScrollLayer } from '../components/ParallaxMedia';
 import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { animate, motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { animate, motion, AnimatePresence } from 'framer-motion'
+import { useSiteMotion } from '../hooks/useSiteMotion';
+import { MotionPreferenceButton } from '../components/MotionPreferenceButton';
 import RestaurantMap from '../components/RestaurantMap';
 import { backendRestricted } from '../lib/backendAvailability';
 import { CatalogRequestError, requireCatalogResponse, parseCatalogRows, oneRestaurantPerBrand } from '../lib/catalogRequest';
@@ -88,7 +91,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
             {res.foto_fachada_url ? (
               <>
                 <img src={res.foto_fachada_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-125 blur-xl opacity-50" />
-                <img src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain group-hover:scale-[1.05] transition-transform duration-700 ease-out z-10 drop-shadow-sm" alt={res.nombre} />
+                <ParallaxMedia depth={3}><img src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain z-10" alt={res.nombre} /></ParallaxMedia>
               </>
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-slate-50"><Store size={32} className="text-orange-200" /></div>
@@ -127,6 +130,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
 
   // Si horizontal es false (lista vertical), mostramos layout List-Item en Móvil, y Grid Card en Desktop
   return (
+    <ScrollLayer distance={26} tilt={.35}>
     <Link to={`/menu/${res.slug || res.id}`} className="eats-mobile-restaurant-card group relative flex md:flex-col items-center md:items-start bg-white rounded-2xl md:rounded-[22px] p-3 md:p-0 shadow-[0_2px_16px_rgba(0,0,0,0.05)] md:shadow-[0_4px_24px_rgba(0,0,0,0.07)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-100/70 gap-3 transition-all duration-300 outline-none w-full md:hover:-translate-y-1 overflow-hidden">
        
        {/* Imagen a la izquierda en móvil, arriba en desktop */}
@@ -134,7 +138,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
           {res.foto_fachada_url ? (
             <>
               <img src={res.foto_fachada_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-125 blur-xl opacity-50" />
-              <img src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain group-hover:scale-[1.06] transition-transform duration-700 ease-out z-10 drop-shadow-sm" alt={res.nombre} />
+              <ParallaxMedia depth={3}><img src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain z-10" alt={res.nombre} /></ParallaxMedia>
             </>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-slate-100"><Store size={32} className="text-orange-200" /></div>
@@ -215,6 +219,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
           </motion.button>
        </div>
     </Link>
+    </ScrollLayer>
   )
 }
 
@@ -225,7 +230,9 @@ export function PublicLandingPage() {
   const isDesktop = useIsDesktop();
   const [showOnboarding, setShowOnboarding] = useState(() => readPreference('estrella_onboarding_done') !== 'true')
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
-  const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
+  const [promotionRows, setPromotionRows] = useState<LandingPromotion[]>([])
+  const [promotionError, setPromotionError] = useState('')
+  const [promotionRetry, setPromotionRetry] = useState(0)
   const [heroBanners, setHeroBanners] = useState<LandingBanner[]>([])
   const [activeCategories, setActiveCategories] = useState<LandingFoodCategory[]>([])
   const [loading, setLoading] = useState(true)
@@ -244,7 +251,8 @@ export function PublicLandingPage() {
   const [showHeader, setShowHeader] = useState(true)
   const lastScrollY = useRef(0)
   const catalogScroll = useRef<ReturnType<typeof animate> | null>(null)
-  const prefersReducedMotion = useReducedMotion()
+  const { enabled: motionEnabled } = useSiteMotion()
+  const prefersReducedMotion = !motionEnabled
   const [showNotifications, setShowNotifications] = useState(false)
   const observerTarget = useRef(null)
   
@@ -465,29 +473,29 @@ export function PublicLandingPage() {
     loadCats()
   }, [])
 
-  async function loadPromos() {
-    setLoadingPromos(true)
-    const { data } = await supabase
-      .from('menu_promociones')
-      .select('*, restaurantes(id, nombre, slug, foto_fachada_url)')
-      .eq('activa', true)
-      
-    if (data) {
-      const currentDay = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'][new Date().getDay()];
-      const validPromos = data.filter(p => {
-        if (p.fecha_fin) {
-          const endDateStr = p.fecha_fin.includes('T') ? p.fecha_fin : `${p.fecha_fin}T23:59:59`;
-          if (new Date(endDateStr) < new Date()) return false;
-        }
-        if (p.dias_aplicacion && p.dias_aplicacion.length > 0 && !p.dias_aplicacion.includes(currentDay)) {
-          return false;
-        }
-        return true;
-      })
-      setPromosGlobales(validPromos as any)
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    const deadline = window.setTimeout(() => controller.abort(), 8000);
+    async function loadPromos() {
+      setLoadingPromos(true);
+      try {
+        const result = await supabase.from('menu_promociones')
+          .select('id,restaurante_id,titulo,descripcion,precio_especial,foto_url,fecha_fin,activa,aplica_subsidio,dias_aplicacion,tipos_pedido,opciones,restaurantes(id,nombre,slug,matriz_id,nombre_sucursal,activo,perfil_completo)')
+          .eq('activa', true).order('id').limit(200).abortSignal(controller.signal);
+        const rows = parseLandingPromotions(requireCatalogResponse(result));
+        if (active) { setPromotionRows(rows); setPromotionError(''); }
+      } catch {
+        if (active) setPromotionError('No pudimos actualizar las ofertas. Puedes volver a intentarlo.');
+      } finally {
+        window.clearTimeout(deadline);
+        if (active) setLoadingPromos(false);
+      }
     }
-    setLoadingPromos(false)
-  }
+    void loadPromos();
+    return () => { active = false; window.clearTimeout(deadline); controller.abort(); };
+  }, [promotionRetry]);
+  const promosGlobales = useMemo(() => groupLandingPromotions(promotionRows, globalDeliveryType === 'recoger' ? 'tienda' : 'domicilio'), [promotionRows, globalDeliveryType]);
 
   async function loadBanners() {
     try {
@@ -505,7 +513,6 @@ export function PublicLandingPage() {
 
   useEffect(() => {
     loadRestaurants(0)
-    loadPromos()
     loadBanners()
   }, [loadRestaurants])
 
@@ -958,6 +965,7 @@ export function PublicLandingPage() {
           />
         )}
 
+        {promotionError && <section className="eats-catalog-notice" role="status"><Ticket size={24} aria-hidden="true" /><div><h2>Ofertas por actualizar</h2><p>{promotionError}</p></div><button type="button" disabled={loadingPromos} onClick={() => setPromotionRetry(value => value + 1)}>Reintentar</button></section>}
         {/* Carrusel de Promociones (Campaigns - eFood Style) */}
         <AnimatePresence>
           {!loadingPromos && promosGlobales.length > 0 && !search && !selectedCategory && (
@@ -967,6 +975,7 @@ export function PublicLandingPage() {
               exit={{ opacity: 0, height: 0, scale: 0.95 }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
               className="eats-desktop-offers mt-6 md:mt-8 mb-2 overflow-hidden"
+              role="region" aria-label="Ofertas para ti"
             >
             <div className="flex items-center justify-between mb-4 px-2 md:px-0">
               <h2 className="text-[18px] md:text-xl font-black tracking-tight">
@@ -974,16 +983,17 @@ export function PublicLandingPage() {
               </h2>
             </div>
             
-            <div className="flex overflow-x-auto gap-4 pb-6 pt-1 px-2 md:px-0 no-scrollbar snap-x">
+            <ScrollDepthGroup className="eats-offer-rail flex overflow-x-auto gap-4 pb-6 pt-1 px-2 md:px-0 no-scrollbar snap-x" distance={14}>
               {promosGlobales.map((promo) => (
+                <ScrollLayer key={promo.id} className="eats-offer-depth" distance={50} tilt={1.4}>
                 <Link 
                   key={promo.id}
                   to={`/menu/${promo.restaurantes.slug || promo.restaurantes.id}?tab=promos`} 
                   className="flex flex-col group relative bg-white rounded-[16px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] border border-slate-50 transition-all duration-300 w-[150px] sm:w-[180px] shrink-0 outline-none overflow-hidden pb-3 snap-start"
                 >
-                  <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden isolate">
+                  <div className="eats-offer-photo relative w-full aspect-square bg-slate-100 overflow-hidden isolate">
                      {promo.foto_url ? (
-                       <img src={promo.foto_url} loading="lazy" className="relative w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out z-10" alt={promo.titulo} />
+                       <img src={promo.foto_url} loading="lazy" className="relative w-full h-full object-contain" alt={promo.titulo} />
                      ) : (
                        <div className="w-full h-full flex items-center justify-center bg-orange-50"><Ticket size={32} className="text-[#FA4A0C]" /></div>
                      )}
@@ -996,6 +1006,7 @@ export function PublicLandingPage() {
                   <div className="flex flex-col px-3 pt-2 w-full">
                      <h3 className="font-bold text-[13px] sm:text-[14px] text-slate-900 leading-tight truncate">{promo.titulo}</h3>
                      <p className="text-slate-400 text-[11px] truncate mt-0.5">{promo.restaurantes?.nombre}</p>
+                     <p className="eats-offer-branches">{globalDeliveryType === 'recoger' ? 'Para recoger' : 'A domicilio'} · {promo.branchCount > 1 ? `${promo.branchCount} sucursales` : promo.restaurantes.nombre_sucursal || 'Consulta su menú'}</p>
                      
                      <div className="flex items-center justify-between w-full mt-2 pt-2 border-t border-slate-50">
                         <span className="text-[14px] font-black text-[#FA4A0C]">${promo.precio_especial?.toFixed(2)}</span>
@@ -1006,8 +1017,9 @@ export function PublicLandingPage() {
                      </div>
                   </div>
                 </Link>
+                </ScrollLayer>
               ))}
-            </div>
+            </ScrollDepthGroup>
           </motion.div>
         )}
         </AnimatePresence>
@@ -1049,6 +1061,7 @@ export function PublicLandingPage() {
           <button disabled={loading || loadingMore} onClick={() => { if (!restaurantes.length) setLoading(true); else setLoadingMore(true); void loadRestaurants(restaurantes.length ? page : 0); }}>Reintentar</button>
         </section>}
         {/* Grid de Restaurantes */}
+        <ScrollDepthGroup distance={8}>
         {loading ? (
           isDesktop ? (
             <DesktopRestaurantSkeletons />
@@ -1156,6 +1169,7 @@ export function PublicLandingPage() {
           </motion.div>
         )}
 
+        </ScrollDepthGroup>
         {/* Cargar más e Infinite Scroll */}
         {hasMore && !loading && displayRestaurants.length > 0 && (
           <div className="flex justify-center mt-8 pb-20" ref={observerTarget}>
@@ -1193,6 +1207,7 @@ export function PublicLandingPage() {
               <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mb-1">Legal</p>
               <Link to="/terminos" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">Términos y Condiciones</Link>
               <Link to="/privacidad" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">Aviso de Privacidad</Link>
+              <MotionPreferenceButton />
             </div>
           </div>
 

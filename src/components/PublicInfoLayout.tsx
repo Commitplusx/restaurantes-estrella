@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { Link, useLocation, useNavigate, type LinkProps } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import './publicInfo.css';
+import { useSiteMotion } from '../hooks/useSiteMotion';
+import { MotionPreferenceButton } from './MotionPreferenceButton';
 
 const InfoNavigation = createContext<((to: string) => void) | null>(null);
 
@@ -18,6 +20,7 @@ export function PublicInfoLink({ to, onClick, ...props }: Omit<LinkProps, 'to'> 
 export function PublicInfoLayout({ children }: { children: ReactNode }) {
   const { pathname, hash } = useLocation();
   const navigate = useNavigate();
+  const { enabled } = useSiteMotion();
   const [leaving, setLeaving] = useState<'home' | 'document' | null>(null);
   const departure = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
@@ -31,7 +34,7 @@ export function PublicInfoLayout({ children }: { children: ReactNode }) {
       setLeaving(null);
       navigate(to, { state: { publicInfoReturn: true } });
     };
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!enabled) {
       go();
       return;
     }
@@ -66,6 +69,7 @@ export function PublicInfoLayout({ children }: { children: ReactNode }) {
         <PublicInfoLink to="/terminos" aria-current={pathname === '/terminos' ? 'page' : undefined}>Términos y condiciones</PublicInfoLink>
         <PublicInfoLink to="/privacidad" aria-current={pathname === '/privacidad' ? 'page' : undefined}>Aviso de privacidad</PublicInfoLink>
       </nav>
+      <MotionPreferenceButton />
       <p>© {new Date().getFullYear()} Estrella Eats.</p>
     </footer>
   </div></InfoNavigation.Provider>;

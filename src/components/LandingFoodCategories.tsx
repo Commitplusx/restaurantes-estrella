@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { House, Utensils, Check } from 'lucide-react';
 import './landingFoodCategories.css';
+import { motion } from 'framer-motion';
+import { useSiteMotion } from '../hooks/useSiteMotion';
+import { SITE_EASE } from '../lib/siteMotion';
 
 export interface LandingFoodCategory {
   name: string;
@@ -21,14 +24,15 @@ export default function LandingFoodCategories({ categories, selected, onSelect }
   onSelect: (category: string | null) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
+  const { enabled } = useSiteMotion();
   useEffect(() => {
     const list = listRef.current;
     if (!list || !window.matchMedia('(max-width: 767px)').matches) return;
     const button = Array.from(list.querySelectorAll<HTMLButtonElement>('button'))
       .find(element => element.dataset.category === (selected || ''));
     if (button) list.scrollTo({ left: button.offsetLeft - (list.clientWidth - button.offsetWidth) / 2,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  }, [selected, categories]);
+      behavior: enabled ? 'smooth' : 'auto' });
+  }, [selected, categories, enabled]);
 
   return (
     <section id="eats-desktop-categories" tabIndex={-1} className="eats-desktop-categories landing-food-categories" aria-labelledby="food-categories-title">
@@ -44,7 +48,7 @@ export default function LandingFoodCategories({ categories, selected, onSelect }
         </button>
         {categories.map(category => (
           <button type="button" key={category.name} data-category={category.name} aria-pressed={selected === category.name} onClick={() => onSelect(category.name)}>
-            <span className="food-category-photo"><CategoryPhoto image={category.image} /></span>
+            <motion.span className="food-category-photo" initial={false} animate={{ scale: enabled && selected === category.name ? 1.06 : 1, rotate: enabled && selected === category.name ? -3 : 0 }} transition={{ duration: .32, ease: SITE_EASE }}><CategoryPhoto image={category.image} /></motion.span>
             <span className="food-category-name">{category.name}</span>
             {selected === category.name && <Check size={16} className="food-category-check" aria-hidden="true" />}
           </button>

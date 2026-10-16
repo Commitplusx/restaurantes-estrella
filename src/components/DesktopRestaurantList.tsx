@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, ChevronLeft, ChevronRight, Store } from 'lucide-react';
 import './desktopRestaurantList.css';
+import { ParallaxMedia, ScrollLayer } from './ParallaxMedia';
 
 /**
  * Catálogo compacto de escritorio y tablet, con fotos completas y densidad
@@ -67,13 +68,13 @@ function DesktopRestaurantCard({
       {/* Foto */}
       <div className="desktop-restaurant-photo">
         {res.foto_fachada_url && res.foto_fachada_url !== failedImage ? (
-            <img
+            <ParallaxMedia depth={4}><img
               src={res.foto_fachada_url}
               alt=""
               loading="lazy"
               decoding="async"
               onError={() => setFailedImage(res.foto_fachada_url || null)}
-            />
+            /></ParallaxMedia>
         ) : (
           <div className="desktop-restaurant-placeholder">
             <Store size={28} strokeWidth={1.5} aria-hidden="true" />
@@ -261,8 +262,8 @@ export function DesktopRestaurantList({
           key={selectedCategory || search || activeTab}
           className="desktop-directory-grid"
         >
-          {restaurants.map((res) => (
-            <div key={res.id}>{renderCard(res)}</div>
+          {restaurants.map((res, index) => (
+            <ScrollLayer key={res.id} distance={24 + index % 3 * 10} tilt={.45}>{renderCard(res)}</ScrollLayer>
           ))}
         </div>
       </section>

@@ -9,6 +9,8 @@ import { useOrderTracking } from '../hooks/useOrderTracking';
 import TrackingMap from '../components/TrackingMap';
 import {useTrackingRoute} from '../hooks/useTrackingRoute';
 import './TrackerPage.css';
+import { useSiteMotion } from '../hooks/useSiteMotion';
+import { SITE_EASE } from '../lib/siteMotion';
 
 const CookingAnimation = () => {
   const { View } = useLottie({ animationData: cookingAnimation, loop: true });
@@ -16,6 +18,7 @@ const CookingAnimation = () => {
 };
 
 export function TrackerPage() {
+  const { enabled } = useSiteMotion();
   const [searchParams] = useSearchParams();
   const pedidoId = searchParams.get('pedido');
   const {pedido,repartidor,restaurante,loading,error,retry} = useOrderTracking(pedidoId);
@@ -134,7 +137,7 @@ export function TrackerPage() {
               </div>
               <div>
                 {/* Título principal: diferenciado para mandaditos */}
-                <h2 className="text-lg font-black text-slate-800 leading-tight line-clamp-1 uppercase">
+                <motion.h2 key={`${pedido.estado}:${pedido.estado_cocina}`} initial={{ opacity: .5, y: enabled ? 12 : 0 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: enabled ? .42 : .1, ease: SITE_EASE }} className="text-lg font-black text-slate-800 leading-tight line-clamp-1 uppercase">
                   {pedido?.estado === 'en_camino'
                     ? (esMandadito ? '🛵 TU PAQUETE VA EN CAMINO' : 'TU ORDEN VA EN CAMINO')
                     : pedido?.estado === 'entregado'
@@ -144,7 +147,7 @@ export function TrackerPage() {
                     : esMandadito
                     ? '📦 ENVÍO EN PROCESO'
                     : pedido?.restaurante}
-                </h2>
+                </motion.h2>
                 <div className="flex items-center gap-2 mt-1">
                   {/* Sub-texto: diferenciado para mandaditos */}
                   <p className="text-sm font-medium text-slate-600">

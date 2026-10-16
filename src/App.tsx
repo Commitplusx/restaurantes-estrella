@@ -45,6 +45,7 @@ const WelcomeDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/Welc
 import { CookieBanner } from './components/CookieBanner'
 import { PushNotificationSetup } from './components/PushNotificationSetup'
 import { NoticeProvider } from './components/NoticeCenter'
+import { SiteMotionProvider } from './components/SiteMotionProvider'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -100,6 +101,7 @@ export default function App() {
   );
   return (
     <BrowserRouter>
+      <SiteMotionProvider>
       <NoticeProvider>
       <PwaUpdateNotice />
       <OfflineBanner />
@@ -130,6 +132,7 @@ export default function App() {
       </Suspense>
       <InstallPWA />
       </NoticeProvider>
+      </SiteMotionProvider>
     </BrowserRouter>
   )
 }

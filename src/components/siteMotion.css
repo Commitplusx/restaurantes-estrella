@@ -1,0 +1,36 @@
+.eats-parallax-media { position: relative; width: 100%; height: 100%; min-width: 0; }
+.eats-parallax-media-layer { width: 100%; height: 100%; }
+.eats-parallax-media-layer > img { width: 100%; height: 100%; object-fit: inherit; }
+.desktop-restaurant-photo > .eats-parallax-media { position: absolute; inset: 0; }
+.desktop-restaurant-photo .eats-parallax-media-layer > img { object-fit: contain; padding: 10px; }
+.desktop-restaurant-card[data-open=false] .desktop-restaurant-photo img { filter: grayscale(1); opacity: .7; }
+.menu-product-photo .eats-parallax-media-layer > img { object-fit: contain; }
+.eats-mobile-row-card .eats-parallax-media-layer > img, .eats-mobile-restaurant-card .eats-parallax-media-layer > img { object-fit: contain; }
+.eats-hero-copy-depth { position: relative; min-width: 0; }
+.eats-hero-photo-depth { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; border-radius: 18px 18px 100px 18px; }
+.eats-hero-photo-plane { position: absolute; inset: -70px -16px; }
+.eats-carousel-photo-plane { position: absolute; inset: -42px -8px; }
+.eats-hero-photo-depth .eats-parallax-media-layer { overflow: hidden; border-radius: 24px 24px 110px 24px; }
+.eats-hero-photo-depth .eats-hero-photo { position: relative; width: 100%; height: 100%; object-fit: cover; }
+.eats-parallax-foreground { position: absolute; inset: 0; pointer-events: none; }
+.eats-scroll-depth-layer { width: 100%; height: 100%; }
+.eats-scroll-depth-group { position: relative; min-width: 0; }
+.eats-scroll-card-layer { position: relative; min-width: 0; transform-origin: center center; }
+.eats-offer-depth { flex: 0 0 auto; padding-block: 42px; }
+.eats-offer-rail { padding-top: 0; }
+.eats-offer-rail .eats-offer-photo { isolation: isolate; }
+.eats-offer-branches { margin-top: 5px; font-size: 11px; line-height: 1.35; color: #626267; }
+.eats-animated-count { display: inline-grid; position: relative; min-width: 1ch; font-variant-numeric: tabular-nums; }
+.eats-animated-count > span { grid-area: 1 / 1; }
+.eats-motion-preview-control { position: fixed; left: 12px; bottom: max(12px,env(safe-area-inset-bottom)); z-index: 65; display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 10px; font: 500 11px Outfit,sans-serif; border-radius: 8px; color: #515154; background: #fff; box-shadow: 0 4px 18px #1d1d1f1a; }
+.eats-motion-preview-control:focus-visible { outline: 3px solid #bd3818; outline-offset: 3px; }
+.eats-motion-setting { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-size: 12px; color: #515154; }
+body:has(.eats-welcome) .eats-motion-preview-control { display: none; }
+@media(max-width:1023px) { .eats-motion-preview-control { display: none; } }
+body[data-eats-motion=full] .info-intro h1 { animation: eats-title-arrival .5s cubic-bezier(.16,1,.3,1) both; }
+body[data-eats-motion=full] .info-intro > p { animation: eats-copy-arrival .6s cubic-bezier(.16,1,.3,1) both; }
+body[data-eats-motion=full] .eats-hero-copy { animation: eats-title-arrival .55s cubic-bezier(.16,1,.3,1) both; }
+body[data-eats-motion=full] .eats-hero-actions { animation: eats-copy-arrival .65s cubic-bezier(.16,1,.3,1) both; }
+body[data-eats-motion=reduced] :is(.public-info-page,.restaurant-menu-page,.checkout-page,.order-tracker,.eats-landing) :is(button,a,img,svg) { transition-duration: .01ms !important; }
+@keyframes eats-title-arrival { from { opacity: .6; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+@keyframes eats-copy-arrival { from { opacity: .65; transform: translateY(14px); } to { opacity: 1; transform: none; } }

@@ -257,20 +257,20 @@
   .eats-explore-button { padding-inline: 16px; gap: 15px; font-size: 12px; }
 }
 
-@media (prefers-reduced-motion: reduce) and (min-width: 1024px) {
-  .eats-landing :is(.eats-explore-button, .eats-restaurant-card, .eats-restaurant-image) { transition: none; }
+@media (min-width: 1024px) {
+  body[data-eats-motion=reduced] .eats-landing :is(.eats-explore-button, .eats-restaurant-card, .eats-restaurant-image) { transition: none; }
 }
 
-@media (prefers-reduced-motion: reduce) and (max-width: 1023px) {
-  .eats-landing :is(button, a, img, .eats-category-strip) { transition: none; scroll-behavior: auto; }
-  .eats-carousel-track { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); transition: none; }
-  .eats-carousel-slide { grid-area: 1 / 1; min-height: 0; opacity: 0; pointer-events: none; transition: opacity 360ms cubic-bezier(.4,0,.2,1); }
-  .eats-carousel-slide[data-active="true"] { opacity: 1; pointer-events: auto; z-index: 1; }
-  .eats-landing > nav { transition: none; }
+@media (max-width: 1023px) {
+  body[data-eats-motion=reduced] .eats-landing :is(button, a, img, .eats-category-strip) { transition: none; scroll-behavior: auto; }
+  .eats-mobile-carousel[data-motion=reduced] .eats-carousel-track { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); transition: none; }
+  .eats-mobile-carousel[data-motion=reduced] .eats-carousel-slide { grid-area: 1 / 1; min-height: 0; opacity: 0; pointer-events: none; transition: opacity 360ms cubic-bezier(.4,0,.2,1); }
+  .eats-mobile-carousel[data-motion=reduced] .eats-carousel-slide[data-active="true"] { opacity: 1; pointer-events: auto; z-index: 1; }
+  body[data-eats-motion=reduced] .eats-landing > nav { transition: none; }
 }
 
-@media (prefers-reduced-motion: no-preference) and (max-width: 1023px) {
-  .eats-carousel-slide[data-active="true"] > :is(img, a, .eats-carousel-message) { animation: eats-banner-reveal 600ms cubic-bezier(.16,1,.3,1); }
+@media (max-width: 1023px) {
+  body[data-eats-motion=full] .eats-carousel-slide[data-active="true"] > :is(img, a, .eats-carousel-message) { animation: eats-banner-reveal 600ms cubic-bezier(.16,1,.3,1); }
 }
 @keyframes eats-banner-reveal {
   from { clip-path: inset(0 8% 0 0); }

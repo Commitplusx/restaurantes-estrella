@@ -39,6 +39,9 @@ import { useRestaurantFamily } from '../hooks/useRestaurantFamily';
 import { restaurantMenuPath, RESTAURANT_PUBLIC_FIELDS, cartRestaurantOrigin, requiresNewBranchCart } from '../lib/restaurantBranches';
 import MenuDetailsFrame from '../components/MenuDetailsFrame';
 import './PublicMenuView.css';
+import { AnimatedCount } from '../components/AnimatedCount';
+import { MotionPreferenceButton } from '../components/MotionPreferenceButton';
+import { ScrollDepthGroup } from '../components/ParallaxMedia';
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 
 const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
@@ -1215,7 +1218,7 @@ export function PublicMenuView() {
   }
 
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig>
     <motion.div className="restaurant-menu-page" initial={{ opacity: 0 }} animate={{ opacity: openingCart ? 0 : 1 }} transition={{ duration: .24, ease: [.22, 1, .36, 1] }} onAnimationComplete={() => {
       if (openingCart) navigate(`/menu/${id}/carrito`);
     }}>
@@ -1248,7 +1251,7 @@ export function PublicMenuView() {
           </div>
         )}
 
-        <div className="menu-catalog-layout">
+        <ScrollDepthGroup className="menu-catalog-layout" distance={24}>
         {/* Categorías del catálogo */}
         {(categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 0 || combos.length > 0 || promos.length > 0) && (
           <nav className="menu-category-nav" aria-label="Categorías del menú">
@@ -1418,7 +1421,7 @@ export function PublicMenuView() {
               </div>
             )}
           </main>
-          </div>{/* menú y categorías */}
+          </ScrollDepthGroup>{/* menú y categorías */}
           </div>
           {/* Fin Contenedor Central */}
 
@@ -1507,6 +1510,7 @@ export function PublicMenuView() {
         <span>EstrellaEats</span>
         <Link to="/terminos">Términos y condiciones</Link>
         <Link to="/privacidad">Aviso de privacidad</Link>
+        <MotionPreferenceButton />
       </footer>
 
       {/* Floating Cart Button en Mobile */}
@@ -1527,7 +1531,7 @@ export function PublicMenuView() {
                 setOpeningCart(true);
               }}
             >
-              <span className="menu-cart-icon"><ShoppingBag size={22} aria-hidden="true" /><span className="menu-cart-count">{cartCount}</span></span>
+              <span className="menu-cart-icon"><ShoppingBag size={22} aria-hidden="true" /><span className="menu-cart-count"><AnimatedCount value={cartCount} /></span></span>
               <span className="menu-cart-label"><strong>Ver mi pedido</strong><small>Productos · ${carrito.reduce((sum, entry) => sum + entry.item.precio * entry.cantidad, 0).toFixed(2)}</small></span>
               <ArrowRight size={20} aria-hidden="true" />
             </motion.button>

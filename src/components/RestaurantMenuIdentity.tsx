@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Clock, MapPin, Store, ChevronDown } from 'lucide-react';
 import type { Restaurante, HorariosRestaurante } from '../lib/supabase';
+import { motion } from 'framer-motion';
+import { useSiteMotion } from '../hooks/useSiteMotion';
+import { SITE_EASE } from '../lib/siteMotion';
 
 const weekdays: (keyof HorariosRestaurante)[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
@@ -11,6 +14,7 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
   onBranches: () => void;
 }) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
+  const { enabled } = useSiteMotion();
   const image = restaurant.logo_url || restaurant.foto_fachada_url;
   const today = restaurant.horarios?.[weekdays[new Date().getDay()]];
   const opening = today?.activo ? today.abre : restaurant.hora_apertura?.slice(0, 5);
@@ -24,7 +28,7 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
     ? restaurant.direccion : 'Ver ubicación';
 
   return (
-    <section className="menu-identity" aria-labelledby="restaurant-menu-title">
+    <motion.section key={restaurant.id} className="menu-identity" aria-labelledby="restaurant-menu-title" initial={{ opacity: .55, x: enabled ? 24 : 0 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: enabled ? .45 : .1, ease: SITE_EASE }}>
       <div className="menu-identity-image">
         {image && failedImage !== image ? <img src={image} alt="" onError={() => setFailedImage(image)} /> : <Store size={32} aria-hidden="true" />}
       </div>
@@ -39,6 +43,6 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
         </div>
       </div>
       {hasBranches && <button type="button" className="menu-branch-button" onClick={onBranches}>Cambiar sucursal <ChevronDown size={16} aria-hidden="true" /></button>}
-    </section>
+    </motion.section>
   );
 }

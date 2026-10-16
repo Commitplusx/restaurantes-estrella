@@ -2,25 +2,25 @@ import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { LandingBanner } from '../lib/landingBanner';
+import { useSiteMotion } from '../hooks/useSiteMotion';
+import { ParallaxMedia } from './ParallaxMedia';
+import { motion, useScroll, useTransform } from 'framer-motion';
 
 export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [inView, setInView] = useState(true);
-  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const { enabled } = useSiteMotion();
+  const reducedMotion = !enabled;
   const carousel = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: carousel, offset: ['start end', 'end start'] });
+  const photoY = useTransform(scrollYProgress, [0, 1], [-38, 38]);
+  const captionY = useTransform(scrollYProgress, [0, 1], [18, -22]);
   const gesture = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
   const rotationIntent = useRef<boolean | null>(null);
   const count = banners.length + 1;
   const activeIndex = index % count;
-
-  useEffect(() => {
-    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReducedMotion(preference.matches);
-    preference.addEventListener('change', update);
-    return () => preference.removeEventListener('change', update);
-  }, []);
 
   useEffect(() => {
     const element = carousel.current;
@@ -56,7 +56,7 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
   };
 
   return (
-    <div ref={carousel} className="eats-mobile-carousel" role="region" aria-roledescription="carrusel" aria-label="Estrella Eats y promociones"
+    <div ref={carousel} className="eats-mobile-carousel" data-motion={enabled ? 'full' : 'reduced'} role="region" aria-roledescription="carrusel" aria-label="Estrella Eats y promociones"
       onFocusCapture={() => setPaused(true)}
       onPointerEnter={event => { if (event.pointerType === 'mouse') setPaused(true); }}>
       <div className="eats-carousel-window"
@@ -81,8 +81,8 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
         }}>
         <div className="eats-carousel-track" style={{ transform: reducedMotion ? undefined : `translateX(-${activeIndex * 100}%)` }}>
           <div className="eats-carousel-slide" data-active={activeIndex === 0} role="group" aria-roledescription="diapositiva" aria-label={`1 de ${count}`} aria-hidden={activeIndex !== 0} inert={activeIndex !== 0}>
-            <img className="eats-carousel-table" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" draggable={false} />
-            <div className="eats-photo-caption"><strong>¿Tacos o<br />hamburguesa?</strong></div>
+            <motion.div className="eats-carousel-photo-plane" style={{ y: enabled ? photoY : 0 }}><ParallaxMedia depth={7}><img className="eats-carousel-table" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" draggable={false} /></ParallaxMedia></motion.div>
+            <motion.div className="eats-photo-caption" style={{ y: enabled ? captionY : 0 }}><strong>¿Tacos o<br />hamburguesa?</strong></motion.div>
           </div>
           {banners.map((banner, position) => {
             const link = banner.link_url && /^(?:\/(?!\/)|https?:\/\/)/.test(banner.link_url) ? banner.link_url : null;

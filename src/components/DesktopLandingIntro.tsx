@@ -1,9 +1,13 @@
 import { ArrowDown, ArrowUpRight, MapPin, Search, ShoppingBag, Sparkles, Utensils, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useRef } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { useIsDesktop } from '../hooks/useIsDesktop';
 import { MobileLandingCarousel } from './MobileLandingCarousel';
 import type { LandingBanner } from '../lib/landingBanner';
 import './desktopLanding.css';
+import { ParallaxMedia } from './ParallaxMedia';
+import { useSiteMotion } from '../hooks/useSiteMotion';
 
 interface DesktopLandingHeaderProps {
   search: string;
@@ -52,8 +56,17 @@ interface DesktopLandingHeroProps {
 
 export function DesktopLandingHero({ onExplore, deliveryType, banners }: DesktopLandingHeroProps) {
   const isDesktop = useIsDesktop(1024);
+  const ref = useRef<HTMLElement>(null);
+  const { enabled } = useSiteMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start 15%', 'end start'] });
+  const photoY = useTransform(scrollYProgress, [0, 1], [-54, 54]);
+  const copyY = useTransform(scrollYProgress, [0, 1], [0, -60]);
+  const captionY = useTransform(scrollYProgress, [0, 1], [0, -76]);
+  const sealY = useTransform(scrollYProgress, [0, 1], [0, -95]);
+  const sealRotate = useTransform(scrollYProgress, [0, 1], [12, -24]);
   return (
-    <section className="eats-desktop-hero" aria-labelledby="desktop-hero-title">
+    <section ref={ref} className="eats-desktop-hero" aria-labelledby="desktop-hero-title">
+      <motion.div className="eats-hero-copy-depth" style={{ y: enabled ? copyY : 0 }}>
       <div className="eats-hero-copy">
         <div className="eats-eyebrow"><span />ESTRELLA EATS EN COMITÁN</div>
         <h1 id="desktop-hero-title">Comida de<br />Comitán.<br /><span>{deliveryType === 'recoger' ? 'Para llevar.' : 'A tu puerta.'}</span><svg className="eats-title-star" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 0 29 18 48 24 29 29 24 48 18 29 0 24 18 18Z" fill="currentColor" /></svg></h1>
@@ -64,11 +77,14 @@ export function DesktopLandingHero({ onExplore, deliveryType, banners }: Desktop
         </div>
         <div className="eats-hero-footnote"><Utensils size={17} aria-hidden="true" /><span>Consulta el menú y el horario de cada restaurante.</span></div>
       </div>
+      </motion.div>
       <div className="eats-hero-visual">
         {isDesktop ? <>
-        <img className="eats-hero-photo" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" />
-        <div className="eats-photo-caption"><span>¿QUÉ VAS A PEDIR?</span><strong>¿Tacos o<br />hamburguesa?</strong><ArrowDown size={23} aria-hidden="true" /></div>
-        <div className="eats-local-seal" aria-hidden="true"><svg viewBox="0 0 100 100"><defs><path id="eats-seal-path" d="M50 50m-35 0a35 35 0 1 1 70 0a35 35 0 1 1-70 0" /></defs><text><textPath href="#eats-seal-path">COMITÁN · ESTRELLA EATS · </textPath></text></svg><span>✦</span></div>
+        <div className="eats-hero-photo-depth"><motion.div className="eats-hero-photo-plane" style={{ y: enabled ? photoY : 0 }}><ParallaxMedia depth={12}>
+          <img className="eats-hero-photo" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" />
+        </ParallaxMedia></motion.div></div>
+        <motion.div className="eats-photo-caption" style={{ y: enabled ? captionY : 0, rotate: -3 }}><span>¿QUÉ VAS A PEDIR?</span><strong>¿Tacos o<br />hamburguesa?</strong><ArrowDown size={23} aria-hidden="true" /></motion.div>
+        <motion.div className="eats-local-seal" style={{ y: enabled ? sealY : 0, rotate: enabled ? sealRotate : 12 }} aria-hidden="true"><svg viewBox="0 0 100 100"><defs><path id="eats-seal-path" d="M50 50m-35 0a35 35 0 1 1 70 0a35 35 0 1 1-70 0" /></defs><text><textPath href="#eats-seal-path">COMITÁN · ESTRELLA EATS · </textPath></text></svg><span>✦</span></motion.div>
         </> : <MobileLandingCarousel banners={banners} />}
       </div>
     </section>

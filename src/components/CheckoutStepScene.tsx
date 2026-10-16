@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { motion, useIsPresent, useReducedMotion } from 'framer-motion';
+import { motion, useIsPresent } from 'framer-motion';
 import type { Variants } from 'framer-motion';
+import { useSiteMotion } from '../hooks/useSiteMotion';
 
 export type CheckoutStepDirection = 1 | -1;
 
@@ -11,7 +12,8 @@ export default function CheckoutStepScene({ step, direction, onEntered, children
   children: ReactNode;
 }) {
   const isPresent = useIsPresent();
-  const reduceMotion = useReducedMotion();
+  const { enabled } = useSiteMotion();
+  const reduceMotion = !enabled;
   const distance = reduceMotion ? 0 : 24;
   const variants: Variants = {
     enter: (travel: CheckoutStepDirection) => ({ x: distance * travel, opacity: 0 }),
