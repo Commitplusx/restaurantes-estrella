@@ -39,9 +39,12 @@ const TrackerPage = lazyWithRetry(() => import('./pages/TrackerPage').then(modul
 const BeneficiosPage = lazyWithRetry(() => import('./pages/BeneficiosPage').then(module => ({ default: module.BeneficiosPage })))
 const PrivacyPage = lazyWithRetry(() => import('./pages/PrivacyPage').then(module => ({ default: module.PrivacyPage })))
 const TermsPage = lazyWithRetry(() => import('./pages/TermsPage').then(module => ({ default: module.TermsPage })))
+const NoticeDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/NoticeDesignPreview')) : null
+const WelcomeDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/WelcomeDesignPreview')) : null
 
 import { CookieBanner } from './components/CookieBanner'
 import { PushNotificationSetup } from './components/PushNotificationSetup'
+import { NoticeProvider } from './components/NoticeCenter'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -97,6 +100,7 @@ export default function App() {
   );
   return (
     <BrowserRouter>
+      <NoticeProvider>
       <PwaUpdateNotice />
       <OfflineBanner />
       <CookieBanner />
@@ -108,6 +112,8 @@ export default function App() {
         </div>
       }>
         <Routes>
+          {NoticeDesignPreview && <Route path="/avisos" element={<NoticeDesignPreview />} />}
+          {WelcomeDesignPreview && <Route path="/bienvenida" element={<WelcomeDesignPreview />} />}
           <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
           <Route path="/beneficios" element={isPartnerDomain ? <Navigate to="/login" replace /> : <BeneficiosPage />} />
           <Route path="/privacidad" element={<PrivacyPage />} />
@@ -123,6 +129,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <InstallPWA />
+      </NoticeProvider>
     </BrowserRouter>
   )
 }

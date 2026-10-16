@@ -6,10 +6,10 @@ Extensión del editor de promociones existente para configurar recogida, domicil
 
 | Superficie | Estado al cerrar esta revisión |
 | --- | --- |
-| Web de Estrella Eats | Cambios locales revisados; esta entrega documental no acredita commit ni despliegue web |
+| Web de Estrella Eats | Publicada en main `98b7ed8`; Vercel success y módulos del dominio comprobados |
 | PostgreSQL de Eats, `jdrrkpvodnqoljycixbg` | Migración `20261016000001_promotion_delivery_rules.sql` aplicada y verificada el 16 de octubre |
 
-El backend dejó las 16 promociones existentes con ambas modalidades y cero configuraciones inválidas. Elegir una exclusividad concreta corresponde al restaurante. La web local todavía debe publicarse y comprobarse en su dominio para que el editor y la ayuda del carrito estén disponibles a clientes. El backend activo ya comprueba las reglas guardadas.
+El backend dejó las 16 promociones existentes con ambas modalidades y cero configuraciones inválidas. Elegir una exclusividad concreta corresponde al restaurante. El despliegue Vercel `J3aGS7cwXyK5jP9WwgGmDgn6yNDU` terminó en success; estrella-eats.mx sirvió el editor `MenuPromosView-BW7j2pnk.js` y carrito `CartPage-ZUD3tlL8.js` con las reglas revisadas. No se modificó una oferta real para la prueba visual ni se hizo un pedido.
 
 ## Uso del editor
 

@@ -1,173 +1,122 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Bell, Check, Loader2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Bell, X } from 'lucide-react';
+import { NoticeSurface } from './NoticeCenter';
+import { useNoticeSlot } from '../hooks/useNoticeSlot';
+import { readPreference, writePreference } from '../lib/noticePreferences';
+import { activatePush, decodeVapid, PushActivationError, withDeadline } from '../lib/pushActivation';
+import type { PushPhase } from '../lib/pushActivation';
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-
-// Utilidad para convertir la clave VAPID
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
-    .replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
+const key = import.meta.env.VITE_VAPID_PUBLIC_KEY?.trim() || '';
+const phases: Record<PushPhase, string> = {
+  permission: 'Confirma el permiso del navegador.', worker: 'Preparando este navegador…',
+  subscription: 'Conectando las notificaciones…', saving: 'Guardando tu preferencia…',
+};
+// Keep unresolved browser operations across retries: their native promises cannot be aborted.
+let permissionRequest: Promise<NotificationPermission> | null = null;
+let subscriptionRequest: Promise<PushSubscription> | null = null;
+function permissionFromClick(): Promise<NotificationPermission> {
+  if (Notification.permission !== 'default') return Promise.resolve(Notification.permission);
+  if (!permissionRequest) {
+    permissionRequest = Notification.requestPermission();
+    void permissionRequest.finally(() => { permissionRequest = null; }).catch(() => undefined);
   }
-  return outputArray;
+  return permissionRequest;
+}
+async function ensureSubscription(registration: ServiceWorkerRegistration, signal: AbortSignal): Promise<PushSubscription> {
+  const existing = await withDeadline(registration.pushManager.getSubscription(), 5_000, 'No pudimos consultar las notificaciones de este navegador.', signal);
+  signal.throwIfAborted();
+  if (existing) return existing;
+  if (!subscriptionRequest) {
+    subscriptionRequest = registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeVapid(key) });
+    void subscriptionRequest.finally(() => { subscriptionRequest = null; }).catch(() => undefined);
+  }
+  return subscriptionRequest;
+}
+async function saveSubscription(subscription: PushSubscription, signal: AbortSignal): Promise<void> {
+  const { data, error: authError } = await withDeadline(supabase.auth.getSession(), 5_000, 'No pudimos comprobar tu sesión. Vuelve a intentarlo.', signal);
+  if (authError) throw new PushActivationError('No pudimos comprobar tu sesión. Vuelve a intentarlo.');
+  const identity = JSON.stringify([subscription.endpoint, data.session?.user.id ?? null, key]);
+  if (readPreference('push_subscription_identity') === identity) return;
+  signal.throwIfAborted();
+  const { error } = await supabase.from('push_subscriptions').insert({ user_id: data.session?.user.id ?? null, subscription: subscription.toJSON() }).abortSignal(signal);
+  if (error) {
+    // A duplicate is only successful when the existing endpoint can actually be verified.
+    if (error.code !== '23505') throw new PushActivationError('Tenemos un problema de conexión. El permiso está listo, pero falta guardar la activación.');
+    const existing = await supabase.from('push_subscriptions').select('id').eq('subscription->>endpoint', subscription.endpoint).limit(1).abortSignal(signal).maybeSingle();
+    if (existing.error || !existing.data) throw new PushActivationError('No pudimos comprobar la activación anterior. Vuelve a intentarlo.');
+  }
+  signal.throwIfAborted();
+  writePreference('push_subscription_identity', identity);
 }
 
 export function PushNotificationSetup() {
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [isSubscribing, setIsSubscribing] = useState(false);
-
+  const [visible, setVisible] = useState(() => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext
+    && Notification.permission !== 'denied' && readPreference('push_prompt_dismissed') !== 'true'
+    && !(Notification.permission === 'granted' && readPreference('push_subscription_identity')));
+  const [phase, setPhase] = useState<PushPhase | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const running = useRef(false);
+  const activation = useRef<AbortController | null>(null);
+  const alive = useRef(false);
+  const shown = useNoticeSlot('push', visible, 10);
   useEffect(() => {
-    const checkSubscription = async () => {
-      // 1. Verificar soporte
-      if (!('serviceWorker' in navigator)) {
-        console.log("No soporta Service Worker");
-        return;
-      }
-      if (!('PushManager' in window)) {
-        console.log("No soporta PushManager (Si estás en iPhone, DEBES instalarla primero con Agregar a Inicio)");
-        return;
-      }
-
-      // 2. Si ya lo rechazó o ya lo cerramos, no molestar por un tiempo
-      if (localStorage.getItem('push_prompt_dismissed') === 'true') {
-        console.log("El prompt fue cerrado anteriormente (limpia localStorage para volver a verlo)");
-        return;
-      }
-
-      // 3. Verificar permiso actual
-      if (Notification.permission === 'granted') {
-        console.log("Permiso ya concedido, suscribiendo silenciosamente...");
-        await subscribeUser(true); // true = modo silencioso (sin UI)
-        return;
-      }
-
-      if (Notification.permission === 'denied') {
-        console.log("El usuario bloqueó las notificaciones en el navegador");
-        return;
-      }
-
-      console.log("Mostrando prompt de notificaciones...");
-      // 4. Mostrar el prompt amigable si no ha interactuado
-      setTimeout(() => setShowPrompt(true), 1000); // Reducido a 1 segundo para pruebas
-
-    };
-
-    checkSubscription();
+    alive.current = true;
+    if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted'
+      && readPreference('push_subscription_identity') && readPreference('push_prompt_dismissed') !== 'true') {
+      const checkSaved = async () => {
+        try {
+          const registration = await withDeadline(navigator.serviceWorker.getRegistration(), 5_000, 'Browser unavailable');
+          const subscription = registration ? await withDeadline(registration.pushManager.getSubscription(), 5_000, 'Browser unavailable') : null;
+          const { data, error: sessionError } = await withDeadline(supabase.auth.getSession(), 5_000, 'Session unavailable');
+          if (sessionError) throw new Error('Session unavailable');
+          const identity = subscription ? JSON.stringify([subscription.endpoint, data.session?.user.id ?? null, key]) : '';
+          if (alive.current && identity !== readPreference('push_subscription_identity')) setVisible(true);
+        } catch { if (alive.current) { setVisible(true); setError('No pudimos comprobar tus notificaciones. Puedes reintentar sin perder tu pedido.'); } }
+      };
+      void checkSaved();
+    }
+    return () => { alive.current = false; activation.current?.abort(); };
   }, []);
 
-  const subscribeUser = async (silent = false) => {
-    if (!VAPID_PUBLIC_KEY) {
-      console.warn("Falta VITE_VAPID_PUBLIC_KEY en .env");
-      return;
-    }
-
+  const activate = async () => {
+    if (running.current) return;
+    running.current = true; setError(''); setPhase('permission');
+    const controller = new AbortController();
+    activation.current = controller;
+    // Bound the complete operation as well as each individual phase.
+    const timer = setTimeout(() => controller.abort(new PushActivationError('La activación tardó demasiado. Puedes volver a intentarlo.')), 45_000);
     try {
-      if (!silent) setIsSubscribing(true);
-
-      let registration = await navigator.serviceWorker.getRegistration();
-      
-      if (!registration) {
-        console.log("No se encontró Service Worker activo, registrando manualmente...");
-        registration = await navigator.serviceWorker.register('/push-sw.js');
-      }
-
-      // Asegurarnos que esté activo
-      if (!registration.active) {
-         await navigator.serviceWorker.ready;
-      }
-      
-      let subscription = await registration.pushManager.getSubscription();
-      
-      if (!subscription) {
-        // Pedir permiso y suscribir
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-        });
-      }
-
-      // Obtener el usuario actual si está logueado
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id || null;
-
-      // Evitar guardar duplicados en cada recarga
-      if (silent && localStorage.getItem('push_subscription_saved') === 'true') {
-        return;
-      }
-
-      // Guardar en Supabase
-      const { error } = await supabase.from('push_subscriptions').insert([{
-        user_id: userId,
-        subscription: subscription
-      }]);
-
-      if (!error || error.code === '23505') {
-        localStorage.setItem('push_subscription_saved', 'true');
-      }
-
-      if (error && error.code !== '23505') { // Ignorar error si ya existe (clave única)
-        console.error("Error guardando suscripción:", error);
-      }
-
-      if (!silent) setShowPrompt(false);
-    } catch (error: any) {
-      if (error.name === 'AbortError' || error.message?.includes('AbortError')) {
-        console.warn('Suscripción push abortada (normal en local o navegadores sin soporte completo).');
-      } else {
-        console.error('Error suscribiendo a notificaciones push:', error);
-      }
-    } finally {
-      if (!silent) setIsSubscribing(false);
-    }
+      decodeVapid(key);
+      // Request permission synchronously within the customer's click, before any await.
+      await activatePush({ permission: permissionFromClick, ready: () => navigator.serviceWorker.ready, subscribe: registration => ensureSubscription(registration, controller.signal),
+        save: subscription => saveSubscription(subscription, controller.signal), signal: controller.signal,
+        phase: value => { if (alive.current && !controller.signal.aborted) setPhase(value); } });
+      if (alive.current && !controller.signal.aborted) setSuccess(true);
+    } catch (cause: unknown) {
+      if (alive.current && (!controller.signal.aborted || controller.signal.reason instanceof PushActivationError)) setError(cause instanceof PushActivationError ? cause.message : controller.signal.reason instanceof PushActivationError ? controller.signal.reason.message : 'No pudimos activar las notificaciones. Puedes reintentar y seguir tu pedido aquí.');
+      console.warn('push_activation_failed', { kind: cause instanceof Error ? cause.name : 'unknown' });
+    } finally { clearTimeout(timer); controller.abort(); running.current = false; activation.current = null; if (alive.current) setPhase(null); }
   };
-
-  const handleDismiss = () => {
-    setShowPrompt(false);
-    localStorage.setItem('push_prompt_dismissed', 'true');
-  };
-
-  if (!showPrompt) return null;
-
-  return (
-    <div className="fixed bottom-6 left-4 right-4 md:left-1/2 md:w-[400px] md:-translate-x-1/2 z-[110] bg-white text-slate-800 rounded-[20px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] p-5 border border-slate-200 flex items-start gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out">
-      <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center shrink-0 border border-orange-100">
-        <Bell size={22} />
-      </div>
-      <div className="flex-1 pt-0.5">
-        <h4 className="font-bold text-slate-900 text-[15px] tracking-tight">Activa las notificaciones</h4>
-        <p className="text-[13px] text-slate-500 mt-1.5 leading-snug pr-2">
-          Entérate al instante de promociones exclusivas, cupones y el estado de tu pedido.
-        </p>
-        <div className="flex items-center gap-4 mt-4">
-          <button
-            onClick={() => subscribeUser(false)}
-            disabled={isSubscribing}
-            className="bg-orange-500 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-orange-600 transition-all active:scale-95 disabled:opacity-50 shadow-md shadow-orange-500/20"
-          >
-            {isSubscribing ? 'Activando...' : 'Activar ahora'}
-          </button>
-          <button
-            onClick={handleDismiss}
-            className="text-slate-400 hover:text-slate-600 text-xs font-semibold transition-colors"
-          >
-            Quizás luego
-          </button>
-        </div>
-      </div>
-      <button 
-        onClick={handleDismiss}
-        className="absolute top-4 right-4 text-slate-300 hover:text-slate-500 transition-colors p-1"
-      >
-        <X size={18} />
+  const dismiss = () => { activation.current?.abort(); writePreference('push_prompt_dismissed', 'true'); setVisible(false); };
+  if (!shown) return null;
+  return <PushNoticeContent phase={phase} error={error} success={success} activate={() => void activate()} dismiss={success ? () => setVisible(false) : dismiss} />;
+}
+export function PushNoticeContent({ phase, error, success, activate, dismiss }: {
+  phase: PushPhase | null; error: string; success: boolean; activate: () => void; dismiss: () => void;
+}) {
+  return <NoticeSurface label="Notificaciones de Estrella Eats">
+    <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{success ? 'Notificaciones activadas. Este navegador ya puede recibir avisos de Estrella Eats.' : error || (phase ? phases[phase] : '')}</p>
+    <div className="eats-notice-heading">{success ? <Check size={22} aria-hidden="true" /> : <Bell size={22} aria-hidden="true" />}<h2>{success ? 'Notificaciones activadas' : 'Activa tus notificaciones'}</h2></div>
+    <p>{success ? 'Este navegador ya puede recibir avisos de Estrella Eats.' : 'Recibe avisos y promociones de Estrella Eats en este navegador. Tu pedido sigue disponible en el tracker.'}</p>
+    {(phase || error) && <div className="eats-notice-feedback" data-error={Boolean(error)} aria-hidden="true"><p>{error || (phase && phases[phase])}</p></div>}
+    <div className="eats-notice-actions">
+      <button className="eats-notice-primary" disabled={Boolean(phase)} onClick={success ? dismiss : activate}>
+        {phase && <Loader2 size={16} className="eats-notice-spinner" aria-hidden="true" />}{success ? 'Listo' : phase ? 'Activando…' : error ? 'Reintentar' : 'Activar notificaciones'}
       </button>
+      {!success && <button className="eats-notice-secondary" onClick={dismiss}>{phase ? 'Cancelar' : 'Ahora no'}</button>}
     </div>
-  );
+    <button className="eats-notice-close" aria-label="Cerrar aviso de notificaciones" onClick={dismiss}><X size={18} aria-hidden="true" /></button>
+  </NoticeSurface>;
 }

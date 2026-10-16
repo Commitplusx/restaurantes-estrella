@@ -11,6 +11,7 @@ import type { CatalogRestaurant as Restaurante } from '../lib/catalogRequest';
 import { readSavedCoordinates } from '../lib/deliveryLocation';
 import './CatalogNotice.css';
 import { OnboardingFlow } from '../components/OnboardingFlow';
+import { readPreference } from '../lib/noticePreferences';
 import { BottomNav } from '../components/BottomNav';
 import { SearchView } from '../components/SearchView';
 import { DesktopRestaurantList, DesktopRestaurantSkeletons } from '../components/DesktopRestaurantList';
@@ -222,7 +223,7 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
 
 export function PublicLandingPage() {
   const isDesktop = useIsDesktop();
-  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('estrella_onboarding_done'))
+  const [showOnboarding, setShowOnboarding] = useState(() => readPreference('estrella_onboarding_done') !== 'true')
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [promosGlobales, setPromosGlobales] = useState<(MenuPromocion & { restaurantes: Restaurante })[]>([])
   const [heroBanners, setHeroBanners] = useState<LandingBanner[]>([])
