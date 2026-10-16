@@ -1,10 +1,10 @@
-# Movimiento de la web cliente — ampliación local del 16 de octubre de 2026
+# Movimiento de la web cliente — 16 de octubre de 2026
 
 ## Alcance y estado
 
 Ampliación local de la web cliente de Estrella Eats: tercer paso de bienvenida, profundidad de fotografía y transiciones de contenido en home, menú, carrito, selección de sucursal e información pública. Se conserva la identidad existente: blanco, Outfit, tinta, naranja Estrella, logo y fotografía actuales. No se añadieron activos, dependencias ni promesas comerciales; `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` conservan su alcance previo.
 
-La ampliación de scroll y ofertas revisada sobre `3900976` se publicó después en `main` con `85800f653c7223345264e1418a3440ec7a9cf0e2`. Vercel `EPPqApb5jAt18E6FQWJQmz8A3wSN` terminó en success; la comprobación del dominio a `2026-10-16T16:39:44Z` registró todos los controles true en `public-motion-assets.json`, incluidos `index-CCLydwut.js` y `PublicLandingPage-DlW5WVgh.js`. La extensión más reciente de los tres momentos descritos al final está **sin commit y pendiente de publicación**, sobre esa base, en `C:/Users/Kaleb/.codex/tmp/eats-branches-release-20261015`. Su publicación ya está autorizada, pero requiere su propio commit y recibo verificado. La evidencia interactiva es local; no hubo cambios de SQL, runtime del worker, roles, WABA ni APK.
+La ampliación de scroll y ofertas revisada sobre `3900976` se publicó después en `main` con `85800f653c7223345264e1418a3440ec7a9cf0e2`. Vercel `EPPqApb5jAt18E6FQWJQmz8A3wSN` terminó en success; la comprobación del dominio a `2026-10-16T16:39:44Z` registró todos los controles true en `public-motion-assets-85800f6.json`, incluidos `index-CCLydwut.js` y `PublicLandingPage-DlW5WVgh.js`. La extensión posterior de tres momentos también está **publicada** en `main` con `58a18597cdd0d0b17876352eb328b153471879c2`, con Vercel success y activos del dominio verificados según el recibo al final. La evidencia interactiva es local; no hubo cambios de SQL, runtime del worker, roles, WABA ni APK.
 
 [WELCOME_AND_NOTIFICATIONS_20261016.md](WELCOME_AND_NOTIFICATIONS_20261016.md) conserva el recibo histórico del release funcional `cd946f9`: bienvenida de **dos** pasos y avisos publicados. Ese recibo no publica ni certifica la ampliación aquí descrita.
 
@@ -109,7 +109,7 @@ La fotografía del hero añade máscara focal y una opción cinematográfica en 
 
 `SiteJourneyProvider.tsx`, `RestaurantMotionLink.tsx`, `lib/siteJourney.ts` y `hooks/useSiteJourney.ts` conectan la imagen del restaurante con la identidad real del menú de destino. El enlace navega inmediatamente y conserva clics con modificadores. La capa visual usa la imagen pública con `contain`; error o plazo de 1500ms cancelan la capa, sin cancelar la navegación.
 
-El vuelo de producto se dispara únicamente cuando aumenta la cantidad confirmada en la tarjeta. Abrir opciones no lo inicia. Usa la posición real del carrito en el DOM, recorre un arco de 620ms con límite superior de 12px, permite como máximo tres elementos visibles y vence a los 1200ms. Error, finalización y vencimiento limpian la capa. Los elementos decorativos son inert, `aria-hidden` y no reciben eventos del puntero. Movimiento reducido omite vuelos, escala y giro.
+El vuelo de producto se dispara únicamente cuando aumenta la cantidad confirmada en la tarjeta. Abrir opciones no lo inicia. Usa la posición real del carrito en el DOM, recorre un arco de 620ms con límite superior de 12px, permite como máximo tres elementos visibles y vence a los 1200ms. Error, finalización y vencimiento limpian la capa. Los elementos decorativos son no interactivos, `aria-hidden` y no reciben eventos del puntero. Movimiento reducido omite vuelos, escala y giro.
 
 Aprobaron el build y ESLint. Las **33 pruebas Deno con comprobación de tipos** aprobaron en dos ejecuciones separadas: las seis de `landingPromotions_test.ts` y las 27 de los cuatro archivos de regresión anteriores. Se usaron `--no-lock --unstable-sloppy-imports --config tests/deno.web.json`; la invocación combinada encontró un conflicto de tipado del grafo de módulos por extensión duplicada. Las ejecuciones separadas conservaron la comprobación de tipos y no añadieron supresiones. La integración de fuentes en el workspace original se comparó normalizando CRLF/LF y aprobó su build, preservando cambios ajenos; log privado `journey-original-build.log`. El detector `journey-detector.json` se ejecutó una vez y terminó con código 0.
 
@@ -123,4 +123,13 @@ Capturas finales abiertas en `C:/Users/Kaleb/.codex/private-backups/promotion-ru
 - `journey-cart-desktop-flight.png` y `journey-cart-mobile-flight.png`.
 - `journey-menu-mobile.png` y `journey-restaurant-mobile-transition.png`.
 
-Una revisión nueva, `journey_motion_finish_review`, comparó las seis capturas y las fuentes finales y devolvió disposición **ship**, sin hallazgos que exigieran corrección. Su alcance son estos tres momentos y la evidencia local indicada; no demuestra FPS físicos ni cobertura de Safari/iOS en hardware. La extensión permanece pendiente del recibo de su publicación autorizada.
+Una revisión nueva, `journey_motion_finish_review`, comparó las seis capturas y las fuentes finales y devolvió disposición **ship**, sin hallazgos que exigieran corrección. Su alcance son estos tres momentos y la evidencia local indicada; no demuestra FPS físicos ni cobertura de Safari/iOS en hardware.
+
+## Recibo de publicación de los tres momentos
+
+- Repositorio: `Commitplusx/restaurantes-estrella`, rama `main`, commit funcional `58a18597cdd0d0b17876352eb328b153471879c2`. La comparación posterior al push confirmó el mismo SHA remoto.
+- [Despliegue Vercel](https://vercel.com/deiffs-projects/restaurantes-estrella/CeV7wYCnjBACFe67RZWyDfxYmCv1): **success**.
+- [Dominio público](https://estrella-eats.mx/), comprobado a `2026-10-16T16:52:58Z`: entrada `/assets/index-nyQ8uOo8.js` y `PublicLandingPage-D9h_qkKM.js`.
+- La lectura pública confirmó tercer paso de bienvenida, plano de fotografía, ofertas agrupadas, preferencia de movimiento, recorridos de restaurante y producto, y ausencia de vistas DEV en el bundle público. Recibo privado: `public-motion-assets.json`.
+
+La publicación es sólo de la web. Las capturas y la QA de interacción descritas arriba siguen siendo locales; verificar activos publicados no equivale a una prueba física de fluidez ni de recepción de notificaciones.
