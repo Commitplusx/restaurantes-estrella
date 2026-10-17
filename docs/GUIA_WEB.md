@@ -71,4 +71,6 @@ Antes de cambiar backend: elegir el síntoma, comprobar tenant/proyecto, leer la
 
 ## Movimiento conectado — 17 de octubre de 2026
 
+Entrega posterior autorizada a GitHub main: [opciones y reemplazo de carrito](MENU_CHOICES_LOCAL_20261017.md) y [parallax individual por fotografía](PARALLAX_REFINEMENT_LOCAL_20261017.md). Incluye validación de precios/opciones, confirmación real antes de reemplazar y geometría acotada con observación compartida. Sin bibliotecas nuevas. La revisión visual está pendiente de acceso al navegador; la subida a GitHub no equivale a una verificación de Vercel, Supabase o APK. El recibo anterior descrito a continuación pertenece a `1ba10e9`.
+
 Foto continua entre tarjeta/menú y regreso al catálogo, vuelo ligado a agregados reales del carrito (incluido el primero y opciones) y encabezado compacto del restaurante. Geometría proporcional, restauración de posición vertical/lateral una sola vez, medición real del header y cancelaciones/vencimientos acotados. Se conserva la política obligatoria de movimiento. No modifica reglas, precios ni consultas del backend. Build, lint, 16 pruebas tipadas, navegador 320/390/1280 y confirmación del build de producción comprobados; delta de 2478 bytes gzip de JavaScript sin dependencias. [Contrato, presupuesto y límites](CONNECTED_MOTION_20261017.md).

@@ -6,7 +6,9 @@ import { useHaptics } from '../hooks/useHaptics'
 import { supabase } from '../lib/supabase'
 // import * as h3 from 'h3-js' (movido al hook)
 import type { Restaurante, MenuCategoria, MenuItem, MenuCombo, MenuPromocion } from '../lib/supabase'
-import { availableOptionGroups, validateOptionSelection, type OpcionItem } from '../lib/menuOptions'
+import { availableOptionGroups } from '../lib/menuOptions'
+import MenuOptionsDialog from '../components/MenuOptionsDialog';
+import CartReplacementDialog from '../components/CartReplacementDialog';
 import { useDeliveryCalculation } from '../hooks/useDeliveryCalculation'
 import {
   Store,
@@ -222,9 +224,7 @@ export function PublicMenuView() {
 
   const [selectedItemDetail, setSelectedItemDetail] = useState<any | null>(null)
 
-  // Wizard de opciones — paso actual
-  const [optionsStep, setOptionsStep] = useState(0)
-  const optionsAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [pendingCartProduct, setPendingCartProduct] = useState<{ product: CartItem & { foto_url?: string }; restaurantId: string } | null>(null)
 
   // Estado del carrito y drawer (Global via Zustand)
   const carrito = useCartStore(state => state.carrito as { item: CartItem & { foto_url?: string }, cantidad: number }[])
@@ -455,12 +455,7 @@ export function PublicMenuView() {
   // Estado del modal de opciones de producto
   type OptionableItem = (MenuItem | MenuCombo | MenuPromocion) & { __tipo: 'item' | 'combo' | 'promo', nombre?: string, precio?: number }
   const [selectedItemForOptions, setSelectedItemForOptions] = useState<OptionableItem | null>(null)
-  // Resetear el paso del wizard cuando cambia el item seleccionado
-  useEffect(() => { setOptionsStep(0); setSelectedOptionsState({}) }, [selectedItemForOptions])
-  useEffect(() => () => {
-    if (optionsAdvanceTimer.current !== null) clearTimeout(optionsAdvanceTimer.current);
-    optionsAdvanceTimer.current = null;
-  }, [selectedItemForOptions, optionsStep])
+  useEffect(() => { setPendingCartProduct(null); setSelectedItemForOptions(null); }, [id])
 
   useEffect(() => {
     const fetchEta = async () => {
@@ -474,7 +469,6 @@ export function PublicMenuView() {
     fetchEta();
   }, []);
 
-  const [selectedOptionsState, setSelectedOptionsState] = useState<Record<string, Record<string, boolean>>>({})
 
   const showToast = (title: string, message?: string, type: 'success' | 'error' | 'loading' = 'success') => {
     setToastMsg({ title, message, type })
@@ -858,47 +852,29 @@ export function PublicMenuView() {
   const descuentoVip = (usarSaldoVip && datosCliente?.es_vip && pinAutorizado) ? Math.max(0, parseFloat(montoSaldoVip || '0')) : 0;
   */
 
-  const addToCart = (product: CartItem & { foto_url?: string }) => {
+  const addToCart = (product: CartItem & { foto_url?: string }, confirmedRestaurantId?: string): boolean => {
+    if (!restaurante) return false;
+    if (!estaAbierto(restaurante)) {
+      setShowClosedToast(true);
+      setTimeout(() => setShowClosedToast(false), 3500);
+      return false;
+    }
+    const current = useCartStore.getState();
+    const origin = cartRestaurantOrigin(current.restaurantId, sessionStorage.getItem('est_carrito_restaurante'));
+    const replacing = requiresNewBranchCart(current.carrito.length, origin, restaurante.id);
+    if (replacing && confirmedRestaurantId !== restaurante.id) {
+      setPendingCartProduct({ product, restaurantId: restaurante.id });
+      return false;
+    }
+    if (replacing) {
+      _clearCart();
+      sessionStorage.removeItem('est_checkoutstep');
+    }
+    useCartStore.getState().setRestaurantId(restaurante.id);
+    sessionStorage.setItem('est_carrito_restaurante', restaurante.id);
+    _addToCart(product);
     vibrateSuccess();
-
-    if (restaurante && !estaAbierto(restaurante)) {
-      setShowClosedToast(true)
-      setTimeout(() => setShowClosedToast(false), 3500)
-      return
-    }
-
-    // Bugfix: Solamente permitir pedir de un restaurante a la vez
-    const currentRestId = cartRestaurantOrigin(useCartStore.getState().restaurantId, sessionStorage.getItem('est_carrito_restaurante'))
-    if (restaurante && requiresNewBranchCart(carrito.length, currentRestId, restaurante.id)) {
-      const confirm = window.confirm('Tienes un pedido guardado de otra ubicación o de una versión anterior. ¿Quieres vaciarlo y empezar un pedido nuevo aquí?');
-      if (confirm) {
-        _clearCart()
-        _addToCart(product)
-        useCartStore.getState().setRestaurantId(restaurante.id)
-        sessionStorage.setItem('est_carrito_restaurante', restaurante.id)
-        sessionStorage.removeItem('est_checkoutstep')
-        showToast('Carrito nuevo', 'Iniciaste un pedido en este restaurante.', 'success')
-      }
-      return
-    } else if (carrito.length === 0 && restaurante) {
-      useCartStore.getState().setRestaurantId(restaurante.id)
-        sessionStorage.setItem('est_carrito_restaurante', restaurante.id)
-    } else if (restaurante && currentRestId === restaurante.id) {
-      useCartStore.getState().setRestaurantId(restaurante.id)
-    }
-
-    // Bugfix: Evitar fraude con cupones. Si cambia el carrito, obligar a re-evaluar el cupón.
-    /*
-    if (cuponValido) {
-      setCuponValido(false)
-      setDescuento(0)
-      setCuponCliente('')
-      setCuponPlataformaIdManual(null)
-      showToast('Aviso', 'Modificaste el carrito. Vuelve a aplicar tu cupón.', 'success')
-    }
-    */
-
-    _addToCart(product)
+    return true;
   }
 
   const removeFromCart = (cartItemId: string) => {
@@ -1238,7 +1214,7 @@ export function PublicMenuView() {
           </div>
         )}
 
-        <ScrollDepthGroup className="menu-catalog-layout" distance={24}>
+        <ScrollDepthGroup className="menu-catalog-layout" distance={18} local>
         {/* Categorías del catálogo */}
         {(categorias.filter(c => items.some(i => i.categoria_id === c.id)).length > 0 || combos.length > 0 || promos.length > 0) && (
           <nav className="menu-category-nav" aria-label="Categorías del menú">
@@ -1328,7 +1304,6 @@ export function PublicMenuView() {
                               onDetails={() => {
                                 if (item.opciones?.length && !item.agotado_hoy && !fueraDeHorario) {
                                   setSelectedItemForOptions({ ...item, __tipo: 'item' });
-                                  setSelectedOptionsState({});
                                 } else {
                                   setSelectedItemDetail({ ...item, cartItemTipo: 'item', unavailable: item.agotado_hoy || fueraDeHorario });
                                 }
@@ -1337,7 +1312,6 @@ export function PublicMenuView() {
                                 if (item.agotado_hoy || fueraDeHorario) return;
                                 if (item.opciones?.length) {
                                   setSelectedItemForOptions({ ...item, __tipo: 'item' });
-                                  setSelectedOptionsState({});
                                 } else addToCart({ ...cartItem, cartItemId: item.id });
                               }}
                             />
@@ -1376,7 +1350,6 @@ export function PublicMenuView() {
                         onAdd={() => {
                           if (combo.opciones?.length) {
                             setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
-                            setSelectedOptionsState({});
                           } else addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
                         }}
                       />
@@ -1475,7 +1448,6 @@ export function PublicMenuView() {
                         
                         if (selectedItemDetail.opciones && selectedItemDetail.opciones.length > 0) {
                           setSelectedItemForOptions({ ...selectedItemDetail, __tipo: selectedItemDetail.cartItemTipo })
-                          setSelectedOptionsState({})
                         } else {
                           vibrateSuccess();
                           addToCart(cartItem)
@@ -1530,364 +1502,31 @@ export function PublicMenuView() {
 
 
 
-      {/* MODAL DE OPCIONES — WIZARD PASO A PASO */}
       <AnimatePresence>
-        {selectedItemForOptions && (() => {
-          const grupos = availableOptionGroups(selectedItemForOptions.opciones || [], items, restaurante?.id || '');
-          const totalSteps = grupos.length;
-          const grupo = grupos[optionsStep];
-          const seleccionados = grupo ? (selectedOptionsState[grupo.titulo] || {}) : {};
-          const countSelected = Object.values(seleccionados).filter(Boolean).length;
-          const isLastStep = optionsStep === totalSteps - 1;
-          const isFirstStep = optionsStep === 0;
-
-          const handleToggle = (opc: OpcionItem) => {
-            if (!grupo) return;
-            const isRadio = grupo.maximo_selecciones === 1;
-            if (optionsAdvanceTimer.current !== null) clearTimeout(optionsAdvanceTimer.current);
-            // Auto-avance FUERA del updater para evitar doble llamada en StrictMode
-            if (isRadio && !isLastStep) {
-              // Usamos optionsStep directo para evitar que múltiples taps rápidos salten pasos (race condition)
-              optionsAdvanceTimer.current = setTimeout(() => setOptionsStep(optionsStep + 1), 200);
-            }
-            setSelectedOptionsState(prev => {
-              const groupState = { ...(prev[grupo.titulo] || {}) };
-              if (isRadio) {
-                return { ...prev, [grupo.titulo]: !grupo.requerido && groupState[opc.nombre] ? {} : { [opc.nombre]: true } };
-              } else {
-                const already = !!groupState[opc.nombre];
-                if (already) {
-                  delete groupState[opc.nombre];
-                } else {
-                  if (Object.values(groupState).filter(Boolean).length >= grupo.maximo_selecciones) return prev;
-                  groupState[opc.nombre] = true;
-                }
-                return { ...prev, [grupo.titulo]: groupState };
-              }
-            });
-          };
-
-          const handleNext = () => {
-            if (optionsAdvanceTimer.current !== null) clearTimeout(optionsAdvanceTimer.current);
-            if (grupo?.requerido && countSelected === 0) {
-              // Shake sin toast
-              const btn = document.getElementById('wizard-next-btn');
-              if (btn) {
-                btn.animate([
-                  { transform: 'translateX(0)' },
-                  { transform: 'translateX(-8px)' },
-                  { transform: 'translateX(8px)' },
-                  { transform: 'translateX(-6px)' },
-                  { transform: 'translateX(6px)' },
-                  { transform: 'translateX(0)' },
-                ], { duration: 320, easing: 'ease-out' });
-              }
-              return;
-            }
-            if (isLastStep) {
-              const selectionError = validateOptionSelection(grupos, selectedOptionsState);
-              if (selectionError) { showToast('Revisa la selección', selectionError, 'error'); return }
-              // Agregar al carrito
-              let precioExtra = 0;
-              const opcionesSel: OpcionSeleccionada[] = [];
-              grupos.forEach(g => {
-                g.opciones.forEach(o => {
-                  if (selectedOptionsState[g.titulo]?.[o.nombre]) {
-                    precioExtra += (o.precio_extra || 0);
-                    opcionesSel.push({ 
-                      grupo_id: g.id || g.titulo, 
-                      grupo: g.titulo, 
-                      opcion_id: o.id || o.nombre, 
-                      opcion: o.nombre, 
-                      precio_extra: o.precio_extra || 0,
-                      ...(o.menu_item_id ? { menu_item_id: o.menu_item_id } : {}),
-                    });
-                  }
-                });
-              });
-              const hashId = selectedItemForOptions.id + '_' + opcionesSel.map(o => `${o.grupo}:${o.menu_item_id || o.opcion}`).sort().join('_');
-              const itemToAdd: CartItem = {
-                id: selectedItemForOptions.id,
-                cartItemId: hashId,
-                nombre: selectedItemForOptions.nombre || 'Promoción',
-                precio: (selectedItemForOptions.precio || 0) + precioExtra,
-                tipo: selectedItemForOptions.__tipo,
-                opcionesSeleccionadas: opcionesSel,
-                aplica_subsidio: selectedItemForOptions.aplica_subsidio
-              };
-              addToCart({ ...itemToAdd, foto_url: selectedItemForOptions.foto_url || undefined });
-              setSelectedItemForOptions(null);
-              showToast(
-  'Agregado', // 1. Título de la notificación
-  `${selectedItemForOptions?.nombre || 'Promoción'} añadido al carrito` // 2. Mensaje descriptivo
-);
-            } else {
-              setOptionsStep(s => s + 1);
-            }
-          };
-
-          // Precio total acumulado hasta el paso actual
-           const precioActual = (selectedItemForOptions?.precio || 0) + grupos.reduce((sum, g) => {
-          return sum + g.opciones.reduce((s2, o) => {
-         return s2 + (selectedOptionsState[g.titulo]?.[o.nombre] ? (o.precio_extra || 0) : 0);
-         }, 0);
-         }, 0); 
-
-          return (
-            <div data-product-motion-dialog data-product-motion-key={`${selectedItemForOptions.__tipo}:${selectedItemForOptions.id}`} className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
-              <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-                onClick={() => setSelectedItemForOptions(null)}
-              />
-              <motion.div
-                initial={{ y: "100%", opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: "100%", opacity: 0 }}
-                transition={{ type: "spring", damping: 32, stiffness: 280, mass: 0.9 }}
-                className="relative w-full sm:max-w-lg bg-white sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-              >
-                {/* ── HEADER ── */}
-                <div className="px-6 pt-6 pb-4 shrink-0 bg-white">
-                  <div className="flex justify-between items-start gap-3 mb-4">
-                    <div className="flex-1">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">{selectedItemForOptions.nombre}</p>
-                      {grupo && (
-                        <div className="flex items-start gap-2">
-                          <h3 className="text-[22px] font-black text-slate-900 tracking-tight leading-tight flex-1">{grupo.titulo}</h3>
-                          {grupo.requerido && countSelected === 0 && (
-                            <span className="shrink-0 mt-1.5 text-[10px] font-black uppercase tracking-widest bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-100">
-                              Requerido
-                            </span>
-                          )}
-                          {grupo.requerido && countSelected > 0 && (
-                            <span className="shrink-0 mt-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100">
-                              ✓ Listo
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {grupo?.maximo_selecciones > 1 && (
-                        <p className="text-[13px] text-slate-400 mt-1">
-                          Elige hasta {grupo.maximo_selecciones}
-                          {countSelected > 0 && (
-                            <span className="ml-1.5 font-bold text-orange-500">— {countSelected} elegid{countSelected === 1 ? 'a' : 'as'}</span>
-                          )}
-                        </p>
-                      )}
-                      {grupo?.maximo_selecciones === 1 && (
-                        <p className="text-[13px] text-slate-600 mt-1">{grupo.requerido ? 'Elige 1 opción' : 'Opcional: elige 1 o continúa sin extras.'}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setSelectedItemForOptions(null)}
-                      className="w-9 h-9 shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 active:bg-slate-200 transition-colors"
-                    >
-                      <X size={18} className="stroke-[2.5px]" />
-                    </button>
-                  </div>
-
-                  {/* ── PROGRESS BAR + DOTS ── */}
-                  {totalSteps > 1 && (
-                    <div className="space-y-2">
-                      {/* Barra de progreso */}
-                      <div className="relative h-1 bg-slate-100 rounded-full overflow-hidden">
-                        <motion.div
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-[#FA4A0C] to-orange-400 rounded-full"
-                          initial={false}
-                          animate={{ width: `${((optionsStep + 1) / totalSteps) * 100}%` }}
-                          transition={{ type: 'spring', stiffness: 180, damping: 28 }}
-                        />
-                      </div>
-                      {/* Dots con checkmarks */}
-                      <div className="flex items-center gap-1.5">
-                        {grupos.map((_: any, i: number) => {
-                          const done = i < optionsStep;
-                          const active = i === optionsStep;
-                          return (
-                            <motion.div
-                              key={i}
-                              layout
-                              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                              className={`rounded-full flex items-center justify-center ${
-                                active ? 'w-6 h-2.5 bg-[#FA4A0C]'
-                                : done  ? 'w-2.5 h-2.5 bg-emerald-400'
-                                :         'w-2.5 h-2.5 bg-slate-200'
-                              }`}
-                            >
-                              {done && (
-                                <motion.svg
-                                  initial={{ opacity: 0, scale: 0 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.05 }}
-                                  viewBox="0 0 10 10" fill="none" className="w-1.5 h-1.5"
-                                >
-                                  <path d="M8.5 2.5L4 7.5L1.5 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </motion.svg>
-                              )}
-                            </motion.div>
-                          );
-                        })}
-                        <span className="ml-auto text-[11px] text-slate-400 font-bold tabular-nums">{optionsStep + 1}&thinsp;/&thinsp;{totalSteps}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── SEPARADOR ── */}
-                <div className="h-px bg-slate-100 shrink-0" />
-
-                {/* ── CONTENIDO DEL PASO ACTUAL (animado) ── */}
-                <div className="flex-1 overflow-y-auto">
-                  <AnimatePresence mode="wait">
-                    {grupo && (
-                      <motion.div
-                        key={optionsStep}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
-                        className="px-5 py-5"
-                      >
-                        {grupo.opciones.length === 0 && <p role="alert" className="py-4 text-sm text-slate-700">Los productos de este grupo no están disponibles ahora. Elige otra promoción.</p>}
-                        {grupo.opciones.every(o => !o.precio_extra || o.precio_extra === 0) ? (
-                          // ── Chips compactos (sin precio extra) ──
-                          <div className="flex flex-wrap gap-2.5">
-                            {grupo.opciones.map((opc, oIdx) => {
-                              const isSelected = !!seleccionados[opc.nombre];
-                              return (
-                                <motion.button
-                                  key={oIdx}
-                                  type="button"
-                                  onClick={() => handleToggle(opc)}
-                                  whileTap={{ scale: 0.93 }}
-                                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                  style={{ minHeight: '44px' }}
-                                  aria-pressed={isSelected}
-                                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-semibold
-                                    select-none whitespace-nowrap border-2
-                                    transition-colors duration-200
-                                    ${isSelected
-                                      ? 'bg-[#FA4A0C] text-white border-[#FA4A0C] shadow-md shadow-orange-200'
-                                      : 'bg-white text-slate-700 border-slate-200'
-                                    }`}
-                                >
-                                  {isSelected ? (
-                                    grupo.maximo_selecciones === 1
-                                      ? <div className="w-2.5 h-2.5 rounded-full bg-white shrink-0" />
-                                      : <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5 shrink-0"><path d="M11.6666 3.5L5.24992 9.91667L2.33325 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  ) : (
-                                    grupo.maximo_selecciones === 1
-                                      ? <div className="w-2.5 h-2.5 rounded-full border-2 border-slate-300 shrink-0" />
-                                      : null
-                                  )}
-                                  {opc.nombre}
-                                </motion.button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          // ── Lista detallada (con precio extra) ──
-                          <div className="space-y-1.5">
-                            {grupo.opciones.map((opc, oIdx) => {
-                              const isSelected = !!seleccionados[opc.nombre];
-                              return (
-                                <motion.button
-                                  key={oIdx}
-                                  type="button"
-                                  onClick={() => handleToggle(opc)}
-                                  whileTap={{ scale: 0.98 }}
-                                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                                  style={{ minHeight: '56px' }}
-                                  aria-pressed={isSelected}
-                                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl select-none border-2
-                                    transition-colors duration-200
-                                    ${isSelected
-                                      ? 'bg-orange-50 border-[#FA4A0C]'
-                                      : 'bg-white border-slate-200'
-                                    }`}
-                                >
-                                  <span className={`text-[15px] font-semibold ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
-                                    {opc.nombre}
-                                  </span>
-                                  <div className="flex items-center gap-3">
-                                    {opc.precio_extra > 0 && (
-                                      <span className={`text-[13px] font-bold ${isSelected ? 'text-[#FA4A0C]' : 'text-slate-400'}`}>
-                                        +${opc.precio_extra.toFixed(2)}
-                                      </span>
-                                    )}
-                                    <motion.div
-                                      animate={isSelected
-                                        ? { backgroundColor: '#FA4A0C', borderColor: '#FA4A0C', scale: 1.08 }
-                                        : { backgroundColor: '#ffffff', borderColor: '#cbd5e1', scale: 1 }
-                                      }
-                                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                      className="w-5 h-5 flex items-center justify-center rounded-full border-2"
-                                    >
-                                      {isSelected && (
-                                        <motion.svg
-                                          initial={{ opacity: 0, scale: 0.3 }}
-                                          animate={{ opacity: 1, scale: 1 }}
-                                          transition={{ type: 'spring', stiffness: 600, damping: 25 }}
-                                          viewBox="0 0 14 14" fill="none" className="w-3 h-3 text-white"
-                                        >
-                                          <path d="M11.6666 3.5L5.24992 9.91667L2.33325 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </motion.svg>
-                                      )}
-                                    </motion.div>
-                                  </div>
-                                </motion.button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* ── FOOTER: Atrás / Siguiente / Agregar ── */}
-                <div className="px-5 py-4 border-t border-slate-100 bg-white shrink-0 flex gap-3">
-                  {!isFirstStep && (
-                    <motion.button
-                      whileTap={{ scale: 0.94 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      onClick={() => setOptionsStep(s => s - 1)}
-                      style={{ minHeight: '52px' }}
-                      className="flex items-center justify-center gap-1.5 px-5 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-[14px] transition-colors duration-150 shrink-0 hover:bg-slate-50"
-                    >
-                      <ChevronDown size={18} className="rotate-90" /> Atrás
-                    </motion.button>
-                  )}
-                  <motion.button
-                    id="wizard-next-btn"
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    onClick={handleNext}
-                    style={{ minHeight: '52px' }}
-                    className={`flex-1 rounded-2xl font-black text-[15px] transition-colors duration-300 flex items-center justify-between px-5
-                      ${ isLastStep
-                        ? 'bg-[#FA4A0C] text-white shadow-lg shadow-orange-300/40'
-                        : grupo?.requerido && countSelected === 0
-                          ? 'bg-slate-100 text-slate-400'
-                          : 'bg-slate-900 text-white'
-                      }`}
-                  >
-                    <span>{isLastStep ? 'Añadir al Carrito' : 'Siguiente'}</span>
-                    {isLastStep
-                      ? <span className="text-white/90 font-black">${precioActual.toFixed(2)}</span>
-                      : <ChevronDown size={20} className="rotate-[-90deg]" />
-                    }
-                  </motion.button>
-                </div>
-              </motion.div>
-            </div>
-          );
-        })()}
+        {selectedItemForOptions && <MenuOptionsDialog key={selectedItemForOptions.id}
+          product={{ id: selectedItemForOptions.id, nombre: selectedItemForOptions.nombre || selectedItemForOptions.titulo || 'Promoción',
+            precio: selectedItemForOptions.precio ?? selectedItemForOptions.precio_especial,
+            tipo: selectedItemForOptions.__tipo, foto_url: selectedItemForOptions.foto_url || undefined,
+            aplica_subsidio: selectedItemForOptions.aplica_subsidio }}
+          groups={availableOptionGroups(selectedItemForOptions.opciones || [], items, restaurante?.id || '')}
+          onClose={() => setSelectedItemForOptions(null)}
+          onAdd={product => {
+            const added = addToCart(product);
+            setSelectedItemForOptions(null);
+            if (added) showToast('Agregado a tu pedido', product.nombre, 'success');
+          }} />}
       </AnimatePresence>
-
-
-
+      <AnimatePresence>
+        {pendingCartProduct && restaurante?.id === pendingCartProduct.restaurantId && <CartReplacementDialog
+          key={pendingCartProduct.product.cartItemId}
+          product={pendingCartProduct.product} restaurantName={restaurante.nombre_sucursal ? restaurante.nombre + ' · ' + restaurante.nombre_sucursal : restaurante.nombre}
+          count={cartCount} onCancel={() => setPendingCartProduct(null)}
+          onConfirm={() => {
+            const added = addToCart(pendingCartProduct.product, pendingCartProduct.restaurantId);
+            setPendingCartProduct(null);
+            if (added) showToast('Tu nuevo pedido está listo', pendingCartProduct.product.nombre + ' agregado al carrito.', 'success');
+          }} />}
+      </AnimatePresence>
 
     {/* Toast notification */}
     <AnimatePresence>

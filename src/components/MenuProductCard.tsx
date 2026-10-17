@@ -31,7 +31,7 @@ export default function MenuProductCard({
   const previousQuantity = useRef(quantity);
   useEffect(() => {
     if (quantity > previousQuantity.current && enabled) {
-      void controls.start({ scale: [1, 1.018, 1], transition: { duration: .36, ease: SITE_EASE } });
+      void controls.start({ borderColor: ['#e8e8ed', '#bd3818', '#e8e8ed'], transition: { duration: .38, ease: SITE_EASE } });
     }
     previousQuantity.current = quantity;
   }, [quantity, enabled, controls]);
@@ -40,7 +40,7 @@ export default function MenuProductCard({
     <motion.article className="menu-product" data-product-motion-key={productKey} data-unavailable={Boolean(unavailable)} animate={controls}>
       <button type="button" className="menu-product-details" onClick={onDetails} aria-label={`Ver ${name}`}>
         <div className="menu-product-photo" data-product-motion-photo>
-          {image && image !== failedSource ? <ParallaxMedia depth={5}><img src={image} alt="" loading="lazy" decoding="async" onError={() => setFailedSource(image)} /></ParallaxMedia>
+          {image && image !== failedSource ? <ParallaxMedia depth={4} cinematic><img src={image} alt="" loading="lazy" decoding="async" onError={() => setFailedSource(image)} /></ParallaxMedia>
             : <Utensils size={32} strokeWidth={1.4} aria-hidden="true" />}
           {badge && <span className="menu-product-badge">{badge}</span>}
         </div>

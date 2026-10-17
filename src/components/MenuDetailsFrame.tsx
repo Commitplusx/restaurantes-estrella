@@ -2,17 +2,27 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { motion, useIsPresent } from 'framer-motion';
 
-export default function MenuDetailsFrame({ children, onClose, productKey }: { children: ReactNode; onClose: () => void; productKey?: string }) {
+const activeDialogs: HTMLDivElement[] = [];
+let originalOverflow = '';
+
+export default function MenuDetailsFrame({ children, onClose, productKey, variant = 'product', titleId = 'menu-detail-title' }: {
+  children: ReactNode; onClose: () => void; productKey?: string; variant?: 'product' | 'options' | 'confirm'; titleId?: string;
+}) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   const isPresent = useIsPresent();
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => {
+    if (!isPresent) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
+    if (activeDialogs.length === 0) originalOverflow = document.body.style.overflow;
+    activeDialogs.push(dialog);
     document.body.style.overflow = 'hidden';
-    dialogRef.current?.focus({ preventScroll: true });
+    (dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]') || dialog).focus({ preventScroll: true });
     const handleKey = (event: KeyboardEvent) => {
+      if (activeDialogs[activeDialogs.length - 1] !== dialog) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         closeRef.current();
@@ -32,14 +42,16 @@ export default function MenuDetailsFrame({ children, onClose, productKey }: { ch
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = previousOverflow;
-      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      const index = activeDialogs.indexOf(dialog);
+      if (index !== -1) activeDialogs.splice(index, 1);
+      if (activeDialogs.length === 0) document.body.style.overflow = originalOverflow;
+      if (previousFocus?.isConnected && !previousFocus.closest('[inert]')) previousFocus.focus({ preventScroll: true });
     };
-  }, []);
+  }, [isPresent]);
 
   return (
-    <motion.div className="menu-detail-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }} onClick={onClose} inert={!isPresent}>
-      <motion.div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="menu-detail-title" className="menu-detail-sheet" data-product-motion-key={productKey}
+    <motion.div className={`menu-detail-backdrop menu-detail-backdrop--${variant}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }} onClick={onClose} inert={!isPresent}>
+      <motion.div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`menu-detail-sheet menu-detail-sheet--${variant}`} data-product-motion-dialog data-product-motion-key={productKey}
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 12, opacity: 0 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} onClick={event => event.stopPropagation()}>
         {children}
       </motion.div>

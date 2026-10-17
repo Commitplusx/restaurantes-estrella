@@ -4,6 +4,7 @@ export type CartItemOption = {
   grupo_id: string;
   grupo: string;
   precio_extra: number;
+  menu_item_id?: string;
 };
 
 export type CartItem = {
