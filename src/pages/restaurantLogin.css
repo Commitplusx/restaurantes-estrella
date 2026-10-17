@@ -575,14 +575,3 @@
     font-size: 32px;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .restaurant-login *,
-  .restaurant-login *::before,
-  .restaurant-login *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}

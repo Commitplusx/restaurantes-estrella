@@ -1,5 +1,7 @@
 # Guía técnica de la web — 12 de octubre de 2026
 
+**Movimiento obligatorio, 17 de octubre:** el selector manual se elimina de todas las entradas, incluida bienvenida y DEV. Se ignora la elección antigua y se presenta movimiento completo. [Política, alcance y verificación](MOTION_REQUIRED_20261017.md). Las referencias siguientes a controles o modo reducido describen versiones anteriores.
+
 **Actualización del 17 de octubre:** recibos, tracker y tarjetas activas usan la RPC de seguimiento con acceso privado en el fragmento; catálogo/sucursales usan la vista pública. La recuperación de otro pedido no consume el carrito nuevo. [Contrato, pruebas, dependencia push y límites de publicación](TRACKING_ACCESS_20261017.md). Se envía a main para que Kaleb compruebe Vercel; las lecturas amplias del backend siguen pendientes de corte. Los apartados anteriores son historial cuando discrepan con esta actualización.
 
 ## Fuente y alcance

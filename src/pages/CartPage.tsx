@@ -80,10 +80,6 @@ const LazyImage = ({ src, alt, className }: { src?: string | null, alt?: string,
 // Helper para scroll suave garantizado en todos los móviles (iOS Safari a veces ignora behavior: 'smooth')
 const smoothScroll = (element: HTMLElement | null, target: number, duration: number) => {
   if (!element) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    element.scrollTop = target;
-    return;
-  }
   const start = element.scrollTop;
   const change = target - start;
   const startTime = performance.now();
@@ -765,7 +761,7 @@ export default function CartPage() {
     if (checkoutStep === 2 && !isStepValid()) {
       if (promotionEligibility.blocked) {
         showToast('Revisa tus promociones', promotionEligibility.message || promotionEligibility.issues[0]?.message || 'Estamos comprobando las reglas. Espera un momento.', 'error');
-        document.getElementById('promotion-cart-rules')?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+        document.getElementById('promotion-cart-rules')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
         return;
       }
       const invalidContact = clienteTel.replace(/\D/g, '').length !== 10 || !clienteNombre.trim();

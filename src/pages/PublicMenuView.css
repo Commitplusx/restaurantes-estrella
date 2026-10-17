@@ -131,6 +131,3 @@
   .menu-product-details { grid-template-columns: minmax(0,1fr) 88px; gap: 10px; }
   .menu-product-photo { width: 88px; height: 100px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .restaurant-menu-page *, .restaurant-menu-page *::before, .restaurant-menu-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-}

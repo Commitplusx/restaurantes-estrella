@@ -161,10 +161,6 @@
   .checkout-panel-heading, .checkout-section { padding: 18px; }
   .checkout-coupon { padding: 14px 18px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .checkout-page *, .checkout-page *::before, .checkout-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-  .checkout-page .checkout-confetti { display: none; }
-}
 .checkout-promotion-rules { display: flex; align-items: flex-start; gap: 12px; padding: 20px; margin-bottom: 24px; background: #fff4ed; border-radius: 14px; color: #9b2e10; overflow-wrap: anywhere; }
 .checkout-promotion-rules > svg { flex-shrink: 0; margin-top: 3px; }
 .checkout-promotion-rules h2 { font-size: 16px; margin: 0 0 8px; font-weight: 750; }

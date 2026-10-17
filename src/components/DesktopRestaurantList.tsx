@@ -152,7 +152,7 @@ function DesktopRow({ title, children }: { title: string; children: ReactNode })
     const el = ref.current;
     if (!el) return;
     el.scrollBy({ left: dir * el.clientWidth * 0.8,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      behavior: 'smooth' });
   };
 
   return (

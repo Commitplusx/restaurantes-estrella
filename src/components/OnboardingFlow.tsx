@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import { ArrowLeft, ArrowRight, MapPin, ShoppingBag, Utensils, Route, Pause, Play, Package, ChefHat } from 'lucide-react';
+import { ArrowLeft, ArrowRight, MapPin, ShoppingBag, Utensils, Route, Package, ChefHat } from 'lucide-react';
 import { useNoticeSlot } from '../hooks/useNoticeSlot';
 import { writePreference } from '../lib/noticePreferences';
 import { useSiteMotion } from '../hooks/useSiteMotion';
@@ -26,7 +26,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [imageFailed, setImageFailed] = useState(false);
-  const { enabled, toggle } = useSiteMotion();
+  const { enabled } = useSiteMotion();
   const reduced = !enabled;
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
@@ -114,7 +114,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         <header className="eats-welcome-header">
           <div className="eats-welcome-brand"><img src="/estrella-circle.png" alt="" width="38" height="38" /><span>estrella<span>eats.</span></span></div>
           <div className="eats-welcome-header-actions">
-            <button type="button" className="eats-welcome-motion-toggle" aria-label={reduced ? 'Ver animaciones completas' : 'Reducir animaciones'} onClick={toggle}>{reduced ? <Play size={17} aria-hidden="true" /> : <Pause size={17} aria-hidden="true" />}</button>
             <button type="button" onClick={complete}>Omitir<ArrowRight size={16} aria-hidden="true" /></button>
           </div>
         </header>

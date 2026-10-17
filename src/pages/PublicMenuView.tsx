@@ -40,7 +40,6 @@ import { restaurantMenuPath, RESTAURANT_PUBLIC_FIELDS, cartRestaurantOrigin, req
 import MenuDetailsFrame from '../components/MenuDetailsFrame';
 import './PublicMenuView.css';
 import { AnimatedCount } from '../components/AnimatedCount';
-import { MotionPreferenceButton } from '../components/MotionPreferenceButton';
 import { ScrollDepthGroup } from '../components/ParallaxMedia';
 import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
 
@@ -208,7 +207,7 @@ export function PublicMenuView() {
     if (activeChip && window.matchMedia('(max-width: 899px)').matches) {
       const list = categoryChipsRef.current;
       list.scrollTo({ left: activeChip.offsetLeft - (list.clientWidth - activeChip.offsetWidth) / 2,
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        behavior: 'smooth' });
     }
   }, [activeTab])
 
@@ -1510,7 +1509,6 @@ export function PublicMenuView() {
         <span>EstrellaEats</span>
         <Link to="/terminos">Términos y condiciones</Link>
         <Link to="/privacidad">Aviso de privacidad</Link>
-        <MotionPreferenceButton />
       </footer>
 
       {/* Floating Cart Button en Mobile */}

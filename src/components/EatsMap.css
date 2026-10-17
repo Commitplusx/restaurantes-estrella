@@ -13,7 +13,6 @@
 .eats-map-marker-face {animation:eats-marker-appear .3s cubic-bezier(.16,1,.3,1);}
 .eats-map-marker-face {transition:background .15s;}.eats-map-marker:hover .eats-map-marker-face {background:#3a3a3c;}
 @keyframes eats-marker-appear {from {opacity:.65;transform:translateY(5px) scale(.94);}to {opacity:1;transform:translateY(0) scale(1);}}
-@media (prefers-reduced-motion:reduce) {.eats-map-marker-face {animation:none;transition:background .1s;}}
 
 /* Neutral map lets each restaurant's own identity stand out. */
 .eats-discovery { --map-paper:#f1f2f1; --map-ink:#252528; --map-orange:#bd3818; --map-muted:#66676b; --map-line:#e4e4e7; --map-open:#276245; position:absolute; inset:0; width:100%; height:100%; isolation:isolate; font-family:Outfit,sans-serif; color:var(--map-ink); }
@@ -107,4 +106,3 @@
   .eats-map-restaurant { padding:7px; min-height:90px; }
   .eats-discovery-controls { top:96px; }
 }
-@media (prefers-reduced-motion:reduce) { .eats-map-selected,.eats-location-pending { animation:none; } .eats-restaurant-pin .eats-map-marker-face { transition:none; } }

@@ -49,7 +49,7 @@ export function SuccessPage() {
           </>
         ) : (
           <>
-            <Loader2 className="w-10 h-10 text-blue-700 animate-spin motion-reduce:animate-none mx-auto mb-6" aria-hidden="true" />
+            <Loader2 className="w-10 h-10 text-blue-700 animate-spin mx-auto mb-6" aria-hidden="true" />
             <h2 className="text-2xl font-black text-slate-800 mb-3">{status === 'validating' ? 'Esperando confirmación' : 'Abriendo tu seguimiento'}</h2>
             <p className="text-slate-600">{status === 'validating' ? 'Tu pago todavía no está confirmado por el servidor.' : 'Estamos comprobando tu pedido para mostrarte su estado.'}</p>
           </>

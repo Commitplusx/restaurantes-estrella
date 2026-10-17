@@ -5,7 +5,3 @@
   .order-tracker[data-panel-expanded="true"] .mapboxgl-ctrl-top-right,
   .order-tracker[data-panel-expanded="true"] .tracking-map > button {display:none;}
 }
-@media (prefers-reduced-motion:reduce) {
-  .order-tracker [class*="transition-"] {transition:none;}
-  .order-tracker .animate-pulse,.order-tracker .animate-bounce {animation:none;}
-}

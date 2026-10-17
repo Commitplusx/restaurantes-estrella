@@ -1,5 +1,7 @@
 # Movimiento de la web cliente — 16 de octubre de 2026
 
+**Actualización del 17 de octubre:** Kaleb reiteró que el movimiento completo es obligatorio. Los selectores y la elección persistida descritos abajo se retiraron de la versión nueva. [Contrato vigente y evidencia](MOTION_REQUIRED_20261017.md). El resto conserva la historia de la ampliación del día 16.
+
 ## Alcance y estado
 
 Ampliación local de la web cliente de Estrella Eats: tercer paso de bienvenida, profundidad de fotografía y transiciones de contenido en home, menú, carrito, selección de sucursal e información pública. Se conserva la identidad existente: blanco, Outfit, tinta, naranja Estrella, logo y fotografía actuales. No se añadieron activos, dependencias ni promesas comerciales; `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` conservan su alcance previo.

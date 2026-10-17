@@ -73,7 +73,7 @@
  .benefits-next { margin-top: 32px; flex-direction: column; align-items: stretch; }
  .benefits-next h2 { font-size: 24px; }
 }
-@media (prefers-reduced-motion: no-preference) {
+@media screen {
  .info-main { animation: info-document-enter 420ms cubic-bezier(.16,1,.3,1); }
  .public-info-page[data-leaving] .info-main { animation: info-document-exit 180ms cubic-bezier(.4,0,1,1) forwards; }
  .public-info-page[data-leaving=home] .info-main { animation-name: info-home-exit; }

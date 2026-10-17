@@ -101,7 +101,3 @@
   .kitchen-monitor__tools { justify-content: flex-start; }
   .kitchen-stage-tabs button { gap: 4px; font-size: 10px; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .kitchen-monitor *, .kitchen-monitor *::before, .kitchen-monitor *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
-}

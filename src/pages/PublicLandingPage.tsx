@@ -9,7 +9,6 @@ import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { animate, motion, AnimatePresence } from 'framer-motion'
 import { useSiteMotion } from '../hooks/useSiteMotion';
-import { MotionPreferenceButton } from '../components/MotionPreferenceButton';
 import RestaurantMap from '../components/RestaurantMap';
 import { backendRestricted } from '../lib/backendAvailability';
 import { CatalogRequestError, requireCatalogResponse, parseCatalogRows, oneRestaurantPerBrand } from '../lib/catalogRequest';
@@ -671,14 +670,13 @@ export function PublicLandingPage() {
   const exploreRestaurants = useCallback(() => {
     const catalog = document.getElementById('eats-desktop-categories');
     if (!catalog) return;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const margin = Number.parseFloat(getComputedStyle(catalog).scrollMarginTop) || 0;
     const destination = () => {
       const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       return Math.min(limit, Math.max(0, window.scrollY + catalog.getBoundingClientRect().top - margin));
     };
     catalogScroll.current?.stop();
-    if (reducedMotion || Math.abs(destination() - window.scrollY) < 1) {
+    if (Math.abs(destination() - window.scrollY) < 1) {
       catalogScroll.current = null;
       window.scrollTo({ top: destination(), behavior: 'instant' });
       catalog.focus({ preventScroll: true });
@@ -1194,7 +1192,6 @@ export function PublicLandingPage() {
               <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mb-1">Legal</p>
               <Link to="/terminos" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">Términos y Condiciones</Link>
               <Link to="/privacidad" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">Aviso de Privacidad</Link>
-              <MotionPreferenceButton />
             </div>
           </div>
 

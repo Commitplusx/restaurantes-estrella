@@ -30,7 +30,3 @@
 .desktop-restaurant-favorite[aria-pressed=true] { color: #bd3818; }
 .desktop-restaurant-favorite[aria-pressed=true] svg { fill: currentColor; }
 .desktop-restaurant-list :is(a,button,[tabindex]):focus-visible { outline: 2px solid #bd3818; outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) {
-  .desktop-restaurant-list *, .desktop-directory-rail { transition: none; scroll-behavior: auto; }
-  .desktop-directory-loading .animate-pulse { animation: none; }
-}

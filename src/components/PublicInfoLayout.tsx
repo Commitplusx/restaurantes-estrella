@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate, type LinkProps } from 'react-router-dom
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import './publicInfo.css';
 import { useSiteMotion } from '../hooks/useSiteMotion';
-import { MotionPreferenceButton } from './MotionPreferenceButton';
 
 const InfoNavigation = createContext<((to: string) => void) | null>(null);
 
@@ -69,7 +68,6 @@ export function PublicInfoLayout({ children }: { children: ReactNode }) {
         <PublicInfoLink to="/terminos" aria-current={pathname === '/terminos' ? 'page' : undefined}>Términos y condiciones</PublicInfoLink>
         <PublicInfoLink to="/privacidad" aria-current={pathname === '/privacidad' ? 'page' : undefined}>Aviso de privacidad</PublicInfoLink>
       </nav>
-      <MotionPreferenceButton />
       <p>© {new Date().getFullYear()} Estrella Eats.</p>
     </footer>
   </div></InfoNavigation.Provider>;

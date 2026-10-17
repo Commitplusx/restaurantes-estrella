@@ -20,4 +20,3 @@
   .food-categories-list button { flex-shrink: 0; min-width: 124px; scroll-snap-align: start; }
   .food-category-name { white-space: nowrap; }
 }
-@media (prefers-reduced-motion: reduce) { .food-categories-list, .food-categories-list button { transition: none; scroll-behavior: auto; } }

@@ -1,5 +1,6 @@
+import { useSiteMotion } from '../hooks/useSiteMotion';
 import { useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { AlertCircle, ArrowUpRight, CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, PackageCheck, Star, Utensils } from 'lucide-react'
 import './restaurantLogin.css'
@@ -12,7 +13,8 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
-  const reduceMotion = useReducedMotion()
+  const { enabled } = useSiteMotion();
+  const reduceMotion = !enabled;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

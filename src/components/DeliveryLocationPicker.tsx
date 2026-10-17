@@ -1,7 +1,8 @@
+import { useSiteMotion } from '../hooks/useSiteMotion';
 import { useEffect, useRef, useState } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { AlertCircle, Loader2, LocateFixed, MapPin, Search, X, ArrowRight, Check } from 'lucide-react';
 import { applyEatsMapTheme } from '../lib/eatsMapTheme';
 import './EatsMap.css';
@@ -29,7 +30,8 @@ const defaultCenter: DeliveryCoordinates = { lat: 16.2516, lng: -92.1332 };
 
 export default function DeliveryLocationPicker({ purpose = 'delivery', initialLocation, restaurantLocation, onConfirm, onClose }: Props) {
   const isRestaurant = purpose === 'restaurant';
-  const reducedMotion = useReducedMotion();
+  const { enabled } = useSiteMotion();
+  const reducedMotion = !enabled;
   const [point, setPoint] = useState<DeliveryCoordinates | null>(initialLocation);
   const [address, setAddress] = useState(initialLocation?.address || '');
   const [query, setQuery] = useState('');
@@ -189,7 +191,7 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
     const current = map.getCenter();
     if (Math.abs(current.lat - point.lat) < 0.0000001 && Math.abs(current.lng - point.lng) < 0.0000001) return;
     map.easeTo({ center: [point.lng, point.lat], zoom: Math.max(map.getZoom(), 16),
-      duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350 });
+      duration: 350 });
   }, [point, mapState]);
 
   async function lookup(reverse = false) {

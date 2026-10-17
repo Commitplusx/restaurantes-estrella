@@ -21,4 +21,3 @@
 @keyframes eats-notice-spin { to { transform: rotate(360deg); } }
 @media (max-width: 639px) { .eats-notice-dock { inset-inline-end: max(12px,env(safe-area-inset-right,0px)); width: calc(100vw - 24px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)); bottom: calc(96px + env(safe-area-inset-bottom,0px)); } .eats-notice { padding: 18px; } }
 @media (max-height: 520px) { .eats-notice-dock { bottom: calc(12px + env(safe-area-inset-bottom,0px)); } .eats-notice { max-height: calc(100dvh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); } }
-@media (prefers-reduced-motion: reduce) { .eats-notice-spinner { animation: none; } }
