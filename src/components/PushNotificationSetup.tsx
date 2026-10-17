@@ -43,8 +43,8 @@ async function saveSubscription(subscription: PushSubscription, signal: AbortSig
   if (error) {
     // A duplicate is only successful when the existing endpoint can actually be verified.
     if (error.code !== '23505') throw new PushActivationError('Tenemos un problema de conexión. El permiso está listo, pero falta guardar la activación.');
-    const existing = await supabase.from('push_subscriptions').select('id').eq('subscription->>endpoint', subscription.endpoint).limit(1).abortSignal(signal).maybeSingle();
-    if (existing.error || !existing.data) throw new PushActivationError('No pudimos comprobar la activación anterior. Vuelve a intentarlo.');
+    const existing = await supabase.rpc('storefront_has_push_subscription', {p_subscription: subscription.toJSON()}).abortSignal(signal);
+    if (existing.error || existing.data !== true) throw new PushActivationError('No pudimos comprobar la activación anterior. Vuelve a intentarlo.');
   }
   signal.throwIfAborted();
   writePreference('push_subscription_identity', identity);

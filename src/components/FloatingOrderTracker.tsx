@@ -1,114 +1,39 @@
-import { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { useEffect, useState } from 'react';
+import { useOrderTracking } from '../hooks/useOrderTracking';
+import { trackingLink } from '../lib/trackingAccess';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, ChefHat, Truck, Package, XCircle, ChevronRight, MapPin } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export function FloatingOrderTracker() {
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [restaurantName, setRestaurantName] = useState<string>('');
-  const [restaurantLogo, setRestaurantLogo] = useState<string>('/logo.png');
   const [isExpanded, setIsExpanded] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-
+  const tracking = useOrderTracking(['/tracker','/success'].includes(location.pathname) ? null : orderId);
+  const status = tracking.pedido?.estado ?? null;
+  const restaurantName = tracking.restaurante?.nombre ?? tracking.pedido?.restaurante ?? 'Estrella Eats';
+  const restaurantLogo = tracking.restaurante?.logo_url ?? '/logo.png';
   useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
+    const check = () => { try { setOrderId(localStorage.getItem('est_active_order')); } catch { setOrderId(null); } };
+    check();
+    const timer = window.setInterval(check, 3000);
+    window.addEventListener('storage', check);
+    return () => { window.clearInterval(timer); window.removeEventListener('storage', check); };
   }, []);
-
   useEffect(() => {
-    const checkOrder = () => {
-      const storedId = localStorage.getItem('est_active_order');
-      if (storedId !== orderId) {
-        setOrderId(storedId);
-      }
-    };
-
-    checkOrder();
-    const interval = setInterval(checkOrder, 3000);
-    return () => clearInterval(interval);
-  }, [orderId]);
-
-  useEffect(() => {
-    if (!orderId) return;
-
-    let channel: any;
-
-    const fetchStatus = async () => {
-      const { data, error } = await supabase
-        .from('pedidos')
-        .select('estado, restaurante')
-        .eq('id', orderId)
-        .single();
-        
-      if (error) {
-        // PGRST116 means no rows found (e.g. order deleted or old cache)
-        if (error.code === 'PGRST116') {
-          localStorage.removeItem('est_active_order');
-          setOrderId(null);
-        }
-        return;
-      }
-
-      if (data) {
-        setStatus(data.estado);
-        setRestaurantName(data.restaurante || 'Estrella Eats');
-        
-        if (data.restaurante) {
-          const { data: restData } = await supabase
-            .from('restaurantes')
-            .select('*')
-            .ilike('nombre', data.restaurante)
-            .single();
-          if (restData) {
-             setRestaurantLogo(restData.logo_url || restData.foto_fachada_url || '/logo.png');
-          }
-        }
-
-        if (['entregado', 'cancelado', 'rechazado'].includes(data.estado)) {
-          localStorage.removeItem('est_active_order');
-          setOrderId(null);
-        }
-      }
-    };
-
-    fetchStatus();
-
-    channel = supabase.channel(`floating-tracker-${orderId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${orderId}` },
-        (payload) => {
-          setStatus(payload.new.estado);
-          
-          // Vibración Háptica nativa
-          if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]); // Vibración suave doble
-          }
-
-          if (['entregado', 'cancelado', 'rechazado'].includes(payload.new.estado)) {
-            localStorage.removeItem('est_active_order');
-            setOrderId(null);
-          } else {
-             setIsExpanded(true);
-             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-             timeoutRef.current = setTimeout(() => setIsExpanded(false), 5000);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [orderId]);
+    if (!status) return;
+    if (['entregado','cancelado','rechazado'].includes(status)) {
+      try { localStorage.removeItem('est_active_order'); } catch { /* Receipt remains accessible by its private link. */ }
+      return;
+    }
+    if (!isExpanded) return;
+    const timer = window.setTimeout(() => setIsExpanded(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [status, isExpanded]);
 
   if (location.pathname === '/success') return null;
-  if (!orderId || !status) return null;
+  if (!orderId || !status || ['entregado','cancelado','rechazado'].includes(status)) return null;
 
   // Determine icon, text, colors, and progress
   let Icon = Clock;
@@ -188,7 +113,7 @@ export function FloatingOrderTracker() {
                 </div>
               </div>
               <button 
-                onClick={() => navigate(`/tracker?pedido=${orderId}`)}
+                onClick={() => navigate(trackingLink('/tracker', orderId))}
                 className={`w-full py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 shadow-md transition-all active:scale-95 ${bgColor}`}
               >
                 Ver Ticket Completo

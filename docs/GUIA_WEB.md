@@ -1,5 +1,7 @@
 # Guía técnica de la web — 12 de octubre de 2026
 
+**Actualización del 17 de octubre:** recibos, tracker y tarjetas activas usan la RPC de seguimiento con acceso privado en el fragmento; catálogo/sucursales usan la vista pública. La recuperación de otro pedido no consume el carrito nuevo. [Contrato, pruebas, dependencia push y límites de publicación](TRACKING_ACCESS_20261017.md). Se envía a main para que Kaleb compruebe Vercel; las lecturas amplias del backend siguen pendientes de corte. Los apartados anteriores son historial cuando discrepan con esta actualización.
+
 ## Fuente y alcance
 
 Arquitectura central: [Loyalty, archivo de la raíz `arquitectura_sistema_v2.md`](https://github.com/Commitplusx/loyalty-estrella/blob/main/arquitectura_sistema_v2.md). Esta guía describe el frontend comprobado en `restaurantes-estrella`; no sustituye esa arquitectura ni certifica el estado productivo de PostgreSQL, Edge, WhatsApp o la APK.

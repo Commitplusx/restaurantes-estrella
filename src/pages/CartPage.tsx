@@ -1,3 +1,6 @@
+import { rememberTrackingKey, trackingLink } from '../lib/trackingAccess';
+import { parseOrderReceipt } from '../utils/orderState';
+import { shouldClearSubmittedCart } from '../lib/checkoutReceipt';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -17,7 +20,6 @@ import { useCheckoutLoyalty } from '../hooks/useCheckoutLoyalty';
 import { useFirstDeliveryCoupon } from '../hooks/useFirstDeliveryCoupon';
 import { checkPromotionEligibility, usePromotionEligibility } from '../hooks/usePromotionEligibility';
 import { firstDeliverySaving, isFirstDeliveryCode } from '../lib/firstDeliveryCoupon';
-import { ACTIVE_ORDER_STATES } from '../utils/orderState';
 import { CheckoutHeader, CheckoutAction } from '../components/CheckoutChrome';
 import CheckoutStepScene from '../components/CheckoutStepScene';
 import type { CheckoutStepDirection } from '../components/CheckoutStepScene';
@@ -255,7 +257,7 @@ export default function CartPage() {
           return;
         }
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-        const query = supabase.from('restaurantes').select('id,nombre,nombre_sucursal,matriz_id,lat,lng,activo,foto_fachada_url');
+        const query = supabase.from('storefront_restaurants').select('id,nombre,nombre_sucursal,matriz_id,lat,lng,activo,foto_fachada_url');
         const {data, error} = await query.eq(isUUID ? 'id' : 'slug', id).limit(1)
           .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).maybeSingle();
         if (!current) return;
@@ -572,16 +574,6 @@ export default function CartPage() {
     try {
       const phone = clienteTel.replace(/\D/g, '');
       if (!/^\d{10}$/.test(phone)) throw new Error('Escribe un teléfono de 10 dígitos.');
-      const {data: active, error} = await supabase.from('pedidos').select('id, estado')
-        .in('cliente_tel', [phone, '52' + phone, '521' + phone]).in('estado', [...ACTIVE_ORDER_STATES]).order('created_at', {ascending: false}).limit(1);
-      if (error) throw new Error('No pudimos comprobar si ya tienes un pedido. Intenta de nuevo.');
-      if (active?.length) {
-        localStorage.setItem('est_active_order', active[0].id);
-        sessionStorage.removeItem('est_checkout_id');
-        idempotencyKeyRef.current = null;
-        navigate('/success?pedido=' + active[0].id);
-        return;
-      }
       if (tipoEntrega === 'domicilio' && (!canConfirmLocation(ubicacionGPS, direccionEntrega) || fueraDeCobertura || calculandoEnvio)) throw new Error('Confirma una dirección y ubicación dentro de la cobertura y espera la cotización.');
       if (!tipoEntrega || !restaurante) throw new Error('Elige cómo recibir tu pedido.');
       const promotionIssues = await checkPromotionEligibility(restaurante.id, promotionIds, tipoEntrega);
@@ -616,11 +608,18 @@ export default function CartPage() {
       if (!order || typeof order !== 'object' || Array.isArray(order) || !('id' in order) || typeof order.id !== 'string') {
         throw new Error('No pudimos comprobar el pedido. Reintenta con el mismo código; no crees otro pedido.');
       }
+      const receipt = parseOrderReceipt(order);
+      if (!('access_token' in order) || !rememberTrackingKey(receipt.id, order.access_token)) throw new Error('El pedido se registró, pero no recibimos su acceso. Reintenta con el mismo código para recuperarlo.');
+      try { localStorage.setItem('est_active_order', receipt.id); } catch { /* Private receipt URL carries access. */ }
       setShowOtpModal(false);
-      _clearCart();
-      for (const key of ['est_checkout_id','est_ubicacion','est_referencias']) sessionStorage.removeItem(key);
+      const consumed = shouldClearSubmittedCart(data, useCartStore.getState().carrito, pending.carrito);
+      if (consumed) _clearCart();
+      for (const key of consumed ? ['est_checkout_id','est_ubicacion','est_referencias'] : ['est_checkout_id']) {
+        try { sessionStorage.removeItem(key); } catch { /* The receipt is already confirmed by the server. */ }
+      }
+      idempotencyKeyRef.current = null;
       pendingCheckoutRef.current = null;
-      navigate('/success?pedido=' + encodeURIComponent(order.id));
+      navigate(trackingLink('/success', receipt.id));
     } catch (error: unknown) {
       showToast('Pedido sin confirmar', error instanceof Error ? error.message : 'Reintenta con el mismo código.', 'error');
     } finally {

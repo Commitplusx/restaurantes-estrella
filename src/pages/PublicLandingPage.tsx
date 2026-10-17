@@ -1,3 +1,5 @@
+import { useOrderTracking } from '../hooks/useOrderTracking';
+import { trackingLink } from '../lib/trackingAccess';
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { groupLandingPromotions, parseLandingPromotions, type LandingPromotion } from '../lib/landingPromotions';
@@ -264,7 +266,8 @@ export function PublicLandingPage() {
   const [userAddress, setUserAddress] = useState<string>(() => sessionStorage.getItem('est_direccion') || '')
   const [locationLoading, setLocationLoading] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('est_active_order'))
-  const [activeOrderStatus, setActiveOrderStatus] = useState<string | null>(null)
+  const {pedido: activeOrder} = useOrderTracking(activeOrderId);
+  const activeOrderStatus = activeOrder?.estado ?? null;
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -326,23 +329,6 @@ export function PublicLandingPage() {
     return () => clearInterval(interval);
   }, [activeOrderId]);
 
-  useEffect(() => {
-    if (!activeOrderId || backendRestricted()) {
-      setActiveOrderStatus(null);
-      return;
-    }
-    const fetchStatus = async () => {
-      const { data } = await supabase.from('pedidos').select('estado').eq('id', activeOrderId).single();
-      if (data) setActiveOrderStatus(data.estado);
-    };
-    fetchStatus();
-
-    const channel = supabase.channel(`landing-tracker-${activeOrderId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${activeOrderId}` }, (payload) => {
-         setActiveOrderStatus(payload.new.estado);
-      }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [activeOrderId]);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('est_favorites')
     return saved ? JSON.parse(saved) : []
@@ -407,7 +393,7 @@ export function PublicLandingPage() {
     catalogRequest.current = controller;
     const deadline = window.setTimeout(() => controller.abort(), 10_000);
     try {
-      const result = await supabase.from('restaurantes')
+      const result = await supabase.from('storefront_restaurants')
         .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng, matriz_id, nombre_sucursal, activo, perfil_completo')
         .eq('activo', true).eq('perfil_completo', true)
         .order('nombre').range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1).abortSignal(controller.signal);
@@ -452,7 +438,7 @@ export function PublicLandingPage() {
 
   useEffect(() => {
     async function loadCats() {
-      const { data } = await supabase.from('restaurantes').select('categorias').eq('activo', true).limit(500).abortSignal(AbortSignal.timeout(10_000))
+      const { data } = await supabase.from('storefront_restaurants').select('categorias').eq('activo', true).limit(500).abortSignal(AbortSignal.timeout(10_000))
       if (data) {
         const unique = new Set<string>()
         data.forEach(r => {
@@ -482,7 +468,7 @@ export function PublicLandingPage() {
       setLoadingPromos(true);
       try {
         const result = await supabase.from('menu_promociones')
-          .select('id,restaurante_id,titulo,descripcion,precio_especial,foto_url,fecha_fin,activa,aplica_subsidio,dias_aplicacion,tipos_pedido,opciones,restaurantes(id,nombre,slug,matriz_id,nombre_sucursal,activo,perfil_completo)')
+          .select('id,restaurante_id,titulo,descripcion,precio_especial,foto_url,fecha_fin,activa,aplica_subsidio,dias_aplicacion,tipos_pedido,opciones,restaurantes:storefront_restaurants(id,nombre,slug,matriz_id,nombre_sucursal,activo,perfil_completo)')
           .eq('activa', true).order('id').limit(200).abortSignal(controller.signal);
         const rows = parseLandingPromotions(requireCatalogResponse(result));
         if (active) { setPromotionRows(rows); setPromotionError(''); }
@@ -854,7 +840,7 @@ export function PublicLandingPage() {
                                  <p className="text-[13px] font-bold text-slate-800">{statusTitle}</p>
                                  <p className="text-[12px] text-slate-500 leading-relaxed">{statusDesc}</p>
                                  <button 
-                                   onClick={() => navigate(`/success?pedido=${activeOrderId}`)}
+                                   onClick={() => navigate(trackingLink('/success', activeOrderId))}
                                    className="mt-3 w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-200 transition-colors"
                                  >
                                    Seguir Pedido

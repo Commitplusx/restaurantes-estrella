@@ -13,7 +13,7 @@ export function useRestaurantFamily(restaurant: Restaurante | null) {
     const controller = new AbortController()
     async function load() {
       try {
-        const { data, error } = await supabase.from('restaurantes').select(RESTAURANT_PUBLIC_FIELDS)
+        const { data, error } = await supabase.from('storefront_restaurants').select(RESTAURANT_PUBLIC_FIELDS)
           .or(`id.eq.${rootId},matriz_id.eq.${rootId}`).eq('activo', true).eq('perfil_completo', true).limit(101)
           .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).returns<unknown>()
         if (error) throw error

@@ -624,7 +624,7 @@ export function PublicMenuView() {
       if (isUUID) {
         // ⚡ UUID: lanzar TODO en paralelo — 1 solo roundtrip
         const [restRes, catsRes, prodsRes, cmbsRes, prmsRes, cupRes] = await Promise.all([
-          supabase.from('restaurantes').select(RESTAURANT_PUBLIC_FIELDS).eq('id', id).maybeSingle(),
+          supabase.from('storefront_restaurants').select(RESTAURANT_PUBLIC_FIELDS).eq('id', id).maybeSingle(),
           supabase.from('menu_categorias').select('*').eq('restaurante_id', id).order('orden'),
           supabase.from('menu_items').select('*').eq('restaurante_id', id).eq('disponible', true).order('orden'),
           supabase.from('menu_combos').select('*').eq('restaurante_id', id).eq('disponible', true),
@@ -639,7 +639,7 @@ export function PublicMenuView() {
         if (cupRes?.data) setCuponPlataformaAuto(cupRes.data)
       } else {
         // Slug: primero resolver el ID real, luego el menú en paralelo
-        const { data: restData } = await supabase.from('restaurantes').select(RESTAURANT_PUBLIC_FIELDS).eq('slug', id).maybeSingle()
+        const { data: restData } = await supabase.from('storefront_restaurants').select(RESTAURANT_PUBLIC_FIELDS).eq('slug', id).maybeSingle()
         rest = restData
         if (rest) {
           const [catsRes, prodsRes, cmbsRes, prmsRes, cupRes] = await Promise.all([

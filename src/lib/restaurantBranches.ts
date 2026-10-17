@@ -1,6 +1,6 @@
 import type { Restaurante, HorariosRestaurante, HorarioDia } from '../types/restaurant'
 
-export const RESTAURANT_PUBLIC_FIELDS = 'id,nombre,telefono,direccion,activo,slug,foto_fachada_url,logo_url,descripcion_corta,correo,hora_apertura,hora_cierre,horarios,categorias,perfil_completo,acepta_pago_online,es_socio,programa_lealtad_activo,lat,lng,es_matriz,matriz_id,nombre_sucursal'
+export const RESTAURANT_PUBLIC_FIELDS = 'id,nombre,telefono,direccion,activo,slug,foto_fachada_url,logo_url,descripcion_corta,hora_apertura,hora_cierre,horarios,categorias,perfil_completo,acepta_pago_online,es_socio,programa_lealtad_activo,lat,lng,es_matriz,matriz_id,nombre_sucursal'
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function cartRestaurantOrigin(persisted: unknown, legacy: unknown): string | null {
   if (typeof persisted === 'string' && UUID_PATTERN.test(persisted)) return persisted
