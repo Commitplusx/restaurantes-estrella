@@ -34,6 +34,7 @@ import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 import MenuProductCard from '../components/MenuProductCard';
 import { promotionDeliveryLabel } from '../lib/promotionRules';
 import RestaurantMenuIdentity from '../components/RestaurantMenuIdentity';
+import RestaurantMenuHeader from '../components/RestaurantMenuHeader';
 import RestaurantBranchPicker from '../components/RestaurantBranchPicker';
 import { useRestaurantFamily } from '../hooks/useRestaurantFamily';
 import { restaurantMenuPath, RESTAURANT_PUBLIC_FIELDS, cartRestaurantOrigin, requiresNewBranchCart } from '../lib/restaurantBranches';
@@ -1223,20 +1224,7 @@ export function PublicMenuView() {
     }}>
 
       {/* TOPBAR */}
-      <header className="menu-topbar">
-        <div className="menu-topbar-inner">
-        <Link
-          to="/"
-          state={fromSearch ? { activeNavTab: 'search' } : undefined}
-          className="menu-back"
-          aria-label="Volver a los restaurantes"
-        >
-          <ChevronLeft size={20} />
-        </Link>
-        <Link to="/" className="menu-brand" aria-label="Estrella Eats, inicio"><img src="/estrella-circle.png" alt="" width="32" height="32" /><span>Estrella<span>Eats</span></span></Link>
-        {cartCount === 0 && <span className="menu-topbar-label">Menú del restaurante</span>}
-        </div>
-      </header>
+      <RestaurantMenuHeader restaurant={restaurante} hasCart={cartCount > 0} fromSearch={fromSearch} />
 
       {/* HERO FULL BLEED (RAPPI STYLE) */}
       <div className="menu-shell">
@@ -1329,6 +1317,7 @@ export function PublicMenuView() {
                           return (
                             <MenuProductCard
                               key={item.id}
+                              productKey={`item:${item.id}`}
                               name={item.nombre}
                               description={item.descripcion}
                               image={item.foto_url}
@@ -1380,7 +1369,7 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <MenuProductCard name={combo.nombre} description={combo.descripcion} price={combo.precio} image={combo.foto_url} includes={combo.incluye} badge="Combo"
+                      <MenuProductCard productKey={`combo:${combo.id}`} name={combo.nombre} description={combo.descripcion} price={combo.precio} image={combo.foto_url} includes={combo.incluye} badge="Combo"
                         quantity={carrito.filter(entry => entry.item.id === combo.id && entry.item.tipo === 'combo').reduce((sum, entry) => sum + entry.cantidad, 0)}
                         customizable={Boolean(combo.opciones?.length)}
                         onDetails={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' })}
@@ -1408,7 +1397,7 @@ export function PublicMenuView() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.24, delay: Math.min(index * 0.03, 0.12), ease: [.22, 1, .36, 1] }}
                     >
-                      <MenuProductCard name={promo.titulo} description={promo.descripcion} price={promo.precio_especial} image={promo.foto_url} badge={promo.tipos_pedido?.length === 1 ? promotionDeliveryLabel(promo.tipos_pedido) : 'Promoción'}
+                      <MenuProductCard productKey={`promo:${promo.id}`} name={promo.titulo} description={promo.descripcion} price={promo.precio_especial} image={promo.foto_url} badge={promo.tipos_pedido?.length === 1 ? promotionDeliveryLabel(promo.tipos_pedido) : 'Promoción'}
                         quantity={carrito.filter(entry => entry.item.id === promo.id && entry.item.tipo === 'promo').reduce((sum, entry) => sum + entry.cantidad, 0)}
                         customizable={Boolean(promo.opciones?.length)}
                         onDetails={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo' })}
@@ -1427,7 +1416,7 @@ export function PublicMenuView() {
           {/* ── Item Detail Sheet ─────────────────────────────── */}
           <AnimatePresence>
             {selectedItemDetail && (
-                <MenuDetailsFrame key={selectedItemDetail.id} onClose={() => setSelectedItemDetail(null)}>
+                <MenuDetailsFrame key={selectedItemDetail.id} productKey={`${selectedItemDetail.cartItemTipo}:${selectedItemDetail.id}`} onClose={() => setSelectedItemDetail(null)}>
                   {selectedItemDetail.foto_url && <LazyImage src={selectedItemDetail.foto_url} alt="" className="menu-detail-photo" />}
                   <div className="flex items-start justify-between mb-2 gap-4">
                     <div>
@@ -1515,13 +1504,14 @@ export function PublicMenuView() {
       <AnimatePresence>
         {cartCount > 0 && (
           <motion.div 
-            initial={{ y: 16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 16, opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: .28, ease: [.22, 1, .36, 1] }}
             className="menu-cart-dock"
           >
             <motion.button 
+              initial={{ y: 16 }} animate={{ y: 0 }} exit={{ y: 16 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }}
               whileTap={{ scale: .985 }}
               disabled={openingCart}
               aria-label={`Ver pedido, ${cartCount} productos`}
@@ -1529,10 +1519,11 @@ export function PublicMenuView() {
                 setOpeningCart(true);
               }}
             >
-              <span className="menu-cart-icon" data-cart-motion-target><ShoppingBag size={22} aria-hidden="true" /><span className="menu-cart-count"><AnimatedCount value={cartCount} /></span></span>
+              <span className="menu-cart-icon" data-cart-motion-receipt><ShoppingBag size={22} aria-hidden="true" /><span className="menu-cart-count"><AnimatedCount value={cartCount} /></span></span>
               <span className="menu-cart-label"><strong>Ver mi pedido</strong><small>Productos · ${carrito.reduce((sum, entry) => sum + entry.item.precio * entry.cantidad, 0).toFixed(2)}</small></span>
               <ArrowRight size={20} aria-hidden="true" />
             </motion.button>
+            <span className="menu-cart-flight-target" data-cart-motion-target aria-hidden="true" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1643,7 +1634,7 @@ export function PublicMenuView() {
          }, 0); 
 
           return (
-            <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div data-product-motion-dialog data-product-motion-key={`${selectedItemForOptions.__tipo}:${selectedItemForOptions.id}`} className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"

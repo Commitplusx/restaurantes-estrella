@@ -5,10 +5,9 @@ import { ParallaxMedia } from './ParallaxMedia';
 import { AnimatedCount } from './AnimatedCount';
 import { useSiteMotion } from '../hooks/useSiteMotion';
 import { SITE_EASE } from '../lib/siteMotion';
-import { useSiteJourney } from '../hooks/useSiteJourney';
-import { visibleJourneyBounds } from '../lib/siteJourney';
 
 export interface MenuProductCardProps {
+  productKey: string;
   name: string;
   description?: string | null;
   image?: string | null;
@@ -23,28 +22,24 @@ export interface MenuProductCardProps {
 }
 
 export default function MenuProductCard({
-  name, description, image, price, badge, includes, unavailable,
+  productKey, name, description, image, price, badge, includes, unavailable,
   quantity = 0, customizable = false, onDetails, onAdd,
 }: MenuProductCardProps) {
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const { enabled } = useSiteMotion();
   const controls = useAnimationControls();
-  const { addProduct } = useSiteJourney();
-  const photo = useRef<HTMLDivElement>(null);
   const previousQuantity = useRef(quantity);
   useEffect(() => {
     if (quantity > previousQuantity.current && enabled) {
       void controls.start({ scale: [1, 1.018, 1], transition: { duration: .36, ease: SITE_EASE } });
-      const bounds = photo.current && visibleJourneyBounds(photo.current);
-      if (bounds && image && image !== failedSource) addProduct(image, bounds);
     }
     previousQuantity.current = quantity;
-  }, [quantity, enabled, controls, addProduct, image, failedSource]);
+  }, [quantity, enabled, controls]);
   const validPrice = typeof price === 'number' && Number.isFinite(price) && price >= 0;
   return (
-    <motion.article className="menu-product" data-unavailable={Boolean(unavailable)} animate={controls}>
+    <motion.article className="menu-product" data-product-motion-key={productKey} data-unavailable={Boolean(unavailable)} animate={controls}>
       <button type="button" className="menu-product-details" onClick={onDetails} aria-label={`Ver ${name}`}>
-        <div ref={photo} className="menu-product-photo">
+        <div className="menu-product-photo" data-product-motion-photo>
           {image && image !== failedSource ? <ParallaxMedia depth={5}><img src={image} alt="" loading="lazy" decoding="async" onError={() => setFailedSource(image)} /></ParallaxMedia>
             : <Utensils size={32} strokeWidth={1.4} aria-hidden="true" />}
           {badge && <span className="menu-product-badge">{badge}</span>}

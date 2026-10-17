@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { motion, useIsPresent } from 'framer-motion';
 
-export default function MenuDetailsFrame({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+export default function MenuDetailsFrame({ children, onClose, productKey }: { children: ReactNode; onClose: () => void; productKey?: string }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   const isPresent = useIsPresent();
@@ -39,7 +39,7 @@ export default function MenuDetailsFrame({ children, onClose }: { children: Reac
 
   return (
     <motion.div className="menu-detail-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }} onClick={onClose} inert={!isPresent}>
-      <motion.div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="menu-detail-title" className="menu-detail-sheet"
+      <motion.div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="menu-detail-title" className="menu-detail-sheet" data-product-motion-key={productKey}
         initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 12, opacity: 0 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} onClick={event => event.stopPropagation()}>
         {children}
       </motion.div>

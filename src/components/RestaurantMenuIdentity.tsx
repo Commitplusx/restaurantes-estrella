@@ -23,7 +23,7 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
     const bounds = identityImage.current && visibleJourneyBounds(identityImage.current);
     if (bounds) arriveRestaurant(restaurant.id, bounds);
   }, [restaurant.id, arriveRestaurant]);
-  const image = restaurant.logo_url || restaurant.foto_fachada_url;
+  const image = restaurant.foto_fachada_url || restaurant.logo_url;
   const today = restaurant.horarios?.[weekdays[new Date().getDay()]];
   const opening = today?.activo ? today.abre : restaurant.hora_apertura?.slice(0, 5);
   const closing = today?.activo ? today.cierra : restaurant.hora_cierre?.slice(0, 5);
@@ -38,7 +38,7 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
   return (
     <motion.section key={restaurant.id} className="menu-identity" aria-labelledby="restaurant-menu-title" initial={{ opacity: incomingRestaurantId === restaurant.id ? 1 : .55, x: enabled && incomingRestaurantId !== restaurant.id ? 24 : 0 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: enabled ? .45 : .1, ease: SITE_EASE }}>
       <div ref={identityImage} className="menu-identity-image">
-        {image && failedImage !== image ? <img src={image} alt="" onError={() => setFailedImage(image)} /> : <Store size={32} aria-hidden="true" />}
+        {image && failedImage !== image ? <img src={image} alt="" data-restaurant-motion-origin={restaurant.id} onError={() => setFailedImage(image)} /> : <Store size={32} aria-hidden="true" />}
       </div>
       <div className="menu-identity-copy">
         <div className="menu-identity-title"><h1 id="restaurant-menu-title">{restaurant.nombre}</h1><span className="menu-open-state" data-open={open}>{open ? 'Abierto' : 'Cerrado'}</span></div>
