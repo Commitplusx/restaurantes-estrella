@@ -42,7 +42,7 @@ Inicio móvil/PC y footer, bienvenida, menú y skeleton, carrito, páginas infor
 
 Build TypeScript/Vite y ESLint pertinente aprobados; las páginas heredadas conservan su deuda previa de tipos. Tres capturas automáticas a 390 × 844 (bienvenida/carrito) y 1280 × 900 (beneficios) revisadas: logo legible, proporciones completas y sin error de ejecución. Auditoría 94/100 conserva la limitación heredada de zoom del viewport; no se declara accesibilidad global completa. El primer intento no cargó porque el servidor local había terminado: se restableció y se conservaron los reportes fallidos. La confirmación posterior sí mostró las páginas y logo correctos. Icono maskable revisado separadamente.
 
-Se publica en GitHub main por petición de Kaleb; despliegue efectivo de Vercel pendiente de verificar. Evidencia privada `logo-*` en `.codex-tmp/eats-performance-20261024` del workspace principal. No hubo pedidos, OTP, cambios de servidor ni otros envíos a clientes.
+GitHub main `32eaec5` confirmado por lectura del remoto, por petición de Kaleb. Comprobación HTTP posterior del dominio: el entry JS referencia el wordmark nuevo y `/brand/estrella-eats-v2-360.webp` devuelve 200, tipo `image/webp` y SHA256 idéntico al archivo revisado. El nombre del entry productivo difiere del build local: no se afirma igualdad global de los bundles. Recorrido visual/interactivo de producción pendiente. Evidencia privada `logo-*` en `.codex-tmp/eats-performance-20261024` del workspace principal. El aviso autorizado al dispatcher no se envió: SSH agotó conexión y Work informa acceso al navegador desactivado. No hubo pedidos, OTP, cambios de servidor ni otros envíos a clientes.
 
 ## Prompt final
 
