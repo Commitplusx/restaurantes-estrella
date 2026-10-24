@@ -14,12 +14,12 @@ const WELCOME_STEPS = [0, 1, 2] as const;
 const HOW_TO_ORDER = [
   { Icon: Utensils, title: 'Elige tu comida', text: 'Abre un menú y agrega lo que se te antoje.' },
   { Icon: ShoppingBag, title: '¿A casa o para recoger?', text: 'Elige cómo recibirlo. Si va a tu casa, dinos dónde.' },
-  { Icon: Route, title: 'Revisa y confirma', text: 'Revisa el total y confirma con el código que te mandamos por WhatsApp.' },
+  { Icon: Route, title: 'Revisa y confirma', text: 'Revisa el total y confirma tu pedido.' },
 ];
 const TRACK_ORDER = [
   { Icon: Package, title: 'Consulta los detalles', text: 'Ahí están los productos que elegiste y el total.' },
   { Icon: ChefHat, title: 'Mira cómo va', text: 'Consulta si ya está en cocina, listo para recoger o en camino.' },
-  { Icon: MapPin, title: 'Cuando lo recibas', text: 'Si es a domicilio, comparte el PIN cuando tengas tu pedido.' },
+  { Icon: MapPin, title: 'Recíbelo o pasa por él', text: 'Recíbelo en tu dirección o pasa al restaurante, según lo que elegiste.' },
 ];
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {

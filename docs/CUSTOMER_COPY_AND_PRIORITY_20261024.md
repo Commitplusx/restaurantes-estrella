@@ -5,9 +5,11 @@
 Después de la entrega `cd28768`, Kaleb pidió trabajar específicamente el lenguaje del onboarding. Candidato nuevo sin subir a GitHub: sólo literales de `OnboardingFlow.tsx`, conservando las tres pantallas, las animaciones, la navegación, el foco, las preferencias y los permisos.
 
 - Entrada: «¿Qué vas a comer hoy?»; explicación breve de elegir restaurante y pedir a casa o para recoger.
-- Pedido: «Así armas tu pedido»; comida, modalidad/dirección y confirmación con el código enviado por WhatsApp.
-- Seguimiento: «¿Cómo va tu pedido?»; detalles, cocina/recogida/entrega y PIN exclusivamente al recibir un pedido a domicilio.
+- Pedido: «Así armas tu pedido»; comida, modalidad/dirección y «Revisa el total y confirma tu pedido».
+- Seguimiento: «¿Cómo va tu pedido?»; detalles, cocina/recogida/entrega y «Recíbelo o pasa por él».
 - Botones: «Saltar», «Cómo pedir», «Cómo ver mi pedido» y «Ver restaurantes». Sin promesas nuevas de velocidad, precio o disponibilidad.
+
+Corrección posterior de Kaleb: no mencionar códigos, WhatsApp ni PIN en la bienvenida. Se retiraron esas referencias del onboarding. El checkout y las instrucciones de entrega conservan su verificación real en el momento correspondiente; no se desactivó ni ocultó un requisito al confirmar una operación.
 
 Build TypeScript/Vite y ESLint del componente aprobados. No se añaden pruebas que sólo comparen frases estáticas. Vista repetible de desarrollo existente: `http://127.0.0.1:5263/bienvenida`; permite volver a abrirla sin borrar el carrito ni las preferencias del origen de producción local en 5262. El build normal 5262 también contiene los textos, pero la bienvenida sólo aparece allí a quien todavía no la haya completado.
 
