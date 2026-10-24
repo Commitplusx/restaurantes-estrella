@@ -1,5 +1,7 @@
 # Guía técnica de la web — 12 de octubre de 2026
 
+**Entrega a GitHub main — 24 de octubre:** optimización del inicio `87b183f` y carga de menú `529605b`, con sus fuentes, assets, pruebas y documentación. Las notas de candidato siguientes conservan la evidencia local previa a esta entrega. Build y 45 pruebas tipadas aprobados; capturas automáticas móvil/PC revisadas. Publicación efectiva en Vercel y recorrido interactivo del dominio pendientes de comprobar. No incluye cambios de backend, SQL, worker, OTP ni APK.
+
 **Carga del menú — candidato local, 24 de octubre:** skeleton con la distribución real en móvil/PC, menú público compartido (20 s fresco/120 s retenido), consultas paralelas con ID conocido y precarga por intención. Errores visibles sin vaciar el menú o carrito por una lectura parcial; selección y animaciones conservadas. 45 pruebas tipadas y build aprobados; medición móvil local de 733 KB a 408 KB, sin mejora clara del primer pintado. Sin publicar; interacción física pendiente. [Contrato, evidencia y límites](MENU_LOADING_20261024.md).
 
 **Rendimiento del inicio — candidato local, 24 de octubre:** composición y animaciones conservadas, imágenes a tamaño de uso, Outfit local y snapshots públicos con caducidad/revalidación. Medición móvil local de 6.18 MB a 0.85 MB transferidos; 21 pruebas tipadas y build aprobados. Sin publicar; revisión interactiva de retorno/filtros pendiente por control de navegador desactivado. [Hallazgos, contrato y límites](HOME_PERFORMANCE_20261024.md).

@@ -2,6 +2,8 @@
 
 ## Alcance y estado
 
+**Entrega a GitHub main, 24 de octubre:** fuentes de esta optimización en `87b183f`, junto con el menú `529605b` y esta documentación. La auditoría y las cifras siguientes son locales; no confirman un despliegue Vercel ni resultados de producción. La descripción de candidato refleja el estado durante la medición.
+
 Auditoría de `https://estrella-eats.mx/` y candidato **local, sin publicar**, basado en main `66f5e45`. Fuentes aisladas en `C:/Users/Kaleb/.codex/tmp/eats-db-privacy-20261017`; no se sobrescribió el árbol de experimentos `loyalty-estrella/estrella-eats`.
 
 Se conservan contenido, composición, Outfit y animaciones. No cambia SQL, políticas, precios, OTP, pedidos, despacho, worker, APK ni WhatsApp. Las visitas automáticas ejecutan la analítica normal; no crean pedidos ni solicitan códigos. No se alteraron fotos o filas productivas.

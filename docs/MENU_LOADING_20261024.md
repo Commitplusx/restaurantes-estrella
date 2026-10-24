@@ -2,6 +2,8 @@
 
 ## Estado y alcance
 
+**Entrega a GitHub main, 24 de octubre:** fuentes del menú en `529605b`, junto con el inicio `87b183f` y esta documentación. Las referencias a candidato describen el estado durante las mediciones locales. Verificación del despliegue Vercel y recorrido interactivo en el dominio pendientes.
+
 Candidato **local, sin publicar**, en `codex/eats-performance-20261024`, sobre la optimización de inicio `87b183f` y main `66f5e45`. Vista de revisión: `http://127.0.0.1:5262/menu/wingman-6846`.
 
 Se conserva el diseño del menú, sucursales, opciones, carrito y animaciones. Sin migraciones, pedidos, OTP, WhatsApps, worker, APK ni despliegue Vercel. Las mediciones ejecutan la analítica normal de visitas. No se modificó el catálogo real para probar eventos.
