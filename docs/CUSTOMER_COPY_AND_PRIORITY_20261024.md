@@ -1,8 +1,8 @@
 # Textos de clientes y prioridad de marcas — 24 de octubre de 2026
 
-## Ampliación local: bienvenida
+## Bienvenida: entrega a main
 
-Después de la entrega `cd28768`, Kaleb pidió trabajar específicamente el lenguaje del onboarding. Candidato nuevo sin subir a GitHub: sólo literales de `OnboardingFlow.tsx`, conservando las tres pantallas, las animaciones, la navegación, el foco, las preferencias y los permisos.
+Después de la entrega `cd28768`, Kaleb pidió trabajar específicamente el lenguaje del onboarding. Fuentes funcionales hasta `23a4cc6`, incluidas en la subida autorizada a GitHub main del 24 de octubre: sólo literales de `OnboardingFlow.tsx`, conservando las tres pantallas, las animaciones, la navegación, el foco, las preferencias y los permisos. Despliegue efectivo en Vercel pendiente de comprobar.
 
 - Entrada: «¿Qué vas a comer hoy?»; explicación breve de elegir restaurante y pedir a casa o para recoger.
 - Pedido: «Así armas tu pedido»; comida, modalidad/dirección y «Revisa el total y confirma tu pedido».
@@ -12,6 +12,8 @@ Después de la entrega `cd28768`, Kaleb pidió trabajar específicamente el leng
 Corrección posterior de Kaleb: no mencionar códigos, WhatsApp ni PIN en la bienvenida. Se retiraron esas referencias del onboarding. El checkout y las instrucciones de entrega conservan su verificación real en el momento correspondiente; no se desactivó ni ocultó un requisito al confirmar una operación.
 
 Build TypeScript/Vite y ESLint del componente aprobados. No se añaden pruebas que sólo comparen frases estáticas. Vista repetible de desarrollo existente: `http://127.0.0.1:5263/bienvenida`; permite volver a abrirla sin borrar el carrito ni las preferencias del origen de producción local en 5262. El build normal 5262 también contiene los textos, pero la bienvenida sólo aparece allí a quien todavía no la haya completado.
+
+La entrega añade este registro documental a las fuentes ya compiladas y revisadas; no cambia nuevamente el componente. Los archivos generados por el servidor DEV bajo `dev-dist` quedan fuera de los commits y de la subida.
 
 Capturas automáticas de la pantalla inicial a 390 × 844 y 1280 × 900 inspeccionadas: texto completo y botones visibles, sin error de ejecución. Los pasos dos/tres se revisaron en código, pendientes de recorrido interactivo. Lighthouse mantiene 94/100 de accesibilidad por la restricción heredada de zoom del viewport; los avisos de recursos del servidor DEV no se presentan como una medición de producción. Se conservaron `welcome-copy-*` y el log de build en la evidencia privada del workspace principal.
 
