@@ -1,5 +1,20 @@
 # Textos de clientes y prioridad de marcas — 24 de octubre de 2026
 
+## Ampliación local: bienvenida
+
+Después de la entrega `cd28768`, Kaleb pidió trabajar específicamente el lenguaje del onboarding. Candidato nuevo sin subir a GitHub: sólo literales de `OnboardingFlow.tsx`, conservando las tres pantallas, las animaciones, la navegación, el foco, las preferencias y los permisos.
+
+- Entrada: «¿Qué vas a comer hoy?»; explicación breve de elegir restaurante y pedir a casa o para recoger.
+- Pedido: «Así armas tu pedido»; comida, modalidad/dirección y confirmación con el código enviado por WhatsApp.
+- Seguimiento: «¿Cómo va tu pedido?»; detalles, cocina/recogida/entrega y PIN exclusivamente al recibir un pedido a domicilio.
+- Botones: «Saltar», «Cómo pedir», «Cómo ver mi pedido» y «Ver restaurantes». Sin promesas nuevas de velocidad, precio o disponibilidad.
+
+Build TypeScript/Vite y ESLint del componente aprobados. No se añaden pruebas que sólo comparen frases estáticas. Vista repetible de desarrollo existente: `http://127.0.0.1:5263/bienvenida`; permite volver a abrirla sin borrar el carrito ni las preferencias del origen de producción local en 5262. El build normal 5262 también contiene los textos, pero la bienvenida sólo aparece allí a quien todavía no la haya completado.
+
+Capturas automáticas de la pantalla inicial a 390 × 844 y 1280 × 900 inspeccionadas: texto completo y botones visibles, sin error de ejecución. Los pasos dos/tres se revisaron en código, pendientes de recorrido interactivo. Lighthouse mantiene 94/100 de accesibilidad por la restricción heredada de zoom del viewport; los avisos de recursos del servidor DEV no se presentan como una medición de producción. Se conservaron `welcome-copy-*` y el log de build en la evidencia privada del workspace principal.
+
+## Entrega anterior
+
 Estado de entrega: código funcional `5ba8179`, incluido en la subida autorizada a GitHub `main` del 24 de octubre junto con los banners móviles. Despliegue efectivo en Vercel pendiente de comprobar. Se conserva el build de producción local en `http://127.0.0.1:5262/`; la rama de preparación es `codex/eats-mobile-banners-20261024`.
 
 ## Lenguaje
