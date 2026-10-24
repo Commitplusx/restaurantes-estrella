@@ -1,5 +1,7 @@
 # Guía técnica de la web — 12 de octubre de 2026
 
+**Rendimiento del inicio — candidato local, 24 de octubre:** composición y animaciones conservadas, imágenes a tamaño de uso, Outfit local y snapshots públicos con caducidad/revalidación. Medición móvil local de 6.18 MB a 0.85 MB transferidos; 21 pruebas tipadas y build aprobados. Sin publicar; revisión interactiva de retorno/filtros pendiente por control de navegador desactivado. [Hallazgos, contrato y límites](HOME_PERFORMANCE_20261024.md).
+
 **Movimiento obligatorio, 17 de octubre:** el selector manual se elimina de todas las entradas, incluida bienvenida y DEV. Se ignora la elección antigua y se presenta movimiento completo. [Política, alcance y verificación](MOTION_REQUIRED_20261017.md). Las referencias siguientes a controles o modo reducido describen versiones anteriores.
 
 **Actualización del 17 de octubre:** recibos, tracker y tarjetas activas usan la RPC de seguimiento con acceso privado en el fragmento; catálogo/sucursales usan la vista pública. La recuperación de otro pedido no consume el carrito nuevo. [Contrato, pruebas, dependencia push y límites de publicación](TRACKING_ACCESS_20261017.md). Se envía a main para que Kaleb compruebe Vercel; las lecturas amplias del backend siguen pendientes de corte. Los apartados anteriores son historial cuando discrepan con esta actualización.

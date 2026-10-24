@@ -25,7 +25,7 @@ export function DesktopLandingHeader({ search, onSearch, deliveryType, onDeliver
     <header className="eats-desktop-header">
       <div className="eats-desktop-header-inner">
         <Link to="/" className="eats-wordmark" aria-label="Estrella Eats, inicio">
-          <img src="/estrella-circle.png" alt="" width="42" height="42" />
+          <img src="/estrella-icon-192.png" alt="" width="42" height="42" />
           <span>estrella<span className="eats-wordmark-accent">eats</span><span className="eats-wordmark-dot">.</span></span>
         </Link>
         <button type="button" className="eats-header-location" onClick={onLocation} title={address || 'Comitán de Domínguez'} aria-label="Elegir ubicación">
@@ -82,7 +82,7 @@ export function DesktopLandingHero({ onExplore, deliveryType, banners }: Desktop
       <div className="eats-hero-visual">
         {isDesktop ? <>
         <motion.div className="eats-hero-photo-depth" initial={enabled ? { clipPath: 'inset(5% 0 0 8% round 24px)' } : false} animate={{ clipPath: 'inset(0% 0 0 0% round 24px)' }} transition={{ duration: .8, ease: [.16, 1, .3, 1] }}><motion.div className="eats-hero-photo-plane" style={{ y: enabled ? photoY : 0, scale: enabled ? photoScale : 1 }}><ParallaxMedia depth={12} cinematic>
-          <img className="eats-hero-photo" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" />
+          <img className="eats-hero-photo" src="/desktop/comitan-table-900.webp" srcSet="/desktop/comitan-table-480.webp 480w, /desktop/comitan-table-900.webp 900w" sizes="(max-width: 639px) 100vw, 50vw" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" />
         </ParallaxMedia></motion.div></motion.div>
         <motion.div className="eats-photo-caption" style={{ y: enabled ? captionY : 0, rotate: -3 }}><span>¿QUÉ VAS A PEDIR?</span><strong>¿Tacos o<br />hamburguesa?</strong><ArrowDown size={23} aria-hidden="true" /></motion.div>
         <motion.div className="eats-local-seal" style={{ y: enabled ? sealY : 0, rotate: enabled ? sealRotate : 12 }} aria-hidden="true"><svg viewBox="0 0 100 100"><defs><path id="eats-seal-path" d="M50 50m-35 0a35 35 0 1 1 70 0a35 35 0 1 1-70 0" /></defs><text><textPath href="#eats-seal-path">COMITÁN · ESTRELLA EATS · </textPath></text></svg><span>✦</span></motion.div>

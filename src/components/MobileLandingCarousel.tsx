@@ -1,3 +1,4 @@
+import { CatalogImage } from './CatalogImage';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -82,14 +83,14 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
         }}>
         <div className="eats-carousel-track" style={{ transform: reducedMotion ? undefined : `translateX(-${activeIndex * 100}%)` }}>
           <div className="eats-carousel-slide" data-active={activeIndex === 0} role="group" aria-roledescription="diapositiva" aria-label={`1 de ${count}`} aria-hidden={activeIndex !== 0} inert={activeIndex !== 0}>
-            <motion.div className="eats-carousel-photo-plane" style={{ y: enabled ? photoY : 0, scale: enabled ? photoScale : 1 }}><ParallaxMedia depth={7} cinematic><img className="eats-carousel-table" src="/desktop/comitan-table.webp" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" draggable={false} /></ParallaxMedia></motion.div>
+            <motion.div className="eats-carousel-photo-plane" style={{ y: enabled ? photoY : 0, scale: enabled ? photoScale : 1 }}><ParallaxMedia depth={7} cinematic><img className="eats-carousel-table" src="/desktop/comitan-table-900.webp" srcSet="/desktop/comitan-table-480.webp 480w, /desktop/comitan-table-900.webp 900w" sizes="(max-width: 639px) 100vw, 50vw" alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" fetchPriority="high" draggable={false} /></ParallaxMedia></motion.div>
             <motion.div className="eats-photo-caption" style={{ y: enabled ? captionY : 0 }}><strong>¿Tacos o<br />hamburguesa?</strong></motion.div>
           </div>
           {banners.map((banner, position) => {
             const link = banner.link_url && /^(?:\/(?!\/)|https?:\/\/)/.test(banner.link_url) ? banner.link_url : null;
             const content = banner.imagen_url === 'dynamic-gradient'
               ? <div className="eats-carousel-message"><strong>{banner.titulo.replace(/<[^>]*>/g, '')}</strong>{banner.subtitulo && <p>{banner.subtitulo}</p>}</div>
-              : <img src={banner.imagen_url} alt={banner.titulo || 'Promoción de Estrella Eats'} draggable={false} loading="eager" />;
+              : <CatalogImage variant="banner" src={banner.imagen_url} alt={banner.titulo || 'Promoción de Estrella Eats'} draggable={false} loading="eager" />;
             return (
               <div key={banner.id} className="eats-carousel-slide" data-active={activeIndex === position + 1} role="group" aria-roledescription="diapositiva" aria-label={`${position + 2} de ${count}: ${banner.titulo}`} aria-hidden={activeIndex !== position + 1} inert={activeIndex !== position + 1}>
                 {link

@@ -1,3 +1,5 @@
+import { catalogImageUrl } from '../lib/catalogImage';
+import { CatalogImage } from './CatalogImage';
 import { useState, useEffect, useRef, useCallback, useId, type MouseEvent, type ReactNode } from 'react';
 import { RestaurantMotionLink } from './RestaurantMotionLink';
 import { motion } from 'framer-motion';
@@ -64,11 +66,11 @@ function DesktopRestaurantCard({
 
   return (
     <article className="desktop-restaurant-card" data-open={isAbierto}>
-    <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url} to={`/menu/${res.slug || res.id}`} className="desktop-restaurant-link" aria-label={`Ver menú de ${res.nombre}`}>
+    <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url ? catalogImageUrl(res.foto_fachada_url, import.meta.env.VITE_SUPABASE_URL) : undefined} to={`/menu/${res.slug || res.id}`} className="desktop-restaurant-link" aria-label={`Ver menú de ${res.nombre}`}>
       {/* Foto */}
       <div className="desktop-restaurant-photo">
         {res.foto_fachada_url && res.foto_fachada_url !== failedImage ? (
-            <ParallaxMedia depth={4}><img
+            <ParallaxMedia depth={4}><CatalogImage
               src={res.foto_fachada_url}
               alt=""
               loading="lazy"

@@ -228,7 +228,7 @@ export default function RestaurantMap({ restaurants, userLocation, locationLoadi
     <header className="eats-discovery-header">
       <button type="button" className="eats-map-control" onClick={onShowList} aria-label="Volver a restaurantes"><ArrowLeft size={21} /></button>
       <div><h1>Explora Comitán<Sparkle size={17} fill="currentColor" aria-hidden="true" /></h1><p>Tu próximo antojo está cerca.</p></div>
-      <img src="/estrella-circle.png" alt="Estrella Eats" />
+      <img src="/estrella-icon-192.png" alt="Estrella Eats" />
     </header>
     <div className="eats-discovery-controls">
       <button type="button" className="eats-map-control" disabled={locationLoading} onClick={onLocate} aria-label="Usar mi ubicación"><LocateFixed size={21} className={locationLoading ? 'eats-location-pending' : ''} /></button>

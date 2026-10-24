@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import imageCompression from 'browser-image-compression'
 import { observeBackendResponse } from './backendAvailability'
 const url = import.meta.env.VITE_SUPABASE_URL as string
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -95,6 +94,7 @@ async function compressImage(file: File): Promise<File> {
   };
   
   try {
+    const { default: imageCompression } = await import('browser-image-compression');
     const compressedBlob = await imageCompression(file, options);
     // browser-image-compression devuelve un Blob o File, nos aseguramos que sea File con extensión webp
     return new File([compressedBlob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {

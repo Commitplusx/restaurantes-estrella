@@ -84,7 +84,7 @@ export function InstallPWA() {
       >
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-slate-50 rounded-2xl flex items-center justify-center shrink-0 border border-slate-100/50 shadow-sm">
-            <img src="/estrella-circle.png" alt="App" className="w-7 h-7" />
+            <img src="/estrella-icon-192.png" alt="App" className="w-7 h-7" />
           </div>
           <div className="flex flex-col pr-2">
             <span className="font-bold text-slate-800 text-[13px] leading-tight">Instala la App 📱</span>

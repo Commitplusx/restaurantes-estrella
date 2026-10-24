@@ -112,7 +112,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     <motion.div className="eats-welcome-backdrop" initial={{ opacity: .95 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : .2 }}>
       <div ref={dialog} role="dialog" aria-modal="true" aria-label="Bienvenido a Estrella Eats" tabIndex={-1} className="eats-welcome" onKeyDown={onKeyDown}>
         <header className="eats-welcome-header">
-          <div className="eats-welcome-brand"><img src="/estrella-circle.png" alt="" width="38" height="38" /><span>estrella<span>eats.</span></span></div>
+          <div className="eats-welcome-brand"><img src="/estrella-icon-192.png" alt="" width="38" height="38" /><span>estrella<span>eats.</span></span></div>
           <div className="eats-welcome-header-actions">
             <button type="button" onClick={complete}>Omitir<ArrowRight size={16} aria-hidden="true" /></button>
           </div>
@@ -137,7 +137,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </div>
           <div className="eats-welcome-media" data-step={step} onPointerMove={movePointer} onPointerLeave={restPointer}>
             {!imageFailed ? <motion.div className="eats-welcome-photo" initial={false} animate={{ x: reduced ? 0 : [8, -18, 6][step], y: reduced ? 0 : [5, -9, -16][step], scale: reduced ? 1 : [1, 1.08, 1.04][step] }} transition={{ duration: reduced ? .1 : .85, ease: ARRIVAL }}>
-              <motion.img style={{ x: reduced ? 0 : photoX, y: reduced ? 0 : photoY }} src="/desktop/comitan-table.webp" alt="Tacos, hamburguesa y papas para compartir" width="900" height="1125" onError={() => setImageFailed(true)} />
+              <motion.img style={{ x: reduced ? 0 : photoX, y: reduced ? 0 : photoY }} src="/desktop/comitan-table-900.webp" srcSet="/desktop/comitan-table-480.webp 480w, /desktop/comitan-table-900.webp 900w" sizes="(max-width: 639px) 100vw, 50vw" alt="Tacos, hamburguesa y papas para compartir" width="900" height="1125" onError={() => setImageFailed(true)} />
             </motion.div>
               : <Utensils size={80} strokeWidth={1} aria-hidden="true" />}
             <motion.div className="eats-welcome-caption-depth" style={{ x: reduced ? 0 : captionX, y: reduced ? 0 : captionY }}>

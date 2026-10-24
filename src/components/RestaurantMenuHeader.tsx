@@ -42,7 +42,7 @@ export default function RestaurantMenuHeader({ restaurant, hasCart, fromSearch }
       <Link to="/" state={fromSearch ? { activeNavTab: 'search' } : undefined} className="menu-back" aria-label="Volver a los restaurantes"><ChevronLeft size={20} aria-hidden="true" /></Link>
       <div className="menu-header-identity">
         <motion.div className="menu-header-brand-plane" animate={{ opacity: compact ? 0 : 1, y: compact ? -8 : 0 }} transition={{ duration: .22, ease: SITE_EASE }} inert={compact} aria-hidden={compact}>
-          <Link to="/" className="menu-brand" aria-label="Estrella Eats, inicio"><img src="/estrella-circle.png" alt="" width="32" height="32" /><span>Estrella<span>Eats</span></span></Link>
+          <Link to="/" className="menu-brand" aria-label="Estrella Eats, inicio"><img src="/estrella-icon-192.png" alt="" width="32" height="32" /><span>Estrella<span>Eats</span></span></Link>
         </motion.div>
         <motion.div className="menu-header-restaurant-plane" initial={false} animate={{ opacity: compact ? 1 : 0, y: compact ? 0 : 8 }} transition={{ duration: .26, ease: SITE_EASE }} inert={!compact} aria-hidden={!compact}>
           <span className="menu-header-photo">

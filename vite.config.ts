@@ -11,7 +11,7 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
-      includeAssets: ['favicon.svg', 'estrella-circle.png', 'og-image.jpg'],
+      includeAssets: ['favicon.svg', 'estrella-icon-192.png', 'estrella-icon-512.png'],
       manifest: {
         name: 'Estrella Eats',
         short_name: 'Estrella',
@@ -22,17 +22,17 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'estrella-circle.png',
+            src: 'estrella-icon-192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'estrella-circle.png',
+            src: 'estrella-icon-512.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'estrella-circle.png',
+            src: 'estrella-icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
@@ -44,7 +44,7 @@ export default defineConfig({
             short_name: "Pedir",
             description: "Pide de tus restaurantes favoritos",
             url: "/",
-            icons: [{ src: "estrella-circle.png", sizes: "192x192" }]
+            icons: [{ src: "estrella-icon-192.png", sizes: "192x192" }]
           }
         ],
         screenshots: [
@@ -64,7 +64,7 @@ export default defineConfig({
       },
       workbox: {
         importScripts: ['/push-sw.js'],
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,woff,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
         globIgnores: ['**/login-cover.png', '**/login-cover.jpg'],
         runtimeCaching: [
           {
@@ -96,14 +96,16 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif)$/,
-            handler: 'CacheFirst',
+            urlPattern: ({ request, url, sameOrigin }) => request.destination === 'image' && (sameOrigin
+              || /^https:\/\/jdrrkpvodnqoljycixbg\.supabase\.co\/storage\/v1\/(?:object|render\/image)\/public\/(?:menu-fotos|publicidad)\//.test(url.href)),
+            handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'images-cache',
+              cacheName: 'catalog-images-v2',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 días
-              }
+                maxAgeSeconds: 60 * 60 * 24 * 7 // Public images only; API data is never cached here.
+              },
+              cacheableResponse: { statuses: [200] }
             }
           }
         ]

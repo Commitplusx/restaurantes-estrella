@@ -1,8 +1,8 @@
+import { catalogImageUrl } from '../lib/catalogImage';
 import { useOrderTracking } from '../hooks/useOrderTracking';
 import { trackingLink } from '../lib/trackingAccess';
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
-import { supabase } from '../lib/supabase'
-import { groupLandingPromotions, parseLandingPromotions, type LandingPromotion } from '../lib/landingPromotions';
+import { groupLandingPromotions } from '../lib/landingPromotions';
 import { ParallaxMedia, ScrollDepthGroup, ScrollLayer } from '../components/ParallaxMedia';
 import { RestaurantMotionLink } from '../components/RestaurantMotionLink';
 import { Store, Search, MapPin, House, Clock, Ticket, Loader2, Star, Heart, Bell, Package, ChefHat, Truck, ShoppingCart } from 'lucide-react'
@@ -10,8 +10,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { animate, motion, AnimatePresence } from 'framer-motion'
 import { useSiteMotion } from '../hooks/useSiteMotion';
 import RestaurantMap from '../components/RestaurantMap';
-import { backendRestricted } from '../lib/backendAvailability';
-import { CatalogRequestError, requireCatalogResponse, parseCatalogRows, oneRestaurantPerBrand } from '../lib/catalogRequest';
+import { oneRestaurantPerBrand } from '../lib/catalogRequest';
 import type { CatalogRestaurant as Restaurante } from '../lib/catalogRequest';
 import { readSavedCoordinates } from '../lib/deliveryLocation';
 import './CatalogNotice.css';
@@ -24,7 +23,10 @@ import { DesktopLandingHeader, DesktopLandingHero } from '../components/DesktopL
 import { useIsDesktop } from '../hooks/useIsDesktop';
 import LandingFoodCategories from '../components/LandingFoodCategories';
 import type { LandingFoodCategory } from '../components/LandingFoodCategories';
-import { isLandingBanner, type LandingBanner } from '../lib/landingBanner';
+import { useLandingCatalog } from '../hooks/useLandingCatalog';
+import { usePublicResource } from '../hooks/usePublicResource';
+import { landingPromotions, landingCategories, landingBanners, landingCoupons } from '../lib/publicLandingCatalog';
+import { CatalogImage } from '../components/CatalogImage';
 
 
 
@@ -88,12 +90,12 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
   // Si horizontal es true (scroll lateral), mostramos diseño de Tarjeta (Bloque Vertical)
   if (horizontal) {
     return (
-      <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url} to={`/menu/${res.slug || res.id}`} className="eats-mobile-row-card flex flex-col group relative bg-white rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-slate-100/60 transition-all duration-300 w-[150px] sm:w-[180px] md:w-full outline-none overflow-hidden hover:-translate-y-0.5">
+      <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url ? catalogImageUrl(res.foto_fachada_url, import.meta.env.VITE_SUPABASE_URL) : undefined} to={`/menu/${res.slug || res.id}`} className="eats-mobile-row-card flex flex-col group relative bg-white rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-slate-100/60 transition-all duration-300 w-[150px] sm:w-[180px] md:w-full outline-none overflow-hidden hover:-translate-y-0.5">
          <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden isolate">
             {res.foto_fachada_url ? (
               <>
-                <img src={res.foto_fachada_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-125 blur-xl opacity-50" />
-                <ParallaxMedia depth={3}><img src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain z-10" alt={res.nombre} /></ParallaxMedia>
+                <CatalogImage src={res.foto_fachada_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-125 blur-xl opacity-50" />
+                <ParallaxMedia depth={3}><CatalogImage src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain z-10" alt={res.nombre} /></ParallaxMedia>
               </>
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-slate-50"><Store size={32} className="text-orange-200" /></div>
@@ -133,14 +135,14 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
   // Si horizontal es false (lista vertical), mostramos layout List-Item en Móvil, y Grid Card en Desktop
   return (
     <ScrollLayer distance={26} tilt={.35}>
-    <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url} to={`/menu/${res.slug || res.id}`} className="eats-mobile-restaurant-card group relative flex md:flex-col items-center md:items-start bg-white rounded-2xl md:rounded-[22px] p-3 md:p-0 shadow-[0_2px_16px_rgba(0,0,0,0.05)] md:shadow-[0_4px_24px_rgba(0,0,0,0.07)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-100/70 gap-3 transition-all duration-300 outline-none w-full md:hover:-translate-y-1 overflow-hidden">
+    <RestaurantMotionLink restaurantId={res.id} image={res.foto_fachada_url ? catalogImageUrl(res.foto_fachada_url, import.meta.env.VITE_SUPABASE_URL) : undefined} to={`/menu/${res.slug || res.id}`} className="eats-mobile-restaurant-card group relative flex md:flex-col items-center md:items-start bg-white rounded-2xl md:rounded-[22px] p-3 md:p-0 shadow-[0_2px_16px_rgba(0,0,0,0.05)] md:shadow-[0_4px_24px_rgba(0,0,0,0.07)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-slate-100/70 gap-3 transition-all duration-300 outline-none w-full md:hover:-translate-y-1 overflow-hidden">
        
        {/* Imagen a la izquierda en móvil, arriba en desktop */}
        <div className="relative shrink-0 w-[72px] h-[72px] md:w-full md:aspect-[16/9] md:h-auto rounded-[12px] md:rounded-none overflow-hidden bg-slate-100 isolate">
           {res.foto_fachada_url ? (
             <>
-              <img src={res.foto_fachada_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-125 blur-xl opacity-50" />
-              <ParallaxMedia depth={3}><img src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain z-10" alt={res.nombre} /></ParallaxMedia>
+              <CatalogImage src={res.foto_fachada_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-125 blur-xl opacity-50" />
+              <ParallaxMedia depth={3}><CatalogImage src={res.foto_fachada_url} loading="lazy" className="relative w-full h-full object-contain z-10" alt={res.nombre} /></ParallaxMedia>
             </>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-slate-100"><Store size={32} className="text-orange-200" /></div>
@@ -231,23 +233,20 @@ function RestaurantCard({ res, isFav, toggleFav, userLocation, estaAbierto, calc
 export function PublicLandingPage() {
   const isDesktop = useIsDesktop();
   const [showOnboarding, setShowOnboarding] = useState(() => readPreference('estrella_onboarding_done') !== 'true')
-  const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
-  const [promotionRows, setPromotionRows] = useState<LandingPromotion[]>([])
-  const [promotionError, setPromotionError] = useState('')
-  const [promotionRetry, setPromotionRetry] = useState(0)
-  const [heroBanners, setHeroBanners] = useState<LandingBanner[]>([])
-  const [activeCategories, setActiveCategories] = useState<LandingFoodCategory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [catalogError, setCatalogError] = useState('')
-  const catalogRequest = useRef<AbortController | null>(null)
-  const catalogBusy = useRef(false)
-  useEffect(() => () => { catalogRequest.current?.abort(); catalogRequest.current = null; catalogBusy.current = false; }, [])
-  const [loadingPromos, setLoadingPromos] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const { restaurantes, loading, loadingMore, catalogError, hasMore, loadMore, retry: retryCatalog } = useLandingCatalog()
+  const promotionQuery = usePublicResource(landingPromotions)
+  const categoryQuery = usePublicResource(landingCategories)
+  const bannerQuery = usePublicResource(landingBanners)
+  const promotionRows = promotionQuery.data || []
+  const promotionError = promotionQuery.error ? 'No pudimos actualizar las ofertas. Puedes volver a intentarlo.' : ''
+  const loadingPromos = promotionQuery.loading
+  const heroBanners = bannerQuery.data || []
+  const activeCategories: LandingFoodCategory[] = useMemo(() => (categoryQuery.data || []).map(name => ({
+    name, emoji: EMOJI_MAP[name] || '🍽️',
+    image: `/categorias/${name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')}.webp`,
+  })), [categoryQuery.data])
   const [search, setSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
   const [activeTab, setActiveTab] = useState<'todos' | 'cerca'>('todos')
   const [isScrolled, setIsScrolled] = useState(false)
   const [showHeader, setShowHeader] = useState(true)
@@ -276,28 +275,12 @@ export function PublicLandingPage() {
   const [globalDeliveryType, setGlobalDeliveryType] = useState<'domicilio'|'recoger'>(() => {
     return (sessionStorage.getItem('est_delivery_type') as any) || 'domicilio';
   });
-  const [cuponesGlobales, setCuponesGlobales] = useState<any[]>([])
+  const couponQuery = usePublicResource(landingCoupons)
+  const cuponesGlobales = (couponQuery.data || []).filter(coupon => {
+    if (coupon.fecha_fin && new Date(`${coupon.fecha_fin}T23:59:59`) < new Date()) return false;
+    return !coupon.uso_maximo || coupon.usos_actuales < coupon.uso_maximo;
+  })
 
-  useEffect(() => {
-    const fetchCupones = async () => {
-      const { data } = await supabase
-        .from('cupones_plataforma')
-        .select('*')
-        .eq('activo', true)
-        .order('created_at', { ascending: false });
-      
-      if (data) {
-        const validCupones = data.filter(c => {
-          if (c.fecha_fin && new Date(`${c.fecha_fin}T23:59:59`) < new Date()) return false;
-          if (c.uso_maximo && c.usos_actuales >= c.uso_maximo) return false;
-          return true;
-        });
-        setCuponesGlobales(validCupones);
-      }
-    };
-    fetchCupones();
-  }, []);
-  
   // Prevenir scroll de la página cuando la tab de ubicación está abierta
   useEffect(() => {
     if (activeNavTab === 'location') {
@@ -344,7 +327,6 @@ export function PublicLandingPage() {
     })
   }
 
-  const PAGE_SIZE = 100
 
   useEffect(() => {
     lastScrollY.current = Math.max(0, window.scrollY);
@@ -385,43 +367,11 @@ export function PublicLandingPage() {
     }
   }, [])
 
-  const loadRestaurants = useCallback(async (pageIndex: number) => {
-    if (catalogBusy.current) return;
-    catalogBusy.current = true;
-    const controller = new AbortController();
-    catalogRequest.current = controller;
-    const deadline = window.setTimeout(() => controller.abort(), 10_000);
-    try {
-      const result = await supabase.from('storefront_restaurants')
-        .select('id, nombre, telefono, direccion, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias, slug, lat, lng, matriz_id, nombre_sucursal, activo, perfil_completo')
-        .eq('activo', true).eq('perfil_completo', true)
-        .order('nombre').range(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE - 1).abortSignal(controller.signal);
-      const data = parseCatalogRows(requireCatalogResponse(result));
-      if (catalogRequest.current !== controller) return;
-      setHasMore(data.length === PAGE_SIZE);
-      setPage(pageIndex);
-      setCatalogError('');
-      if (pageIndex === 0) setRestaurantes(data);
-      else setRestaurantes(previous => [...previous.filter(row => !data.some(next => next.id === row.id)), ...data]);
-    } catch (cause: unknown) {
-      if (catalogRequest.current !== controller) return;
-      setCatalogError(cause instanceof CatalogRequestError ? cause.message : 'No pudimos cargar los restaurantes. Revisa tu conexión y vuelve a intentarlo.');
-      console.warn('catalog_request_failed', { status: cause instanceof CatalogRequestError ? cause.status : 0, code: cause instanceof CatalogRequestError ? cause.code : 'network' });
-    } finally {
-      window.clearTimeout(deadline);
-      if (catalogRequest.current === controller) {
-        catalogBusy.current = false; catalogRequest.current = null;
-        setLoading(false); setLoadingMore(false);
-      }
-    }
-  }, []);
-
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
         if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !catalogError) {
-          setLoadingMore(true);
-          void loadRestaurants(page + 1);
+          void loadMore();
         }
       },
       { threshold: 0.1 }
@@ -433,97 +383,9 @@ export function PublicLandingPage() {
     return () => {
       if (target) observer.unobserve(target);
     };
-  }, [hasMore, loading, loadingMore, page, catalogError, loadRestaurants]);
+  }, [hasMore, loading, loadingMore, catalogError, loadMore]);
 
-  useEffect(() => {
-    async function loadCats() {
-      const { data } = await supabase.from('storefront_restaurants').select('categorias').eq('activo', true).limit(500).abortSignal(AbortSignal.timeout(10_000))
-      if (data) {
-        const unique = new Set<string>()
-        data.forEach(r => {
-          if (r.categorias && Array.isArray(r.categorias)) {
-            r.categorias.forEach((c: string) => unique.add(c))
-          }
-        })
-        const catArray = Array.from(unique).sort().map(name => {
-          const imgName = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '');
-          return {
-            name,
-            emoji: EMOJI_MAP[name] || '🍽️',
-            image: `/categorias/${imgName}.jpg`
-          }
-        })
-        setActiveCategories(catArray)
-      }
-    }
-    loadCats()
-  }, [])
-
-  useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
-    const deadline = window.setTimeout(() => controller.abort(), 8000);
-    async function loadPromos() {
-      setLoadingPromos(true);
-      try {
-        const result = await supabase.from('menu_promociones')
-          .select('id,restaurante_id,titulo,descripcion,precio_especial,foto_url,fecha_fin,activa,aplica_subsidio,dias_aplicacion,tipos_pedido,opciones,restaurantes:storefront_restaurants(id,nombre,slug,matriz_id,nombre_sucursal,activo,perfil_completo)')
-          .eq('activa', true).order('id').limit(200).abortSignal(controller.signal);
-        const rows = parseLandingPromotions(requireCatalogResponse(result));
-        if (active) { setPromotionRows(rows); setPromotionError(''); }
-      } catch {
-        if (active) setPromotionError('No pudimos actualizar las ofertas. Puedes volver a intentarlo.');
-      } finally {
-        window.clearTimeout(deadline);
-        if (active) setLoadingPromos(false);
-      }
-    }
-    void loadPromos();
-    return () => { active = false; window.clearTimeout(deadline); controller.abort(); };
-  }, [promotionRetry]);
   const promosGlobales = useMemo(() => groupLandingPromotions(promotionRows, globalDeliveryType === 'recoger' ? 'tienda' : 'domicilio'), [promotionRows, globalDeliveryType]);
-
-  async function loadBanners() {
-    try {
-      const { data } = await supabase.from('app_banners').select('*').eq('activo', true).order('orden', { ascending: true }).order('creado_en', { ascending: false }).limit(5);
-      if (data) {
-        const rawBanners: unknown[] = data;
-        const validBanners = rawBanners.filter(isLandingBanner);
-        if (validBanners.length !== rawBanners.length) console.warn('[Landing] Banners con formato inválido omitidos');
-        setHeroBanners(validBanners);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  useEffect(() => {
-    loadRestaurants(0)
-    loadBanners()
-  }, [loadRestaurants])
-
-  useEffect(() => {
-    if (loading || catalogError || backendRestricted()) return;
-    const channel = supabase
-      .channel('public:landing_restaurantes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes' }, (payload) => {
-        if (payload.eventType === 'DELETE') {
-          setRestaurantes(prev => prev.filter(r => r.id !== payload.old.id))
-          return
-        }
-        try {
-          const next = parseCatalogRows([payload.new])[0]
-          setRestaurantes(previous => {
-            if (!next.activo || next.perfil_completo !== true) return previous.filter(r => r.id !== next.id)
-            return [next, ...previous.filter(r => r.id !== next.id)]
-          })
-        } catch { console.warn('catalog_event_invalid') }
-
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [loading, catalogError])
 
   const estaAbierto = (res: Restaurante) => {
     const toMinutes = (timeStr: string): number => {
@@ -741,7 +603,7 @@ export function PublicLandingPage() {
               {/* Desktop Logo (Left) */}
               <div className="hidden md:flex items-center gap-2.5 mr-2 cursor-pointer group" onClick={() => window.scrollTo(0,0)}>
                  <div className="relative">
-                   <img src="/estrella-circle.png" alt="Estrella Eats" className="w-10 h-10 object-contain group-hover:scale-110 transition-transform duration-300" />
+                   <img src="/estrella-icon-192.png" alt="Estrella Eats" className="w-10 h-10 object-contain group-hover:scale-110 transition-transform duration-300" />
                  </div>
                  <span className="text-xl font-black tracking-tighter hidden lg:block">
                    <span className="text-slate-900">Estrella</span><span className="text-[#FA4A0C]">Eats</span>
@@ -950,7 +812,7 @@ export function PublicLandingPage() {
           />
         )}
 
-        {promotionError && <section className="eats-catalog-notice" role="status"><Ticket size={24} aria-hidden="true" /><div><h2>Ofertas por actualizar</h2><p>{promotionError}</p></div><button type="button" disabled={loadingPromos} onClick={() => setPromotionRetry(value => value + 1)}>Reintentar</button></section>}
+        {promotionError && <section className="eats-catalog-notice" role="status"><Ticket size={24} aria-hidden="true" /><div><h2>Ofertas por actualizar</h2><p>{promotionError}</p></div><button type="button" disabled={loadingPromos} onClick={promotionQuery.refresh}>Reintentar</button></section>}
         {/* Carrusel de Promociones (Campaigns - eFood Style) */}
         <AnimatePresence>
           {!loadingPromos && promosGlobales.length > 0 && !search && !selectedCategory && (
@@ -978,7 +840,7 @@ export function PublicLandingPage() {
                 >
                   <div className="eats-offer-photo relative w-full aspect-square bg-slate-100 overflow-hidden isolate">
                      {promo.foto_url ? (
-                       <img src={promo.foto_url} loading="lazy" className="relative w-full h-full object-contain" alt={promo.titulo} />
+                       <CatalogImage src={promo.foto_url} loading="lazy" className="relative w-full h-full object-contain" alt={promo.titulo} />
                      ) : (
                        <div className="w-full h-full flex items-center justify-center bg-orange-50"><Ticket size={32} className="text-[#FA4A0C]" /></div>
                      )}
@@ -1043,7 +905,7 @@ export function PublicLandingPage() {
         {catalogError && <section className="eats-catalog-notice" role="status">
           <Store size={24} aria-hidden="true" />
           <div><h2>No pudimos actualizar los restaurantes</h2><p>{catalogError}</p>{restaurantes.length > 0 && <p>Conservamos la última lista que cargó. Confirma la disponibilidad antes de pedir.</p>}</div>
-          <button disabled={loading || loadingMore} onClick={() => { if (!restaurantes.length) setLoading(true); else setLoadingMore(true); void loadRestaurants(restaurantes.length ? page : 0); }}>Reintentar</button>
+          <button disabled={loading || loadingMore} onClick={retryCatalog}>Reintentar</button>
         </section>}
         {/* Grid de Restaurantes */}
         <ScrollDepthGroup distance={8}>
@@ -1177,7 +1039,7 @@ export function PublicLandingPage() {
             {/* Brand */}
             <div className="flex flex-col items-center md:items-start gap-4">
               <div className="flex items-center gap-3">
-                <img src="/estrella-circle.png" alt="Estrella Eats" className="w-11 h-11 object-contain brightness-110" />
+                <img src="/estrella-icon-192.png" alt="Estrella Eats" className="w-11 h-11 object-contain brightness-110" />
                 <span className="text-2xl font-black tracking-tighter">
                   <span className="text-white">Estrella</span><span className="text-[#FA4A0C]">Eats</span>
                 </span>
