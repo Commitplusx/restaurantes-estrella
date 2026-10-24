@@ -76,6 +76,7 @@ Deno.test('forward search uses permanent storage, Mexico, Spanish and one explic
     equal(input.pathname, '/search/geocode/v6/forward');
     equal(input.searchParams.get('q'), 'Calle Sur 10');
     equal(input.searchParams.get('permanent'), 'true');
+    equal(input.searchParams.get('limit'), '5');
     equal(input.searchParams.get('autocomplete'), 'false');
     equal(input.searchParams.get('country'), 'mx');
     equal(input.searchParams.get('language'), 'es');
@@ -96,6 +97,8 @@ Deno.test('reverse lookup preserves latitude/longitude and requests permanent re
     equal(input.searchParams.get('longitude'), String(point.lng));
     equal(input.searchParams.get('latitude'), String(point.lat));
     equal(input.searchParams.get('permanent'), 'true');
+    equal(input.searchParams.get('types'), 'address,street');
+    assert(!input.searchParams.has('limit'), 'Reverse lookup must not combine multiple types with an explicit limit');
     return Promise.resolve(Response.json(body));
   };
   equal((await requestAddresses(config, { point }, new AbortController().signal, fetcher)).length, 1);

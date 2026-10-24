@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useNoticeSlot } from '../hooks/useNoticeSlot';
 
 export function InstallPWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -7,6 +8,7 @@ export function InstallPWA() {
   const [isIOS, setIsIOS] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const shown = useNoticeSlot('install', showPrompt, 10);
 
   useEffect(() => {
     // Detectar si es iOS
@@ -73,7 +75,7 @@ export function InstallPWA() {
     localStorage.setItem('install_prompt_dismissed', 'true');
   };
 
-  if (!showPrompt) return null;
+  if (!shown) return null;
 
   return (
     <>

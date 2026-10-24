@@ -1,28 +1,29 @@
 import type { Map as MapboxMap } from 'mapbox-gl';
 
 // Preserve street data, readable place names and provider attribution.
-export function applyEatsMapTheme(map: MapboxMap, theme: 'warm' | 'neutral' = 'warm'): void {
-  const neutral = theme === 'neutral';
+export function applyEatsMapTheme(map: MapboxMap, theme: 'warm' | 'neutral' | 'gray' = 'warm'): void {
+  const neutral = theme !== 'warm';
+  const gray = theme === 'gray';
   for (const layer of map.getStyle().layers ?? []) {
     const name = layer.id.toLowerCase();
-    if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', neutral ? '#f1f2f1' : '#faf1df');
+    if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', gray ? '#eeeeee' : neutral ? '#f1f2f1' : '#faf1df');
     if (layer.type === 'fill') {
-      if (name.includes('water')) map.setPaintProperty(layer.id, 'fill-color', neutral ? '#d3dce1' : '#acd9e3');
-      else if (name.includes('park') || name.includes('national')) map.setPaintProperty(layer.id, 'fill-color', neutral ? '#dde3dd' : '#bcd6a3');
-      else if (name.includes('building')) map.setPaintProperty(layer.id, 'fill-color', neutral ? '#e0e2df' : '#e4d3bb');
+      if (name.includes('water')) map.setPaintProperty(layer.id, 'fill-color', gray ? '#d1d1d1' : neutral ? '#d3dce1' : '#acd9e3');
+      else if (name.includes('park') || name.includes('national')) map.setPaintProperty(layer.id, 'fill-color', gray ? '#e2e2e2' : neutral ? '#dde3dd' : '#bcd6a3');
+      else if (name.includes('building')) map.setPaintProperty(layer.id, 'fill-color', gray ? '#dadada' : neutral ? '#e0e2df' : '#e4d3bb');
       else if (name.includes('landuse') || name === 'land') map.setPaintProperty(layer.id, 'fill-color', [
-        'match', ['get', 'class'], ['park', 'grass', 'wood', 'scrub', 'cemetery'], neutral ? '#e0e6df' : '#c4dcae',
-        ['hospital', 'school', 'college'], neutral ? '#e4e5e3' : '#f0d8c7', ['industrial'], neutral ? '#e2e4e4' : '#e5dfd0', neutral ? '#eceeeb' : '#f5ead5',
+        'match', ['get', 'class'], ['park', 'grass', 'wood', 'scrub', 'cemetery'], gray ? '#e2e2e2' : neutral ? '#e0e6df' : '#c4dcae',
+        ['hospital', 'school', 'college'], gray ? '#e5e5e5' : neutral ? '#e4e5e3' : '#f0d8c7', ['industrial'], gray ? '#e1e1e1' : neutral ? '#e2e4e4' : '#e5dfd0', gray ? '#eeeeee' : neutral ? '#eceeeb' : '#f5ead5',
       ]);
     }
     if (layer.type === 'line' && name.includes('road') && !name.includes('label')) {
-      const color = name.includes('case') ? (neutral ? '#d4d8d5' : '#e0c8a7')
-        : name.includes('motorway') || name.includes('trunk') ? (neutral ? '#d9dcda' : '#eda967') : (neutral ? '#ffffff' : '#fffdf7');
+      const color = name.includes('case') ? (gray ? '#cdcdcd' : neutral ? '#d4d8d5' : '#e0c8a7')
+        : name.includes('motorway') || name.includes('trunk') ? (gray ? '#dddddd' : neutral ? '#d9dcda' : '#eda967') : (neutral ? '#ffffff' : '#fffdf7');
       map.setPaintProperty(layer.id, 'line-color', color);
     }
     if (layer.type === 'symbol' && layer.layout?.['text-field']) {
-      map.setPaintProperty(layer.id, 'text-color', neutral ? '#666d70' : name.includes('water') ? '#347583' : name.includes('park') ? '#406e37' : '#65553f');
-      map.setPaintProperty(layer.id, 'text-halo-color', neutral ? '#f9faf8' : '#fffaf0');
+      map.setPaintProperty(layer.id, 'text-color', gray ? '#555555' : neutral ? '#666d70' : name.includes('water') ? '#347583' : name.includes('park') ? '#406e37' : '#65553f');
+      map.setPaintProperty(layer.id, 'text-halo-color', gray ? '#fafafa' : neutral ? '#f9faf8' : '#fffaf0');
     }
   }
 }

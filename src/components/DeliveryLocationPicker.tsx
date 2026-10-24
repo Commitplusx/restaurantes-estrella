@@ -1,14 +1,16 @@
 import { useSiteMotion } from '../hooks/useSiteMotion';
+import { useNoticeSlot } from '../hooks/useNoticeSlot';
 import { useEffect, useRef, useState } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion } from 'framer-motion';
 import { AlertCircle, Loader2, LocateFixed, MapPin, Search, X, ArrowRight, Check } from 'lucide-react';
 import { applyEatsMapTheme } from '../lib/eatsMapTheme';
+import { AddressLookupSession } from '../lib/addressLookupSession';
 import './EatsMap.css';
 import './DeliveryLocationPicker.css';
 import {
-  AddressLookupError, canConfirmLocation, isDeliveryCoordinates, isPublicMapboxToken, requestAddresses,
+  AddressLookupError, canConfirmLocation, isDeliveryCoordinates, isPublicMapboxToken,
 } from '../lib/deliveryLocation';
 import type { AddressResult, DeliveryCoordinates, DeliveryLocation, MapboxAddressConfig } from '../lib/deliveryLocation';
 
@@ -29,6 +31,8 @@ const canSearch = hasToken && config.permanentGeocoding;
 const defaultCenter: DeliveryCoordinates = { lat: 16.2516, lng: -92.1332 };
 
 export default function DeliveryLocationPicker({ purpose = 'delivery', initialLocation, restaurantLocation, onConfirm, onClose }: Props) {
+  // Reserve the notice queue while this explicit modal is open.
+  useNoticeSlot('delivery-location', true, 200);
   const isRestaurant = purpose === 'restaurant';
   const { enabled } = useSiteMotion();
   const reducedMotion = !enabled;
@@ -37,6 +41,7 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<AddressResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [resolvingAddress, setResolvingAddress] = useState(false);
   const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState('');
   const [mapState, setMapState] = useState<'loading' | 'ready' | 'failed' | 'unconfigured'>(hasToken ? 'loading' : 'unconfigured');
@@ -44,35 +49,32 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
   const containerRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
+  const selectedPointRef = useRef<DeliveryCoordinates | null>(initialLocation);
   const firstCenterRef = useRef(initialLocation || restaurantLocation || defaultCenter);
-  const manualAddressRef = useRef(false);
-  const controllerRef = useRef<AbortController | null>(null);
-  const sequenceRef = useRef(0);
+  const lookupSessionRef = useRef<AddressLookupSession | null>(null);
+  if (!lookupSessionRef.current) lookupSessionRef.current = new AddressLookupSession(config);
+  const initialLookupRef = useRef(initialLocation && !initialLocation.address.trim() ? initialLocation : null);
   const gpsSequenceRef = useRef(0);
   const liveRef = useRef(true);
   const closeRef = useRef(onClose);
 
   function cancelRequests() {
-    sequenceRef.current += 1;
     gpsSequenceRef.current += 1;
-    controllerRef.current?.abort();
-    controllerRef.current = null;
+    lookupSessionRef.current?.cancel();
     setSearching(false);
+    setResolvingAddress(false);
     setLocating(false);
   }
 
   function choosePoint(next: DeliveryCoordinates, resultAddress?: string) {
     if (!isDeliveryCoordinates(next)) return;
     cancelRequests();
+    selectedPointRef.current = { lat: next.lat, lng: next.lng };
     setPoint({ lat: next.lat, lng: next.lng });
     setResults([]);
     setMessage('');
-    if (resultAddress) {
-      manualAddressRef.current = false;
-      setAddress(resultAddress);
-    } else if (!manualAddressRef.current) {
-      setAddress('');
-    }
+    setAddress(resultAddress || '');
+    if (!resultAddress && canSearch) lookup(true, next, 450);
   }
   const choosePointRef = useRef(choosePoint);
   useEffect(() => {
@@ -82,6 +84,7 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
 
   useEffect(() => {
     liveRef.current = true;
+    if (initialLookupRef.current) choosePointRef.current(initialLookupRef.current);
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -108,9 +111,8 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
     document.addEventListener('keydown', keyboard);
     return () => {
       liveRef.current = false;
-      sequenceRef.current += 1;
       gpsSequenceRef.current += 1;
-      controllerRef.current?.abort();
+      lookupSessionRef.current?.cancel();
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', keyboard);
       opener?.focus();
@@ -138,7 +140,7 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
       instance = new mapboxgl.Map({
         container: containerRef.current,
         accessToken: config.accessToken,
-        style: import.meta.env.VITE_MAPBOX_STYLE_URL || 'mapbox://styles/mapbox/streets-v12',
+        style: 'mapbox://styles/mapbox/light-v11',
         center: [center.lng, center.lat],
         zoom: 16,
         maxZoom: 19,
@@ -154,7 +156,7 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
       instance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
       instance.on('load', () => {
         clearTimeout(timeout);
-        if (instance && !disposed && !failed) applyEatsMapTheme(instance);
+        if (instance && !disposed && !failed) applyEatsMapTheme(instance, 'gray');
         if (!disposed && !failed) setMapState('ready');
         instance?.resize();
       });
@@ -168,6 +170,8 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
         if (!userMoved || failed || disposed || !instance) return;
         userMoved = false;
         const next = instance.getCenter();
+        const selected = selectedPointRef.current;
+        if (selected && Math.abs(selected.lat - next.lat) < .0000001 && Math.abs(selected.lng - next.lng) < .0000001) return;
         choosePointRef.current({ lat: next.lat, lng: next.lng });
       });
       instance.on('click', event => {
@@ -194,34 +198,29 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
       duration: 350 });
   }, [point, mapState]);
 
-  async function lookup(reverse = false) {
-    if (!canSearch || (reverse && !point)) return;
+  function lookup(reverse = false, selectedPoint = point, delay = 0) {
+    if (!canSearch || (reverse && !selectedPoint)) return;
     cancelRequests();
-    const sequence = sequenceRef.current;
-    const controller = new AbortController();
-    controllerRef.current = controller;
     setMessage('');
     setResults([]);
-    setSearching(true);
-    try {
-      const request = reverse && point ? { point } : { query, proximity: point || restaurantLocation || defaultCenter };
-      const found = await requestAddresses(config, request, controller.signal);
-      if (!liveRef.current || sequence !== sequenceRef.current) return;
-      if (found.length === 0) {
-        setMessage('No encontramos esa dirección. Ajusta el pin y escribe la calle y número.');
-      } else if (reverse) {
-        manualAddressRef.current = false;
-        setAddress(found[0].address);
-      } else {
-        setResults(found);
-      }
-    } catch (error: unknown) {
-      if (!liveRef.current || sequence !== sequenceRef.current) return;
-      setMessage(error instanceof AddressLookupError ? error.message
-        : 'No pudimos consultar la dirección. Intenta de nuevo o escríbela debajo.');
-    } finally {
-      if (liveRef.current && sequence === sequenceRef.current) setSearching(false);
-    }
+    setSearching(!reverse);
+    setResolvingAddress(reverse);
+    const request = reverse && selectedPoint ? { point: selectedPoint } : { query, proximity: selectedPoint || restaurantLocation || defaultCenter };
+    lookupSessionRef.current?.lookup(request, {
+      result: found => {
+        setSearching(false);
+        setResolvingAddress(false);
+        if (found.length === 0) setMessage(reverse ? 'No encontramos la calle de este punto. Puedes ajustar el pin o escribir la dirección.' : 'No encontramos esa dirección. Prueba con otra calle o elige un punto en el mapa.');
+        else if (reverse) setAddress(found[0].address);
+        else setResults(found);
+      },
+      error: (error: unknown) => {
+        setSearching(false);
+        setResolvingAddress(false);
+        setMessage(error instanceof AddressLookupError ? error.message
+          : 'No pudimos consultar la dirección. Intenta de nuevo o escríbela debajo.');
+      },
+    }, delay);
   }
 
   function locate() {
@@ -251,7 +250,7 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
   }
 
   function confirm() {
-    if (!canConfirmLocation(point, address) || !point || searching || locating) return;
+    if (!canConfirmLocation(point, address) || !point || searching || resolvingAddress || locating) return;
     onConfirm({ lat: point.lat, lng: point.lng, address: address.trim() });
   }
 
@@ -264,7 +263,7 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
         transition={{ duration: reducedMotion ? 0 : 0.32, ease: [0.16, 1, 0.3, 1] }} className="delivery-location-dialog">
         <div className="delivery-location-map eats-map-surface">
           <div ref={containerRef} className="delivery-location-canvas" aria-label={isRestaurant ? 'Mapa de la sucursal' : 'Mapa del punto de entrega'} />
-          <div className="delivery-map-heading"><MapPin size={17} aria-hidden="true" /><span>Elige dónde recibir tu pedido</span></div>
+          <div className="delivery-map-heading"><MapPin size={17} aria-hidden="true" /><span>{isRestaurant ? 'Marca la entrada de tu sucursal' : 'Pon el pin en tu puerta'}</span></div>
           {mapState === 'ready' && <>
             <div className="delivery-location-pin" aria-hidden="true"><span><MapPin size={27} /></span><i /><strong>{isRestaurant ? 'Tu sucursal' : 'Tu entrega'}</strong></div>
             <p className="delivery-map-hint">{point ? (isRestaurant ? 'Revisa que el pin esté en la entrada del local' : 'Revisa que el pin esté justo en tu puerta') : 'Mueve el mapa o toca la ubicación exacta'}</p>
@@ -281,11 +280,21 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
         </div>
         <div className="delivery-location-panel">
           <div className="delivery-location-heading"><h2 id="delivery-location-title">{isRestaurant ? 'Ubica tu sucursal' : <>¿Dónde te lo <br />entregamos?</>}</h2><button onClick={onClose} aria-label="Cerrar selector de ubicación" className="delivery-location-close"><X size={20} /></button></div>
-          <p className="delivery-location-intro">{isRestaurant ? 'Marca la entrada del local y escribe su dirección para que clientes y repartidores lo encuentren.' : 'Pon el pin en tu puerta y déjanos la dirección. Así será más fácil encontrarte.'}</p>
+          <p className="delivery-location-intro">{canSearch ? 'Usa tu ubicación o mueve el pin. Completamos la dirección por ti.' : 'Elige el punto en el mapa y escribe la dirección.'}</p>
           <div className="delivery-location-fields">
-            {canSearch && <div className="delivery-field">
+            <div className="delivery-field">
+              <label htmlFor="delivery-street-address">{isRestaurant ? 'Dirección del local' : 'Dirección de entrega'}</label>
+              <textarea id="delivery-street-address" rows={3} value={address} maxLength={300} autoComplete="street-address" placeholder={canSearch ? 'Aquí aparecerá la dirección del pin' : 'Calle, número y colonia'} aria-describedby="delivery-address-help"
+                onChange={event => { cancelRequests(); setAddress(event.target.value); setMessage(''); }} />
+              <p id="delivery-address-help" className="delivery-address-help">{canSearch ? 'Revisa el número y agrega referencias si hace falta.' : 'Escribe calle, número y colonia.'}</p>
+              {resolvingAddress && <p className="delivery-address-loading" role="status"><Loader2 size={16} className="delivery-spinner" aria-hidden="true" />Buscando la calle de este punto…</p>}
+              {canSearch && point && !address && !resolvingAddress && <button type="button" onClick={() => lookup(true)} className="delivery-pin-address"><MapPin size={15} aria-hidden="true" />Volver a buscar la calle</button>}
+            </div>
+            {canSearch && <details className="delivery-address-alternative">
+              <summary>¿Buscas otra dirección?</summary>
+              <div className="delivery-field">
               <label htmlFor="delivery-address-search">Busca tu dirección</label>
-              <form onSubmit={event => { event.preventDefault(); void lookup(); }} className="delivery-search">
+              <form onSubmit={event => { event.preventDefault(); lookup(); }} className="delivery-search">
                 <Search size={18} aria-hidden="true" />
                 <input id="delivery-address-search" value={query} maxLength={256} placeholder="Calle, número o colonia" autoComplete="off"
                   onChange={event => { cancelRequests(); setQuery(event.target.value); setResults([]); setMessage(''); }} />
@@ -294,17 +303,12 @@ export default function DeliveryLocationPicker({ purpose = 'delivery', initialLo
               {results.length > 0 && <ul aria-label="Direcciones encontradas" className="delivery-search-results">
                 {results.map(result => <li key={result.id}><button onClick={() => choosePoint(result, result.address)}><MapPin size={17} aria-hidden="true" /><span>{result.address}</span></button></li>)}
               </ul>}
-            </div>}
-            <div className="delivery-field">
-              <label htmlFor="delivery-street-address">Calle, número y colonia</label>
-              <textarea id="delivery-street-address" rows={3} value={address} maxLength={300} autoComplete="street-address" placeholder="Ej. 1a Calle Sur #12, Centro"
-                onChange={event => { cancelRequests(); manualAddressRef.current = true; setAddress(event.target.value); setMessage(''); }} />
-              {canSearch && point && <button onClick={() => void lookup(true)} disabled={searching} className="delivery-pin-address"><MapPin size={15} />Usar la dirección de este pin</button>}
-            </div>
-            <div className="delivery-point-state" data-selected={Boolean(point)}>{point ? <Check size={17} aria-hidden="true" /> : <MapPin size={17} aria-hidden="true" />}<span>{point ? 'Punto de entrega elegido. Revisa la dirección.' : 'Falta elegir tu punto en el mapa.'}</span></div>
+              </div>
+            </details>}
+            <div className="delivery-point-state" role="status" data-selected={canConfirmLocation(point, address) && !resolvingAddress}>{canConfirmLocation(point, address) && !resolvingAddress ? <Check size={17} aria-hidden="true" /> : <MapPin size={17} aria-hidden="true" />}<span>{resolvingAddress ? 'Ya tenemos el punto. Estamos buscando la dirección.' : canConfirmLocation(point, address) ? 'Dirección lista. Revisa el pin antes de confirmar.' : point ? 'Punto elegido. Falta completar la dirección.' : 'Usa tu ubicación o elige un punto en el mapa.'}</span></div>
             {message && <p role="alert" className="delivery-location-error">{message}</p>}
           </div>
-          <div className="delivery-confirm-area"><button onClick={confirm} disabled={!canConfirmLocation(point, address) || searching || locating} className="delivery-location-confirm"><span>Confirmar ubicación</span><ArrowRight size={20} /></button></div>
+          <div className="delivery-confirm-area"><button onClick={confirm} disabled={!canConfirmLocation(point, address) || searching || resolvingAddress || locating} className="delivery-location-confirm"><span>Confirmar ubicación</span><ArrowRight size={20} /></button></div>
         </div>
       </motion.div>
     </motion.div>

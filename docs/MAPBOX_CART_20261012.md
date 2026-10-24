@@ -1,5 +1,7 @@
 # Mapbox en el carrito — 12 de octubre de 2026
 
+**Ampliación local del 24 de octubre de 2026:** selector gris y consulta inversa automática tras GPS/selección del pin, con coordinación de avisos y protección de respuestas anteriores. Sin publicar. El botón explícito de consulta y el tema cálido descritos abajo corresponden a la base histórica. [Contrato actual, pruebas y límites](DELIVERY_LOCATION_AUTOFILL_20261024.md).
+
 ## Estado
 
 Implementado y **publicado en estrella-eats.mx** desde `main`, commit `ef748c72725f66dafc7d07b32977087fe88ff6b8`. Vercel `deiffs-projects/restaurantes-estrella`, despliegue `8qdBmowJg7pQJytqDaScG1aNcVGs`, estado Ready y dominio de producción asignado. Sin cambios en Supabase, APK o worker.

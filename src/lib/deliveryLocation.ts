@@ -16,6 +16,8 @@ export interface MapboxAddressConfig {
   permanentGeocoding: boolean;
 }
 
+export type AddressRequest = { query: string; proximity: DeliveryCoordinates } | { point: DeliveryCoordinates };
+
 export class AddressLookupError extends Error {}
 
 export function isDeliveryCoordinates(value: unknown): value is DeliveryCoordinates {
@@ -74,7 +76,7 @@ export function parseAddressResults(value: unknown): AddressResult[] {
 
 export async function requestAddresses(
   config: MapboxAddressConfig,
-  request: { query: string; proximity: DeliveryCoordinates } | { point: DeliveryCoordinates },
+  request: AddressRequest,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
 ): Promise<AddressResult[]> {
@@ -88,8 +90,8 @@ export async function requestAddresses(
   url.searchParams.set('country', 'mx');
   url.searchParams.set('language', 'es');
   url.searchParams.set('types', 'address,street');
-  url.searchParams.set('limit', '5');
   if ('query' in request) {
+    url.searchParams.set('limit', '5');
     const query = request.query.trim();
     if (query.length < 3 || query.length > 256 || query.includes(';') || !isDeliveryCoordinates(request.proximity)) {
       throw new AddressLookupError('Escribe una calle y número válidos para buscar.');
