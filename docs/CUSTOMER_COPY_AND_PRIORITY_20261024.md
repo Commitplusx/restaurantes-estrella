@@ -1,6 +1,6 @@
 # Textos de clientes y prioridad de marcas — 24 de octubre de 2026
 
-Estado: candidato local en `codex/eats-mobile-banners-20261024`. Se sirve con el build de producción local en `http://127.0.0.1:5262/`. Esta entrega no se ha subido a GitHub ni publicado en Vercel.
+Estado de entrega: código funcional `5ba8179`, incluido en la subida autorizada a GitHub `main` del 24 de octubre junto con los banners móviles. Despliegue efectivo en Vercel pendiente de comprobar. Se conserva el build de producción local en `http://127.0.0.1:5262/`; la rama de preparación es `codex/eats-mobile-banners-20261024`.
 
 ## Lenguaje
 
@@ -38,6 +38,8 @@ La prioridad actúa sobre el catálogo cargado por la paginación existente. El 
 - Build TypeScript/Vite aprobado, conservando las advertencias heredadas de tamaño de chunk y `eval` dentro de Lottie.
 - ESLint de los componentes tipados y la nueva regla/pruebas aprobado. No se afirma limpieza completa de las páginas heredadas con supresiones preexistentes.
 - Doce pruebas con tipos: seis de prioridad, aislamiento por marca, sucursal sin matriz visible, conservación de filtros/orden/objetos y seis de agrupación/elegibilidad de promociones.
+
+Antes de subir se ejecutaron juntas esas doce pruebas y las siete de carrusel/imágenes: **19 aprobadas, cero fallos**, con comprobación de tipos. ESLint de los componentes tipados nuevos/modificados aprobado. Las fuentes coinciden con el build local ya verificado; la entrega añade sólo el registro documental del estado de publicación.
 
 ```powershell
 deno test --sloppy-imports --config tests/deno.web.json tests/restaurantPriority_test.ts tests/landingPromotions_test.ts

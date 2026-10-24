@@ -2,9 +2,9 @@
 
 ## Estado
 
-Candidato local posterior a main `9a8c31b`, sin subir a GitHub ni publicar. Vista normal: `http://127.0.0.1:5262/`, build de producción local. No modifica banners reales, SQL, checkout, worker, WhatsApp ni APK.
+Entrega autorizada a GitHub main el 24 de octubre: candidato posterior a `9a8c31b`, incluido con las mejoras de textos y prioridad de marcas hasta `5ba8179`. Despliegue efectivo en Vercel pendiente de comprobar. Vista normal local: `http://127.0.0.1:5262/`, build de producción. No modifica banners reales, SQL, checkout, worker, WhatsApp ni APK.
 
-**Ampliación solicitada: parallax al cambiar.** Posterior al candidato `708e95f`: transición direccional por planos en lugar de trasladar una tira completa. Confirmada visualmente la transición automática entre los dos banners reales en una captura de traza a 320 px. Siete pruebas tipadas y build aprobados; la ampliación sigue local.
+**Ampliación solicitada: parallax al cambiar.** Posterior al candidato `708e95f`: transición direccional por planos en lugar de trasladar una tira completa. Confirmada visualmente la transición automática entre los dos banners reales en una captura de traza a 320 px. Siete pruebas tipadas y build aprobados; incluida en esta entrega a main. Verificación conjunta antes de subir: diecinueve pruebas de carrusel, imágenes, prioridad y promociones aprobadas.
 
 ## Presentación y contenido
 
