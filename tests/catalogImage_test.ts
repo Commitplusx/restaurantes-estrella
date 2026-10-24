@@ -10,6 +10,7 @@ Deno.test('catalogue images use bounded shared variants without cropping or remo
   assert(card.searchParams.get('v') === '42');
   const banner = new URL(catalogImageUrl(original.replace('menu-fotos', 'publicidad'), project, 'banner'));
   assert(banner.searchParams.get('width') === '960' && banner.searchParams.get('height') === '600');
+  assert(new URL(catalogImageUrl(original, project, 'product')).searchParams.get('width') === '900');
 });
 Deno.test('private, signed, foreign, non-HTTPS and non-catalogue image URLs are never rewritten', () => {
   const unchanged = [

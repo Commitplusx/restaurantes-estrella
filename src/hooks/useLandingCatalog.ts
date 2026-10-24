@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { backendRestricted } from '../lib/backendAvailability';
 import { cachedLandingCatalog, catalogPage, invalidateLandingCatalog, landingCategories, landingPromotions, landingCoupons, landingBanners } from '../lib/publicLandingCatalog';
+import { invalidatePublicMenus } from '../lib/publicMenuCatalog';
 
 export function useLandingCatalog() {
   const [state, setState] = useState(cachedLandingCatalog);
@@ -45,13 +46,13 @@ export function useLandingCatalog() {
     const channel = backendRestricted() ? null : supabase.channel('public:landing_catalog_cached')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurantes' }, () => {
         if (!active) return;
-        invalidateLandingCatalog(); landingCategories.invalidate(); landingPromotions.invalidate();
+        invalidateLandingCatalog(); invalidatePublicMenus(); landingCategories.invalidate(); landingPromotions.invalidate();
         void Promise.all(resources.map(resource => resource.refresh())).then(() => refresh());
         void landingCategories.refresh(); void landingPromotions.refresh();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_promociones' }, () => {
         if (!active) return;
-        landingPromotions.invalidate(); void landingPromotions.refresh().then(() => landingPromotions.refresh());
+        landingPromotions.invalidate(); invalidatePublicMenus(); void landingPromotions.refresh().then(() => landingPromotions.refresh());
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cupones_plataforma' }, () => {
         if (!active) return;

@@ -5,7 +5,8 @@ import { InstallPWA } from './components/InstallPWA'
 import { OfflineBanner } from './components/OfflineBanner'
 import { PwaUpdateNotice } from './components/PwaUpdateNotice'
 import type { Session } from '@supabase/supabase-js'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import RestaurantMenuSkeleton from './components/RestaurantMenuSkeleton'
 
 // Wrapper para evitar pantalla blanca cuando un chunk (JS viejo) falla al cargar (común en SPAs tras un deploy)
 const lazyWithRetry = (componentImport: () => Promise<any>) =>
@@ -47,7 +48,13 @@ import { PushNotificationSetup } from './components/PushNotificationSetup'
 import { NoticeProvider } from './components/NoticeCenter'
 import { SiteMotionProvider } from './components/SiteMotionProvider'
 
-export default function App() {
+const isMenuRoute = (path: string) => /^\/menu\/[^/]+\/?$/.test(path);
+function RouteLoadingFallback() {
+  const { pathname } = useLocation();
+  return isMenuRoute(pathname) ? <RestaurantMenuSkeleton /> : <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>;
+}
+
+function AppContent() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -94,13 +101,13 @@ export default function App() {
     trackVisit();
   }, []);
 
+  if (loading && isMenuRoute(window.location.pathname)) return <RestaurantMenuSkeleton />;
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
     </div>
   );
   return (
-    <BrowserRouter>
       <SiteMotionProvider>
       <NoticeProvider>
       <PwaUpdateNotice />
@@ -108,11 +115,7 @@ export default function App() {
       <CookieBanner />
       <FloatingOrderTracker />
       <PushNotificationSetup />
-      <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      }>
+      <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
           {NoticeDesignPreview && <Route path="/avisos" element={<NoticeDesignPreview />} />}
           {WelcomeDesignPreview && <Route path="/bienvenida" element={<WelcomeDesignPreview />} />}
@@ -133,6 +136,9 @@ export default function App() {
       <InstallPWA />
       </NoticeProvider>
       </SiteMotionProvider>
-    </BrowserRouter>
   )
+}
+
+export default function App() {
+  return <BrowserRouter><AppContent /></BrowserRouter>;
 }

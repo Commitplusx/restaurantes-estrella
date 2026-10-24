@@ -5,6 +5,7 @@ import { ParallaxMedia } from './ParallaxMedia';
 import { AnimatedCount } from './AnimatedCount';
 import { useSiteMotion } from '../hooks/useSiteMotion';
 import { SITE_EASE } from '../lib/siteMotion';
+import { CatalogImage } from './CatalogImage';
 
 export interface MenuProductCardProps {
   productKey: string;
@@ -40,7 +41,7 @@ export default function MenuProductCard({
     <motion.article className="menu-product" data-product-motion-key={productKey} data-unavailable={Boolean(unavailable)} animate={controls}>
       <button type="button" className="menu-product-details" onClick={onDetails} aria-label={`Ver ${name}`}>
         <div className="menu-product-photo" data-product-motion-photo>
-          {image && image !== failedSource ? <ParallaxMedia depth={4} cinematic><img src={image} alt="" loading="lazy" decoding="async" onError={() => setFailedSource(image)} /></ParallaxMedia>
+          {image && image !== failedSource ? <ParallaxMedia depth={4} cinematic><CatalogImage variant="product" src={image} alt="" onError={() => setFailedSource(image)} /></ParallaxMedia>
             : <Utensils size={32} strokeWidth={1.4} aria-hidden="true" />}
           {badge && <span className="menu-product-badge">{badge}</span>}
         </div>

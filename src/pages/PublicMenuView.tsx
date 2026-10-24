@@ -39,14 +39,19 @@ import RestaurantMenuIdentity from '../components/RestaurantMenuIdentity';
 import RestaurantMenuHeader from '../components/RestaurantMenuHeader';
 import RestaurantBranchPicker from '../components/RestaurantBranchPicker';
 import { useRestaurantFamily } from '../hooks/useRestaurantFamily';
-import { restaurantMenuPath, RESTAURANT_PUBLIC_FIELDS, cartRestaurantOrigin, requiresNewBranchCart } from '../lib/restaurantBranches';
+import { restaurantMenuPath, cartRestaurantOrigin, requiresNewBranchCart } from '../lib/restaurantBranches';
 import MenuDetailsFrame from '../components/MenuDetailsFrame';
 import './PublicMenuView.css';
+import './CatalogNotice.css';
+import RestaurantMenuSkeleton from '../components/RestaurantMenuSkeleton';
+import { useRestaurantMenu } from '../hooks/useRestaurantMenu';
+import { menuConfigurationIssue, menuTabAfterRefresh, type PublicMenuData } from '../lib/publicMenuData';
+import { reconcileMenuCart } from '../lib/menuCartRefresh';
 import { AnimatedCount } from '../components/AnimatedCount';
 import { ScrollDepthGroup } from '../components/ParallaxMedia';
-import { useLoadScript, GoogleMap, Marker } from '@react-google-maps/api';
+import { GoogleMap, Marker } from '@react-google-maps/api';
 
-const LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
+import MenuMapLoader from '../components/MenuMapLoader';
 
 import { UBER_EATS_MAP_STYLE } from '../utils/mapStyles';
 
@@ -115,15 +120,7 @@ export type CartItem = {
   aplica_subsidio?: boolean;
 }
 
-// CACHE GLOBAL PARA CARGA INSTANTÁNEA
-const menuCache: Record<string, {
-  restaurante: Restaurante;
-  categorias: MenuCategoria[];
-  items: MenuItem[];
-  combos: MenuCombo[];
-  promos: MenuPromocion[];
-  timestamp: number;
-}> = {}
+const EMPTY_MENU: Pick<PublicMenuData, 'categorias' | 'items' | 'combos'> = { categorias: [], items: [], combos: [] };
 
 // COMPONENTE DE IMAGEN CON SKELETON LOADER
 const LazyImage = ({ src, alt, className, imgClassName, blurBackground }: { src?: string | null, alt?: string, className?: string, imgClassName?: string, blurBackground?: boolean }) => {
@@ -186,17 +183,16 @@ export function PublicMenuView() {
   const location = useLocation()
   const fromSearch = location.state?.fromSearch;
   
-  const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
-  const [restaurantePausado, setRestaurantePausado] = useState(false)
+  const menuQuery = useRestaurantMenu(id)
+  const restaurante = menuQuery.data?.restaurante || null
+  const restaurantePausado = menuQuery.restaurantePausado
+  const categorias = menuQuery.data?.categorias || EMPTY_MENU.categorias
+  const items = menuQuery.data?.items || EMPTY_MENU.items
+  const combos = menuQuery.data?.combos || EMPTY_MENU.combos
+  const promos = menuQuery.promos
+  const loading = menuQuery.loading
   const { family: sucursalesFamilia, error: branchesError, retry: retryBranches } = useRestaurantFamily(restaurante)
   const [showSucursalesModal, setShowSucursalesModal] = useState(false)
-
-  const [categorias, setCategorias] = useState<MenuCategoria[]>([])
-  const [items, setItems] = useState<MenuItem[]>([])
-  const [combos, setCombos] = useState<MenuCombo[]>([])
-  const [promos, setPromos] = useState<MenuPromocion[]>([])
-
-  const [loading, setLoading] = useState(true)
 
   const [activeTab, setActiveTab] = useState<string>('')
   const [openingCart, setOpeningCart] = useState(false);
@@ -291,12 +287,6 @@ export function PublicMenuView() {
   const [realLocation, setRealLocation] = useState<{lat: number, lng: number} | null>(null) // Punto azul GPS
   const [draftUbicacion, setDraftUbicacion] = useState<{lat: number, lng: number} | null>(null) // Centro del mapa al moverlo
   const [draftDireccion, setDraftDireccion] = useState('') // Dirección temporal al mover el mapa
-  // Nota: useLoadScript no soporta cambiar la API key dinámicamente o iniciar vacía,
-  // por lo que debemos cargar el script directamente. Al ser asíncrono, el impacto en TBT es nulo.
-  const { isLoaded: isGoogleMapsLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: LIBRARIES
-  });
   const submittingRef = useRef(false) // BUG 5 fix: prevents double-submit
   const idempotencyKeyRef = useRef<string | null>(null)
   const ticketIdRef = useRef<string | null>(null)
@@ -309,7 +299,6 @@ export function PublicMenuView() {
   const [validandoCupon, setValidandoCupon] = useState(false)
   const [cuponValido, setCuponValido] = useState(false)
   const [descuento, setDescuento] = useState(0)
-  const [cuponPlataformaAuto, setCuponPlataformaAuto] = useState<any>(null)
   const [cuponPlataformaIdManual, setCuponPlataformaIdManual] = useState<string | null>(null)
   const [costoEnvioFijoOverride, setCostoEnvioFijoOverride] = useState<number | null>(null)
 
@@ -595,236 +584,29 @@ export function PublicMenuView() {
   }
   */
 
-  // Verificamos si la ruta o id cambian para hacer reload silencioso si es necesario
-
   useEffect(() => {
     window.scrollTo(0, 0);
-    setLoading(true);
     setOpeningCart(false);
     setShowSucursalesModal(false);
-    let isMounted = true
+    setSelectedItemDetail(null);
+    setSelectedItemForOptions(null);
+    setActiveTab('');
+  }, [id]);
 
-    async function fetchMenuData(silently = false) {
-      if (!id) return
-
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-
-      let rest: any = null
-      let cats: any[] | null = null
-      let prods: any[] | null = null
-      let cmbs: any[] | null = null
-      let prms: any[] | null = null
-
-      if (isUUID) {
-        // ⚡ UUID: lanzar TODO en paralelo — 1 solo roundtrip
-        const [restRes, catsRes, prodsRes, cmbsRes, prmsRes, cupRes] = await Promise.all([
-          supabase.from('storefront_restaurants').select(RESTAURANT_PUBLIC_FIELDS).eq('id', id).maybeSingle(),
-          supabase.from('menu_categorias').select('*').eq('restaurante_id', id).order('orden'),
-          supabase.from('menu_items').select('*').eq('restaurante_id', id).eq('disponible', true).order('orden'),
-          supabase.from('menu_combos').select('*').eq('restaurante_id', id).eq('disponible', true),
-          supabase.from('menu_promociones').select('*').eq('restaurante_id', id).eq('activa', true),
-          supabase.from('cupones_plataforma').select('*').eq('activo', true).is('codigo', null).order('created_at', { ascending: false }).limit(1).maybeSingle()
-        ])
-        rest = restRes.data
-        cats = catsRes.data
-        prods = prodsRes.data
-        cmbs = cmbsRes.data
-        prms = prmsRes.data
-        if (cupRes?.data) setCuponPlataformaAuto(cupRes.data)
-      } else {
-        // Slug: primero resolver el ID real, luego el menú en paralelo
-        const { data: restData } = await supabase.from('storefront_restaurants').select(RESTAURANT_PUBLIC_FIELDS).eq('slug', id).maybeSingle()
-        rest = restData
-        if (rest) {
-          const [catsRes, prodsRes, cmbsRes, prmsRes, cupRes] = await Promise.all([
-            supabase.from('menu_categorias').select('*').eq('restaurante_id', rest.id).order('orden'),
-            supabase.from('menu_items').select('*').eq('restaurante_id', rest.id).eq('disponible', true).order('orden'),
-            supabase.from('menu_combos').select('*').eq('restaurante_id', rest.id).eq('disponible', true),
-            supabase.from('menu_promociones').select('*').eq('restaurante_id', rest.id).eq('activa', true),
-            supabase.from('cupones_plataforma').select('*').eq('activo', true).is('codigo', null).order('created_at', { ascending: false }).limit(1).maybeSingle()
-          ])
-          cats = catsRes.data
-          prods = prodsRes.data
-          cmbs = cmbsRes.data
-          prms = prmsRes.data
-          if (cupRes?.data) setCuponPlataformaAuto(cupRes.data)
-        }
-      }
-
-      if (!rest) {
-        if (isMounted && !silently) {
-          navigate('/?error=notfound', { replace: true })
-        }
-        return null
-      }
-
-      const actualId = rest.id;
-
-      const currentDay = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'][new Date().getDay()];
-      const validPromos = (prms || []).filter(p => {
-        if (p.fecha_fin) {
-          const endDateStr = p.fecha_fin.includes('T') ? p.fecha_fin : `${p.fecha_fin}T23:59:59`;
-          if (new Date(endDateStr) < new Date()) return false;
-        }
-        if (p.dias_aplicacion && p.dias_aplicacion.length > 0 && !p.dias_aplicacion.includes(currentDay)) {
-          return false;
-        }
-        return true;
-      })
-
-      // Guardar en caché
-      menuCache[id] = {
-        restaurante: rest,
-        categorias: cats || [],
-        items: prods || [],
-        combos: cmbs || [],
-        promos: validPromos,
-        timestamp: Date.now()
-      }
-
-      if (isMounted) {
-        setCategorias(cats || [])
-        setItems(prods || [])
-        setCombos(cmbs || [])
-        setPromos(validPromos)
-        
-        setRestaurante(rest)
-        setRestaurantePausado(rest.activo !== true)
-
-        // Sincronizar el carrito si hay items que se actualizaron en tiempo real
-        const prevCart = useCartStore.getState().carrito;
-        if (!prevCart || prevCart.length === 0 || (useCartStore.getState().restaurantId || sessionStorage.getItem('est_carrito_restaurante')) !== rest.id) {
-          if (!silently) setLoading(false);
-          return;
-        }
-        let hasChanges = false;
-        const newCart = prevCart.map(cObj => {
-          let latestItem;
-          if (cObj.item.tipo === 'item') latestItem = (prods || []).find((p: any) => p.id === cObj.item.id);
-          else if (cObj.item.tipo === 'combo') latestItem = (cmbs || []).find((c: any) => c.id === cObj.item.id);
-          else if (cObj.item.tipo === 'promo') latestItem = validPromos.find(p => p.id === cObj.item.id);
-
-          // Si el item ya no está disponible o se eliminó, lo quitamos del carrito
-          if (!latestItem) {
-            hasChanges = true;
-            return null;
-          }
-
-          // Actualizamos la bandera del subsidio si cambió en tiempo real
-          if (cObj.item.aplica_subsidio !== latestItem.aplica_subsidio) {
-            hasChanges = true;
-            return { ...cObj, item: { ...cObj.item, aplica_subsidio: latestItem.aplica_subsidio } };
-          }
-          return cObj;
-        }).filter(Boolean) as typeof prevCart;
-        
-        if (hasChanges) {
-          useCartStore.setState({ carrito: newCart });
-        }
-        
-        if (!silently) {
-          setLoading(false)
-          const hasCombos = (cmbs || []).length > 0
-          const hasValidPromos = validPromos.length > 0
-          
-          const urlTab = new URLSearchParams(location.search).get('tab')
-        if (urlTab && urlTab !== 'menu') {
-          setActiveTab(urlTab)
-        } else {
-          const validCategories = (cats || []).filter(c => (prods || []).some(i => i.categoria_id === c.id))
-          if (hasValidPromos) setActiveTab('promos')
-          else if (validCategories.length > 0) setActiveTab(validCategories[0].id)
-          else if (hasCombos) setActiveTab('combos')
-        }
-      }
+  const reconciledMenu = useRef({ identifier: id, data: menuQuery.data });
+  useEffect(() => {
+    const data = menuQuery.data;
+    if (reconciledMenu.current.identifier !== id) {
+      reconciledMenu.current = { identifier: id, data };
+      return;
     }
-      
-    return actualId
-    }
-
-    async function load() {
-      let actualRestId = id;
-
-      // 1. Revisar caché local para carga instantánea en 0ms
-      if (id && menuCache[id]) {
-        const cached = menuCache[id]
-        setRestaurante(cached.restaurante)
-        setCategorias(cached.categorias)
-        setItems(cached.items)
-        setCombos(cached.combos)
-        setPromos(cached.promos)
-        setLoading(false)
-        actualRestId = cached.restaurante.id;
-        
-        // Inicializar la pestaña activa desde caché
-        const urlTab = new URLSearchParams(location.search).get('tab')
-        if (urlTab && urlTab !== 'menu') {
-          setActiveTab(urlTab)
-        } else {
-          const validCategories = cached.categorias.filter((c: any) => cached.items.some((i: any) => i.categoria_id === c.id))
-          if (cached.promos.length > 0) setActiveTab('promos')
-          else if (validCategories.length > 0) setActiveTab(validCategories[0].id)
-          else if (cached.combos.length > 0) setActiveTab('combos')
-        }
-        
-        // Ejecutar fetch silencioso en background para actualizar caché si pasaron más de 1 min
-        if (Date.now() - cached.timestamp > 60000) {
-          fetchMenuData(true)
-        }
-      } else {
-        const fetchedId = await fetchMenuData()
-        if (fetchedId) actualRestId = fetchedId
-      }
-
-      // Creamos el canal de realtime (con un sufijo único para evitar errores de StrictMode o re-renders rápidos)
-      const channelId = `public:menu_updates:${actualRestId}_${Math.random().toString(36).substring(7)}`;
-      const realtimeChannel = supabase.channel(channelId)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `restaurante_id=eq.${actualRestId}` }, () => {
-          fetchMenuData(true) // Silencioso
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_combos', filter: `restaurante_id=eq.${actualRestId}` }, () => {
-          fetchMenuData(true)
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_promociones', filter: `restaurante_id=eq.${actualRestId}` }, () => {
-          fetchMenuData(true)
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'restaurantes', filter: `id=eq.${actualRestId}` }, (payload) => {
-          const nuevo = payload.new as Restaurante
-          if (nuevo.activo === false) {
-            // Restaurante se desactivó en tiempo real → mostrar overlay amigable
-            setRestaurantePausado(true)
-          } else if (nuevo.activo === true) {
-            // Volvió a abrir → quitar overlay y refrescar menú
-            setRestaurantePausado(false)
-            fetchMenuData(true)
-          } else {
-            fetchMenuData(true)
-          }
-        })
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'cupones_restaurante', filter: `restaurante_id=eq.${actualRestId}` },
-          () => {
-            // Cuando el dueño desactiva/activa/elimina un cupón, el cliente lo ve de inmediato
-            fetchMenuData(true)
-          }
-        )
-        .subscribe()
-
-      // Limpiar canal al desmontar
-      return () => {
-        supabase.removeChannel(realtimeChannel)
-      }
-    }
-
-    const cleanupRealtime = load()
-
-    return () => {
-      isMounted = false
-      cleanupRealtime.then(cleanup => {
-        if (typeof cleanup === 'function') cleanup()
-      })
-    }
-  }, [id])
+    if (!data || menuQuery.error || data === reconciledMenu.current.data) return;
+    reconciledMenu.current = { identifier: id, data };
+    const store = useCartStore.getState();
+    const origin = cartRestaurantOrigin(store.restaurantId, sessionStorage.getItem('est_carrito_restaurante'));
+    const next = reconcileMenuCart(store.carrito, origin, { ...data, promos });
+    if (next !== store.carrito) useCartStore.setState({ carrito: next });
+  }, [id, menuQuery.data, menuQuery.error, promos]);
 
   /*
   // --- Lógica de Subsidio Dinámico ($8 por artículo) ---
@@ -894,20 +676,9 @@ export function PublicMenuView() {
   }
 
   useEffect(() => {
-    // Si ya hay un tab seleccionado y es válido, no lo sobreescribimos (salvo que ya no exista)
-    if (activeTab && activeTab !== 'menu' && activeTab !== 'promos' && activeTab !== 'combos') {
-      if (categorias.some(c => c.id === activeTab)) return;
-    }
-    const urlTab = new URLSearchParams(location.search).get('tab')
-    if (urlTab && urlTab !== 'menu') {
-      setActiveTab(urlTab)
-    } else {
-      const validCategories = categorias.filter(c => items.some(i => i.categoria_id === c.id))
-      if (promos.length > 0) setActiveTab('promos')
-      else if (validCategories.length > 0) setActiveTab(validCategories[0].id)
-      else if (combos.length > 0) setActiveTab('combos')
-    }
-  }, [location.search, categorias, items, promos, combos])
+    const requested = new URLSearchParams(location.search).get('tab');
+    setActiveTab(current => menuTabAfterRefresh(current, requested, { categorias, items, combos, promos }));
+  }, [location.search, categorias, items, promos, combos]);
 
   // Fix Map interaction to be like Rappi/Uber (fixed center pin)
   const handleMapDragEnd = () => {
@@ -1142,45 +913,11 @@ export function PublicMenuView() {
     </div>
   )
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#FAFAFA] animate-pulse">
-      {/* Header Skeleton */}
-      <div className="h-48 md:h-64 bg-slate-200 w-full mb-8 rounded-b-[40px]"></div>
-      
-      <div className="max-w-5xl mx-auto px-4">
-        {/* Info & Tabs Skeleton */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 bg-slate-300 rounded-full -mt-20 mb-4 border-4 border-[#FAFAFA]"></div>
-          <div className="h-8 bg-slate-200 rounded-lg w-48 mb-2"></div>
-          <div className="h-4 bg-slate-200 rounded-lg w-32 mb-6"></div>
-          
-          <div className="flex gap-4 w-full max-w-sm">
-            <div className="h-12 bg-slate-200 rounded-[20px] flex-1"></div>
-            <div className="h-12 bg-slate-200 rounded-[20px] flex-1"></div>
-          </div>
-        </div>
+  if (loading) return <RestaurantMenuSkeleton />;
 
-        {/* Categories Skeleton */}
-        <div className="flex gap-3 mb-8 overflow-hidden">
-          {[1,2,3,4].map(i => <div key={i} className="h-10 bg-slate-200 rounded-full w-24 shrink-0"></div>)}
-        </div>
-
-        {/* Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
-          {[1,2,3,4,5,6].map(i => (
-            <div key={i} className="bg-slate-100 p-4 rounded-[32px] flex gap-4 h-32">
-              <div className="w-24 h-24 rounded-[24px] bg-slate-200 shrink-0"></div>
-              <div className="flex-1 space-y-3 py-2">
-                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-                <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-                <div className="h-6 bg-slate-200 rounded-full w-20 mt-auto"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
+  if (menuQuery.error && !restaurante) return <main className="restaurant-menu-page min-h-screen flex flex-col items-center justify-center px-4">
+    <section className="eats-catalog-notice" role="alert"><AlertCircle aria-hidden="true" /><div><h1>No pudimos cargar este menú</h1><p>Revisa tu conexión y vuelve a intentarlo.</p></div><button type="button" disabled={menuQuery.fetching} onClick={menuQuery.refresh}>Reintentar</button></section><Link to="/">Volver al inicio</Link>
+  </main>;
 
   if (!restaurante) {
     return (
@@ -1199,6 +936,7 @@ export function PublicMenuView() {
       if (openingCart) navigate(`/menu/${id}/carrito`);
     }}>
 
+      {menuQuery.error && <section className="eats-catalog-notice" role="status"><AlertCircle aria-hidden="true" /><div><h2>No pudimos actualizar este menú</h2><p>Conservamos la última información que cargó. Actualízala antes de pedir.</p></div><button type="button" disabled={menuQuery.fetching} onClick={menuQuery.refresh}>Actualizar menú</button></section>}
       {/* TOPBAR */}
       <RestaurantMenuHeader restaurant={restaurante} hasCart={cartCount > 0} fromSearch={fromSearch} />
 
@@ -1290,6 +1028,7 @@ export function PublicMenuView() {
                             item.hora_inicio_disponible && item.hora_fin_disponible &&
                             (horaActual < item.hora_inicio_disponible || horaActual > item.hora_fin_disponible)
                           )
+                          const configurationIssue = menuConfigurationIssue(item);
                           return (
                             <MenuProductCard
                               key={item.id}
@@ -1300,16 +1039,16 @@ export function PublicMenuView() {
                               price={item.precio}
                               quantity={carrito.filter(entry => entry.item.id === item.id && entry.item.tipo === 'item').reduce((sum, entry) => sum + entry.cantidad, 0)}
                               customizable={Boolean(item.opciones?.length)}
-                              unavailable={item.agotado_hoy ? 'Agotado por hoy' : fueraDeHorario ? `Disponible de ${item.hora_inicio_disponible} a ${item.hora_fin_disponible}` : undefined}
+                              unavailable={configurationIssue || (item.agotado_hoy ? 'Agotado por hoy' : fueraDeHorario ? `Disponible de ${item.hora_inicio_disponible} a ${item.hora_fin_disponible}` : undefined)}
                               onDetails={() => {
-                                if (item.opciones?.length && !item.agotado_hoy && !fueraDeHorario) {
+                                if (item.opciones?.length && !configurationIssue && !item.agotado_hoy && !fueraDeHorario) {
                                   setSelectedItemForOptions({ ...item, __tipo: 'item' });
                                 } else {
-                                  setSelectedItemDetail({ ...item, cartItemTipo: 'item', unavailable: item.agotado_hoy || fueraDeHorario });
+                                  setSelectedItemDetail({ ...item, cartItemTipo: 'item', unavailable: configurationIssue || item.agotado_hoy || fueraDeHorario });
                                 }
                               }}
                               onAdd={() => {
-                                if (item.agotado_hoy || fueraDeHorario) return;
+                                if (configurationIssue || item.agotado_hoy || fueraDeHorario) return;
                                 if (item.opciones?.length) {
                                   setSelectedItemForOptions({ ...item, __tipo: 'item' });
                                 } else addToCart({ ...cartItem, cartItemId: item.id });
@@ -1346,8 +1085,10 @@ export function PublicMenuView() {
                       <MenuProductCard productKey={`combo:${combo.id}`} name={combo.nombre} description={combo.descripcion} price={combo.precio} image={combo.foto_url} includes={combo.incluye} badge="Combo"
                         quantity={carrito.filter(entry => entry.item.id === combo.id && entry.item.tipo === 'combo').reduce((sum, entry) => sum + entry.cantidad, 0)}
                         customizable={Boolean(combo.opciones?.length)}
-                        onDetails={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo' })}
+                        unavailable={menuConfigurationIssue(combo)}
+                        onDetails={() => setSelectedItemDetail({ ...combo, cartItemTipo: 'combo', unavailable: menuConfigurationIssue(combo) })}
                         onAdd={() => {
+                          if (menuConfigurationIssue(combo)) return;
                           if (combo.opciones?.length) {
                             setSelectedItemForOptions({ ...combo, __tipo: 'combo' });
                           } else addToCart({ id: combo.id, nombre: combo.nombre, precio: combo.precio, tipo: 'combo', foto_url: combo.foto_url || undefined, cartItemId: combo.id, aplica_subsidio: combo.aplica_subsidio });
@@ -1373,8 +1114,9 @@ export function PublicMenuView() {
                       <MenuProductCard productKey={`promo:${promo.id}`} name={promo.titulo} description={promo.descripcion} price={promo.precio_especial} image={promo.foto_url} badge={promo.tipos_pedido?.length === 1 ? promotionDeliveryLabel(promo.tipos_pedido) : 'Promoción'}
                         quantity={carrito.filter(entry => entry.item.id === promo.id && entry.item.tipo === 'promo').reduce((sum, entry) => sum + entry.cantidad, 0)}
                         customizable={Boolean(promo.opciones?.length)}
-                        onDetails={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo' })}
-                        onAdd={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo' })}
+                        unavailable={menuConfigurationIssue(promo)}
+                        onDetails={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo', unavailable: menuConfigurationIssue(promo) })}
+                        onAdd={() => setSelectedItemDetail({ ...promo, nombre: promo.titulo, precio: promo.precio_especial, cartItemTipo: 'promo', unavailable: menuConfigurationIssue(promo) })}
                       />
                     </motion.div>
                   )
@@ -1624,7 +1366,7 @@ export function PublicMenuView() {
                 </div>
               </div>
 
-              {isGoogleMapsLoaded ? (
+              <MenuMapLoader>{isLoaded => isLoaded ? (
                 <div className="relative w-full h-full">
                   <GoogleMap
                     mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -1682,7 +1424,7 @@ export function PublicMenuView() {
                 <div className="w-full h-full flex items-center justify-center text-slate-400">
                   <Loader2 size={32} className="animate-spin text-slate-300" />
                 </div>
-              )}
+              )}</MenuMapLoader>
             </div>
 
             {/* Footer del Modal (Botón de Confirmar) */}

@@ -1,7 +1,7 @@
-export type CatalogImageSize = 'card' | 'banner';
-const SIZES = { card: [480, 480], banner: [960, 600] } as const;
+export type CatalogImageSize = 'card' | 'banner' | 'product';
+const SIZES = { card: [480, 480], banner: [960, 600], product: [900, 900] } as const;
 
-/** Two shared variants, public catalogue buckets only; never rewrite signed/private URLs. */
+/** Shared display sizes, public catalogue buckets only; never rewrite signed/private URLs. */
 export function catalogImageUrl(source: string, projectUrl: string, size: CatalogImageSize = 'card'): string {
   try {
     const url = new URL(source);

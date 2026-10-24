@@ -70,3 +70,12 @@ Deno.test('expired content is removed and announced even if no new fetch is poss
   equal(resource.snapshot().data, undefined); assert(resource.snapshot().error); equal(notifications, 1);
   resource.expire(); equal(notifications, 1); stop();
 });
+Deno.test('a failed loader aborts sibling operations before releasing its shared request', async () => {
+  let aborted = false;
+  const resource = new PublicResource(signal => {
+    signal.addEventListener('abort', () => { aborted = true; });
+    return Promise.reject(new Error('one menu query failed'));
+  });
+  await resource.refresh();
+  assert(aborted && !resource.snapshot().fetching && resource.snapshot().error);
+});

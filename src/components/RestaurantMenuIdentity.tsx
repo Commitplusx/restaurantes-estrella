@@ -6,6 +6,7 @@ import { useSiteMotion } from '../hooks/useSiteMotion';
 import { SITE_EASE } from '../lib/siteMotion';
 import { useSiteJourney } from '../hooks/useSiteJourney';
 import { visibleJourneyBounds } from '../lib/siteJourney';
+import { CatalogImage } from './CatalogImage';
 
 const weekdays: (keyof HorariosRestaurante)[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
@@ -38,7 +39,7 @@ export default function RestaurantMenuIdentity({ restaurant, open, hasBranches, 
   return (
     <motion.section key={restaurant.id} className="menu-identity" aria-labelledby="restaurant-menu-title" initial={{ opacity: incomingRestaurantId === restaurant.id ? 1 : .55, x: enabled && incomingRestaurantId !== restaurant.id ? 24 : 0 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: enabled ? .45 : .1, ease: SITE_EASE }}>
       <div ref={identityImage} className="menu-identity-image">
-        {image && failedImage !== image ? <img src={image} alt="" data-restaurant-motion-origin={restaurant.id} onError={() => setFailedImage(image)} /> : <Store size={32} aria-hidden="true" />}
+        {image && failedImage !== image ? <CatalogImage src={image} loading="eager" alt="" data-restaurant-motion-origin={restaurant.id} onError={() => setFailedImage(image)} /> : <Store size={32} aria-hidden="true" />}
       </div>
       <div className="menu-identity-copy">
         <div className="menu-identity-title"><h1 id="restaurant-menu-title">{restaurant.nombre}</h1><span className="menu-open-state" data-open={open}>{open ? 'Abierto' : 'Cerrado'}</span></div>

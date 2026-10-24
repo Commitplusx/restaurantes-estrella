@@ -87,6 +87,7 @@ export class PublicResource<T> {
         this.publish({ data, updatedAt: this.now(), fetching: true, error: null });
       })
       .catch((cause: unknown) => {
+        controller.abort();
         if (revision !== this.revision) return;
         this.failedAt = this.now();
         this.publish({ ...this.state, data: this.visible(), error: cause instanceof Error ? cause : new Error('No pudimos actualizar el catálogo.') });

@@ -24,16 +24,17 @@ function menuDeparture(): RestaurantDeparture | null {
   return null;
 }
 
-function productOrigin(key: string, image: string): JourneyBounds | null {
+function productOrigin(key: string, image: string): { bounds: JourneyBounds; image: string } | null {
   // Decoration reuses media already loaded by the menu, never preloads another photo.
-  if (!Array.from(document.images).some(photo => photo.complete && photo.naturalWidth > 0 && (photo.getAttribute('src') === image || photo.currentSrc === image))) return null;
   const sources = Array.from(document.querySelectorAll<HTMLElement>('[data-product-motion-key]'));
   for (const source of sources.reverse()) {
     if (source.dataset.productMotionKey !== key || source.closest('[inert]')) continue;
+    const photo = source.querySelector<HTMLImageElement>('[data-product-motion-photo] img, .menu-detail-photo img');
+    if (!photo?.complete || !photo.naturalWidth || !(photo.getAttribute('src') === image || photo.currentSrc === image || photo.dataset.catalogOriginal === image)) continue;
     const active = document.activeElement;
     const focusOrigin = source.matches('[role="dialog"], [data-product-motion-dialog]') && active instanceof HTMLElement && source.contains(active) ? active : null;
     const bounds = visibleJourneyBounds(focusOrigin || source.querySelector('[data-product-motion-photo], .menu-detail-photo') || source);
-    if (bounds) return bounds;
+    if (bounds) return { bounds, image: photo.currentSrc || photo.src };
   }
   return null;
 }
@@ -88,7 +89,7 @@ export function SiteJourneyProvider({ children }: { children: ReactNode }) {
     const added = addedCartProduct(previous.carrito, next.carrito);
     if (!added) return;
     const origin = productOrigin(added.key, added.image);
-    if (origin) addProduct(added.image, origin);
+    if (origin) addProduct(origin.image, origin.bounds);
   }), [enabled, addProduct]);
   useEffect(() => {
     const capture = () => {

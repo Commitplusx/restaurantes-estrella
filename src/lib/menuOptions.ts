@@ -21,6 +21,7 @@ export interface MenuOptionProduct {
   disponible: boolean;
   agotado_hoy?: boolean;
   activo?: boolean;
+  catalog_issue?: 'options_format';
 }
 
 export type OptionSelection = Record<string, Record<string, boolean>>;
@@ -74,7 +75,7 @@ export function validateOptionGroups(groups: OpcionGrupo[], products?: MenuOptio
 }
 
 export function availableOptionGroups(groups: OpcionGrupo[], products: MenuOptionProduct[], restaurantId: string): OpcionGrupo[] {
-  const availableIds = new Set(products.filter(product => product.restaurante_id === restaurantId && product.disponible && !product.agotado_hoy && product.activo !== false).map(product => product.id));
+  const availableIds = new Set(products.filter(product => product.restaurante_id === restaurantId && product.disponible && !product.agotado_hoy && product.activo !== false && !product.catalog_issue).map(product => product.id));
   return groups.map(group => ({ ...group, opciones: group.opciones.filter(option => !option.menu_item_id || availableIds.has(option.menu_item_id)) }));
 }
 

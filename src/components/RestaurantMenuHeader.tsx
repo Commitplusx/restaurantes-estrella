@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Store } from 'lucide-react';
 import { SITE_EASE } from '../lib/siteMotion';
+import { CatalogImage } from './CatalogImage';
 
 interface HeaderRestaurant { id: string; nombre: string; nombre_sucursal?: string | null; foto_fachada_url?: string | null; logo_url?: string | null }
 
@@ -46,7 +47,7 @@ export default function RestaurantMenuHeader({ restaurant, hasCart, fromSearch }
         </motion.div>
         <motion.div className="menu-header-restaurant-plane" initial={false} animate={{ opacity: compact ? 1 : 0, y: compact ? 0 : 8 }} transition={{ duration: .26, ease: SITE_EASE }} inert={!compact} aria-hidden={!compact}>
           <span className="menu-header-photo">
-            {image && failedImage !== image ? <img src={image} alt="" data-restaurant-motion-origin={restaurant.id} onError={() => setFailedImage(image)} /> : <Store size={20} aria-hidden="true" />}
+            {image && failedImage !== image ? <CatalogImage src={image} loading="eager" alt="" data-restaurant-motion-origin={restaurant.id} onError={() => setFailedImage(image)} /> : <Store size={20} aria-hidden="true" />}
           </span>
           <span className="menu-header-name"><strong>{restaurant.nombre}</strong><small>{restaurant.nombre_sucursal || 'Menú del restaurante'}</small></span>
         </motion.div>
