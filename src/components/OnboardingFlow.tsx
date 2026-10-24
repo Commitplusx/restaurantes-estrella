@@ -12,14 +12,14 @@ interface OnboardingFlowProps { onComplete: () => void }
 const ARRIVAL = [.16, 1, .3, 1] as const;
 const WELCOME_STEPS = [0, 1, 2] as const;
 const HOW_TO_ORDER = [
-  { Icon: Utensils, title: 'Encuentra tu antojo', text: 'Explora restaurantes, consulta su menú y arma tu pedido.' },
+  { Icon: Utensils, title: 'Elige qué comer', text: 'Abre un menú y agrega lo que vas a pedir.' },
   { Icon: ShoppingBag, title: 'Elige cómo recibirlo', text: 'A domicilio o para recoger. Revisa el total antes de confirmar.' },
-  { Icon: Route, title: 'Revisa y confirma', text: 'Revisa tu selección y confirma con el código que recibes por WhatsApp.' },
+  { Icon: Route, title: 'Revisa y confirma', text: 'Comprueba el total y confirma con el código que te llega por WhatsApp.' },
 ];
 const TRACK_ORDER = [
-  { Icon: Package, title: 'Consulta tu selección', text: 'Vuelve a ver los detalles del pedido que confirmaste.' },
-  { Icon: ChefHat, title: 'Revisa cómo va', text: 'Abre el seguimiento para consultar el estado de tu pedido.' },
-  { Icon: MapPin, title: 'Recíbelo o pasa por él', text: 'Consulta la entrega o la recogida según lo que elegiste.' },
+  { Icon: Package, title: 'Lo que pediste', text: 'Vuelve a ver los detalles de tu pedido.' },
+  { Icon: ChefHat, title: 'Revisa cómo va', text: 'Consulta el estado de tu pedido desde la web.' },
+  { Icon: MapPin, title: 'Recíbelo o pasa por él', text: 'En tu dirección o en el restaurante, según lo que elegiste.' },
 ];
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
@@ -124,10 +124,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 variants={sceneMotion} initial="hidden" animate="visible" exit="out">
                 {step === 0 ? <>
                   <motion.h1 variants={groupMotion}>{['Comida de', 'Comitán.', 'A tu puerta.'].map((line, index) => <span className="eats-welcome-line" key={line}><motion.span className={index === 2 ? 'eats-welcome-accent' : undefined} custom={direction} variants={lineMotion}>{line}</motion.span></span>)}</motion.h1>
-                  <motion.p variants={layerMotion} className="eats-welcome-description">Tus restaurantes de siempre y nuevos antojos por descubrir. Pide a domicilio o pasa a recoger.</motion.p>
-                  <motion.div variants={layerMotion} className="eats-welcome-location"><MapPin size={17} aria-hidden="true" /><span>Hecho para pedir en Comitán.</span></motion.div>
+                  <motion.p variants={layerMotion} className="eats-welcome-description">Mira los menús de los restaurantes de Comitán. Pide a casa o pasa a recoger.</motion.p>
+                  <motion.div variants={layerMotion} className="eats-welcome-location"><MapPin size={17} aria-hidden="true" /><span>Pide en Comitán.</span></motion.div>
                 </> : <>
-                  <motion.h1 className="eats-welcome-how-title" variants={groupMotion}>{(step === 1 ? ['Tu antojo.', 'Así de fácil.'] : ['Tu pedido.', 'Siempre a la vista.']).map((line, index) => <span className="eats-welcome-line" key={line}><motion.span className={index === 1 ? 'eats-welcome-accent' : undefined} custom={direction} variants={lineMotion}>{line}</motion.span></span>)}</motion.h1>
+                  <motion.h1 className="eats-welcome-how-title" variants={groupMotion}>{(step === 1 ? ['Así haces', 'tu pedido.'] : ['Revisa cómo', 'va tu pedido.']).map((line, index) => <span className="eats-welcome-line" key={line}><motion.span className={index === 1 ? 'eats-welcome-accent' : undefined} custom={direction} variants={lineMotion}>{line}</motion.span></span>)}</motion.h1>
                   <motion.ol variants={groupMotion} className="eats-welcome-steps">{(step === 1 ? HOW_TO_ORDER : TRACK_ORDER).map(({ Icon, title, text }) => <motion.li variants={layerMotion} key={title}>
                     <Icon size={23} strokeWidth={1.6} aria-hidden="true" /><div><h2>{title}</h2><p>{text}</p></div>
                   </motion.li>)}</motion.ol>
@@ -141,7 +141,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             </motion.div>
               : <Utensils size={80} strokeWidth={1} aria-hidden="true" />}
             <motion.div className="eats-welcome-caption-depth" style={{ x: reduced ? 0 : captionX, y: reduced ? 0 : captionY }}>
-              <motion.div className="eats-welcome-caption" initial={false} animate={{ x: reduced ? 0 : [0, 10, 3][step], y: reduced ? 0 : [0, -18, -6][step], rotate: reduced ? 0 : [0, -1.5, 1][step] }} transition={{ duration: reduced ? .1 : .62, ease: ARRIVAL }}><span>Hoy se antoja</span><strong>Comer rico.<br />Pedir fácil.</strong></motion.div>
+              <motion.div className="eats-welcome-caption" initial={false} animate={{ x: reduced ? 0 : [0, 10, 3][step], y: reduced ? 0 : [0, -18, -6][step], rotate: reduced ? 0 : [0, -1.5, 1][step] }} transition={{ duration: reduced ? .1 : .62, ease: ARRIVAL }}><span>Elige tu favorito</span><strong>¿Hoy qué<br />comemos?</strong></motion.div>
             </motion.div>
           </div>
         </div>

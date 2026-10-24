@@ -77,7 +77,7 @@ export function SearchView({ restaurantes, estaAbierto, activeCategories = [] }:
           </div>
           <input
             type="text"
-            placeholder="Restaurantes, platillos, antojos..."
+            placeholder="Busca comida o restaurantes"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-white border-none rounded-2xl py-4 pl-12 pr-4 text-slate-800 font-medium placeholder:text-slate-400 focus:ring-2 focus:ring-orange-500 shadow-sm transition-shadow outline-none"
@@ -88,7 +88,7 @@ export function SearchView({ restaurantes, estaAbierto, activeCategories = [] }:
       {/* Estado Inicial: Categorías */}
       {!searchTerm.trim() && activeCategories.length > 0 && (
         <div className="mt-2 px-1">
-          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Categorías Populares</h3>
+          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Tipos de comida</h3>
           <div className="flex flex-col gap-3">
             {activeCategories.map((cat, index) => (
               <motion.button

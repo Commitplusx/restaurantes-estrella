@@ -397,14 +397,14 @@ export default function CartPage() {
         setCuponValido(true);
         setDescuento(descuentoFinal);
         setCuponPlataformaIdManual(cuponPlat.id);
-        showToast('¡Cupón de Plataforma Aplicado!', 'Descuento aplicado correctamente', 'success');
+        showToast('Cupón aplicado', 'Revisa el descuento en el resumen.', 'success');
         return;
       }
 
       // Si nada funciona
-      showToast('Cupón Inválido', 'El código ingresado no existe o expiró.', 'error');
+      showToast('Revisa el cupón', 'Ese código no existe o ya venció.', 'error');
     } catch(e) {
-      showToast('Error', 'Hubo un error al validar el cupón.', 'error');
+      showToast('No pudimos revisar el cupón', 'Intenta de nuevo.', 'error');
     } finally {
       setValidandoCupon(false);
     }
@@ -674,7 +674,7 @@ export default function CartPage() {
             transition={{ delay: 0.2 }}
             className="text-3xl font-semibold tracking-tight mb-3"
           >
-            Tu pedido empieza aquí.
+            Tu carrito está vacío
           </motion.h2>
           
           <motion.p 
@@ -683,7 +683,7 @@ export default function CartPage() {
             transition={{ delay: 0.3 }}
             className="text-slate-600 mb-8 leading-relaxed text-base"
           >
-            Elige algo {id === 'global' ? 'de nuestros restaurantes' : `del menú de ${restaurante?.nombre || 'este restaurante'}`} y lo guardaremos en tu carrito.
+            Agrega algo {id === 'global' ? 'de un restaurante' : `del menú de ${restaurante?.nombre || 'este restaurante'}`} para empezar tu pedido.
           </motion.p>
           
           <motion.button 
@@ -801,9 +801,9 @@ export default function CartPage() {
             <section id="promotion-cart-rules" className="checkout-promotion-rules" aria-live="polite" aria-label="Reglas de tus promociones">
               <Tag size={20} aria-hidden="true" />
               <div>
-                <h2>{promotionEligibility.status === 'loading' ? 'Estamos revisando tus promociones' : 'Tu promoción tiene condiciones'}</h2>
+                <h2>{promotionEligibility.status === 'loading' ? 'Estamos revisando tus promociones' : 'Revisa estas promociones'}</h2>
                 {promotionEligibility.status === 'error' ? <><p>{promotionEligibility.message}</p><button type="button" onClick={promotionEligibility.retry}>Volver a comprobar</button></>
-                  : promotionEligibility.status === 'loading' ? <p>Comprobamos la modalidad y la vigencia antes de continuar.</p>
+                  : promotionEligibility.status === 'loading' ? <p>Estamos revisando si aplican a tu pedido.</p>
                   : <><ul>{promotionEligibility.issues.map(issue => <li key={issue.id}><strong>{issue.title}</strong><span>{issue.message}</span></li>)}</ul>
                     <p>Puedes cambiar la entrega abajo o quitar estas promociones. Conservaremos el resto de tu pedido.</p>
                     <button type="button" onClick={() => {
@@ -981,8 +981,8 @@ export default function CartPage() {
                         <div className="checkout-loyalty-content" role="status" aria-atomic="true">
                           <Star size={20} className="checkout-loyalty-icon" aria-hidden="true" />
                           <div>
-                            <p className="checkout-loyalty-title">¡Qué gusto verte por aquí!</p>
-                            <p className="checkout-loyalty-description">Aún no tienes beneficios con este número. Puedes seguir con tu pedido.</p>
+                            <p className="checkout-loyalty-title">Puedes pedir con este número</p>
+                            <p className="checkout-loyalty-description">Aún no hay beneficios para este número. Puedes continuar con tu pedido.</p>
                           </div>
                         </div>
                       </motion.div>

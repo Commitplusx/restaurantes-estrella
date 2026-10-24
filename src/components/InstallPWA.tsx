@@ -87,11 +87,11 @@ export function InstallPWA() {
             <img src="/estrella-icon-192.png" alt="App" className="w-7 h-7" />
           </div>
           <div className="flex flex-col pr-2">
-            <span className="font-bold text-slate-800 text-[13px] leading-tight">Instala la App 📱</span>
+            <span className="font-bold text-slate-800 text-[13px] leading-tight">Instala Estrella Eats</span>
             <span className="text-[11px] text-slate-500 leading-tight mt-0.5 max-w-[220px]">
               {isIOS ? (
                 <>Toca el icono <span className="inline-block translate-y-0.5 text-blue-500 mx-0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span> abajo y luego <b>"Añadir a inicio"</b></>
-              ) : 'Instala la app y pide en segundos ✨'}
+              ) : 'Ábrela desde tu pantalla de inicio.'}
             </span>
           </div>
         </div>
@@ -102,13 +102,14 @@ export function InstallPWA() {
               onClick={handleInstallClick}
               className="bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-orange-600 transition-colors shadow-md shadow-orange-500/20 whitespace-nowrap"
             >
-              Instalar Ahora
+              Instalar ahora
             </button>
           </div>
         )}
         
         <button 
           onClick={handleDismiss}
+          aria-label="Cerrar aviso de instalación"
           className="absolute -top-2 -right-2 w-7 h-7 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors z-10"
         >
           <X size={14} strokeWidth={3} />

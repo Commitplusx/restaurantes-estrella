@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { backendRestricted } from '../lib/backendAvailability';
 import { cachedLandingCatalog, catalogPage, invalidateLandingCatalog, landingCategories, landingPromotions, landingCoupons, landingBanners } from '../lib/publicLandingCatalog';
 import { invalidatePublicMenus } from '../lib/publicMenuCatalog';
+import { prioritizeRestaurantBrands } from '../lib/restaurantPriority';
 
 export function useLandingCatalog() {
   const [state, setState] = useState(cachedLandingCatalog);
@@ -80,7 +81,7 @@ export function useLandingCatalog() {
     setBusy(false);
   }, [busy, state.hasMore, state.page]);
   return {
-    restaurantes: [...new Map(state.restaurants.map(row => [row.id, row])).values()],
+    restaurantes: prioritizeRestaurantBrands([...new Map(state.restaurants.map(row => [row.id, row])).values()]),
     loading: !state.available && !catalogError,
     loadingMore: busy,
     catalogError,

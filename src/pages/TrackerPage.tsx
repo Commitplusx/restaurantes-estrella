@@ -33,7 +33,7 @@ export function TrackerPage() {
     <Loader2 size={24} className="animate-spin" aria-hidden="true" /> Consultando tu pedido…
   </main>;
   if (!pedido) return <main className="min-h-[100dvh] flex items-center justify-center bg-slate-50 p-6">
-    <div className="max-w-md text-center"><h1 className="text-2xl font-semibold mb-3">Vamos a encontrar tu pedido.</h1>
+    <div className="max-w-md text-center"><h1 className="text-2xl font-semibold mb-3">No pudimos abrir este pedido</h1>
       <p role="alert" className="text-slate-600">{error}</p><button className="mt-6 min-h-11 bg-slate-900 text-white rounded-xl px-6" onClick={retry}>Volver a consultar</button>
       <a className="block min-h-11 mt-3 underline" href="/">Ver restaurantes</a></div>
   </main>;
@@ -139,7 +139,7 @@ export function TrackerPage() {
                 {/* Título principal: diferenciado para mandaditos */}
                 <motion.h2 key={`${pedido.estado}:${pedido.estado_cocina}`} initial={{ opacity: .5, y: enabled ? 12 : 0 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: enabled ? .42 : .1, ease: SITE_EASE }} className="text-lg font-black text-slate-800 leading-tight line-clamp-1 uppercase">
                   {pedido?.estado === 'en_camino'
-                    ? (esMandadito ? '🛵 TU PAQUETE VA EN CAMINO' : 'TU ORDEN VA EN CAMINO')
+                    ? (esMandadito ? '🛵 TU PAQUETE VA EN CAMINO' : 'TU PEDIDO VA EN CAMINO')
                     : pedido?.estado === 'entregado'
                     ? (esMandadito ? '📦 ¡PAQUETE ENTREGADO!' : 'PEDIDO ENTREGADO')
                     : cancelado
@@ -152,15 +152,15 @@ export function TrackerPage() {
                   {/* Sub-texto: diferenciado para mandaditos */}
                   <p className="text-sm font-medium text-slate-600">
                     {pedido?.estado === 'en_camino'
-                      ? (esMandadito ? 'Tu mensajero lleva el paquete' : 'Nos vemos pronto')
+                      ? (esMandadito ? 'Tu mensajero lleva el paquete' : 'El repartidor va hacia tu dirección.')
                       : pedido?.estado === 'entregado'
-                      ? (esMandadito ? '¡Entregado con éxito!' : '¡Disfruta tu comida!')
+                      ? (esMandadito ? 'El paquete ya fue entregado.' : '¡Disfruta tu comida!')
                       : cancelado
-                      ? 'Este viaje terminó'
+                      ? 'Este pedido ya no está activo.'
                       : esMandadito
                       ? (repartidor ? 'Mensajero asignado' : 'Buscando mensajero...')
                       : esperandoRestaurante
-                      ? 'Esperando aceptación del restaurante'
+                      ? 'Falta que el restaurante confirme.'
                       : listoParaRecoger
                       ? (esRecogida ? 'Tu pedido está listo para recoger' : 'Tu pedido está listo; esperamos al repartidor')
                       : enCocina
@@ -279,7 +279,7 @@ export function TrackerPage() {
                  <div>
                    <p className="font-black text-slate-800 leading-tight">{repartidor.nombre}</p>
                    <p className="text-sm text-slate-600 mt-0.5">
-                     {esMandadito ? 'MENSAJERO ASIGNADO' : 'ASIGNADO A TU ORDEN'}
+                     {esMandadito ? 'MENSAJERO ASIGNADO' : 'ASIGNADO A TU PEDIDO'}
                    </p>
                  </div>
                </div>

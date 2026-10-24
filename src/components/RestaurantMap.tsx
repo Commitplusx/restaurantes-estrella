@@ -221,13 +221,13 @@ export default function RestaurantMap({ restaurants, userLocation, locationLoadi
     <div className="eats-discovery-canvas" ref={container} />
     {state !== 'ready' && <div className="eats-discovery-fallback" role="status">
       <AlertCircle size={28} aria-hidden="true" />
-      <p>{state === 'loading' ? 'Buscando tu próximo antojo…' : 'El mapa no está disponible. Los menús siguen aquí abajo.'}</p>
+      <p>{state === 'loading' ? 'Cargando el mapa…' : 'El mapa no está disponible. Los menús siguen aquí abajo.'}</p>
       {state === 'failed' && configured && <button type="button" onClick={() => { setState('loading'); setAttempt(value => value + 1); }}>Reintentar mapa</button>}
       <button type="button" onClick={onShowList}>Volver a restaurantes</button>
     </div>}
     <header className="eats-discovery-header">
       <button type="button" className="eats-map-control" onClick={onShowList} aria-label="Volver a restaurantes"><ArrowLeft size={21} /></button>
-      <div><h1>Explora Comitán<Sparkle size={17} fill="currentColor" aria-hidden="true" /></h1><p>Tu próximo antojo está cerca.</p></div>
+      <div><h1>Explora Comitán<Sparkle size={17} fill="currentColor" aria-hidden="true" /></h1><p>Elige un restaurante.</p></div>
       <img src="/estrella-icon-192.png" alt="Estrella Eats" />
     </header>
     <div className="eats-discovery-controls">

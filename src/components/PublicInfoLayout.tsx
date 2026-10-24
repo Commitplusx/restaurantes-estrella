@@ -56,7 +56,7 @@ export function PublicInfoLayout({ children }: { children: ReactNode }) {
     <header className="info-header">
       <div className="info-header-inner">
         <PublicInfoLink to="/" className="info-back"><ArrowLeft size={18} aria-hidden="true" /><span>Inicio</span></PublicInfoLink>
-        <PublicInfoLink to="/" className="info-brand" aria-label="Estrella Eats, inicio"><img src="/estrella-icon-192.png" width="30" height="30" alt="" /><span>Estrella<span>Eats</span></span></PublicInfoLink>
+        <PublicInfoLink to="/" className="info-brand" aria-label="EstrellaEats, ir al inicio"><img src="/estrella-icon-192.png" width="30" height="30" alt="" /><span>Estrella<span>Eats</span></span></PublicInfoLink>
         <PublicInfoLink to="/#eats-desktop-categories" className="info-restaurants">Ver restaurantes<ArrowUpRight size={17} aria-hidden="true" /></PublicInfoLink>
       </div>
     </header>

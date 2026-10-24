@@ -44,17 +44,17 @@ export function FloatingOrderTracker() {
 
   if (['pendiente', 'pagado', 'asignado'].includes(status)) {
     Icon = Clock;
-    text = 'Pedido Confirmado';
+    text = 'Pedido recibido';
     progress = 25;
   } else if (['en_cocina', 'listo_para_recoger', 'recibido', 'preparando'].includes(status)) {
     Icon = ChefHat;
-    text = 'Preparando Orden';
+    text = 'Preparando tu pedido';
     color = 'text-orange-500';
     bgColor = 'bg-orange-500';
     progress = 60;
   } else if (status === 'en_camino') {
     Icon = Truck;
-    text = 'En Camino';
+    text = 'En camino';
     color = 'text-blue-500';
     bgColor = 'bg-blue-500';
     progress = 90;
@@ -116,7 +116,7 @@ export function FloatingOrderTracker() {
                 onClick={() => navigate(trackingLink('/tracker', orderId))}
                 className={`w-full py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 shadow-md transition-all active:scale-95 ${bgColor}`}
               >
-                Ver Ticket Completo
+                Ver mi pedido
                 <ChevronRight className="w-4 h-4" />
               </button>
             </motion.div>

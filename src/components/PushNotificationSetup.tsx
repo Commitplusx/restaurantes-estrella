@@ -109,7 +109,7 @@ export function PushNoticeContent({ phase, error, success, activate, dismiss }: 
   return <NoticeSurface label="Notificaciones de Estrella Eats">
     <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{success ? 'Notificaciones activadas. Este navegador ya puede recibir avisos de Estrella Eats.' : error || (phase ? phases[phase] : '')}</p>
     <div className="eats-notice-heading">{success ? <Check size={22} aria-hidden="true" /> : <Bell size={22} aria-hidden="true" />}<h2>{success ? 'Notificaciones activadas' : 'Activa tus notificaciones'}</h2></div>
-    <p>{success ? 'Este navegador ya puede recibir avisos de Estrella Eats.' : 'Recibe avisos y promociones de Estrella Eats en este navegador. Tu pedido sigue disponible en el tracker.'}</p>
+    <p>{success ? 'Este navegador ya puede recibir avisos de Estrella Eats.' : 'Recibe avisos y promociones en este navegador. También puedes seguir tu pedido en la web.'}</p>
     {(phase || error) && <div className="eats-notice-feedback" data-error={Boolean(error)} aria-hidden="true"><p>{error || (phase && phases[phase])}</p></div>}
     <div className="eats-notice-actions">
       <button className="eats-notice-primary" disabled={Boolean(phase)} onClick={success ? dismiss : activate}>

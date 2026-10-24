@@ -566,13 +566,13 @@ export function PublicMenuView() {
         setCuponValido(true)
         setDescuento(descuentoFinal)
         setCuponPlataformaIdManual(cuponPlat.id)
-        showToast('¡Cupón de Plataforma Aplicado!', 'Descuento aplicado correctamente', 'success')
+        showToast('Cupón aplicado', 'Revisa el descuento en el resumen.', 'success')
         return
       }
 
       // Ningún cupón encontrado
       setCuponPlataformaIdManual(null)
-      showToast('Cupón Inválido', data?.error || 'El cupón no es válido o ya expiró', 'error')
+      showToast('Revisa el cupón', data?.error || 'Ese código no existe o ya venció.', 'error')
       setCuponValido(false)
       setDescuento(0)
       setCostoEnvioFijoOverride(null)
@@ -895,18 +895,18 @@ export function PublicMenuView() {
         <div className="w-20 h-20 rounded-[24px] bg-amber-50 flex items-center justify-center mx-auto mb-5">
           <span className="text-4xl">⏸️</span>
         </div>
-        <h2 className="text-2xl font-black text-slate-800 mb-2">Esta ubicación está pausada</h2>
+        <h2 className="text-2xl font-black text-slate-800 mb-2">Pedidos en pausa</h2>
         {sucursalesFamilia.length > 0 && <button type="button" className="branch-button" onClick={() => setShowSucursalesModal(true)}>Ver otras sucursales</button>}
         {branchesError && <p role="alert">{branchesError} <button type="button" onClick={retryBranches}>Reintentar</button></p>}
         <p className="text-slate-500 text-sm leading-relaxed mb-1">
-          <strong className="text-slate-700">{restaurante?.nombre}</strong> tomó un descanso y no está recibiendo pedidos en este momento.
+          <strong className="text-slate-700">{restaurante?.nombre}</strong> no está recibiendo pedidos por ahora.
         </p>
         <p className="text-slate-400 text-sm mb-7">
-          Por favor regresa un poco más tarde. Cuando retomen actividad verás el menú automáticamente.
+          Puedes volver a revisar más tarde.
         </p>
         <div className="flex gap-2 items-center justify-center text-xs text-amber-500 font-bold bg-amber-50 rounded-xl px-4 py-2.5">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-          Esperando que reabran...
+          Revisando disponibilidad…
         </div>
       </div>
       {branchPicker}
@@ -936,7 +936,7 @@ export function PublicMenuView() {
       if (openingCart) navigate(`/menu/${id}/carrito`);
     }}>
 
-      {menuQuery.error && <section className="eats-catalog-notice" role="status"><AlertCircle aria-hidden="true" /><div><h2>No pudimos actualizar este menú</h2><p>Conservamos la última información que cargó. Actualízala antes de pedir.</p></div><button type="button" disabled={menuQuery.fetching} onClick={menuQuery.refresh}>Actualizar menú</button></section>}
+      {menuQuery.error && <section className="eats-catalog-notice" role="status"><AlertCircle aria-hidden="true" /><div><h2>No pudimos actualizar este menú</h2><p>Te mostramos el último menú que cargó. Actualízalo antes de pedir.</p></div><button type="button" disabled={menuQuery.fetching} onClick={menuQuery.refresh}>Actualizar menú</button></section>}
       {/* TOPBAR */}
       <RestaurantMenuHeader restaurant={restaurante} hasCart={cartCount > 0} fromSearch={fromSearch} />
 
@@ -1137,7 +1137,7 @@ export function PublicMenuView() {
                     <div>
                       {selectedItemDetail.cartItemTipo === 'promo' && (
                         <div className="bg-[#FA4A0C]/10 text-[#FA4A0C] font-black text-[11px] px-2.5 py-1 rounded-md inline-block mb-2 uppercase tracking-wider">
-                          Promo Especial
+                          Promoción
                         </div>
                       )}
                       <h2 id="menu-detail-title" className="text-2xl font-semibold tracking-tight text-slate-900 leading-tight">

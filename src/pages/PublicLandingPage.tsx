@@ -11,6 +11,7 @@ import { animate, motion, AnimatePresence } from 'framer-motion'
 import { useSiteMotion } from '../hooks/useSiteMotion';
 import RestaurantMap from '../components/RestaurantMap';
 import { oneRestaurantPerBrand } from '../lib/catalogRequest';
+import { prioritizeRestaurantBrands } from '../lib/restaurantPriority';
 import type { CatalogRestaurant as Restaurante } from '../lib/catalogRequest';
 import { readSavedCoordinates } from '../lib/deliveryLocation';
 import './CatalogNotice.css';
@@ -526,7 +527,7 @@ export function PublicLandingPage() {
       });
     }
     
-    return oneRestaurantPerBrand(result);
+    return prioritizeRestaurantBrands(oneRestaurantPerBrand(result));
   }, [restaurantes, search, selectedCategory, activeTab, userLocation]);
 
   const exploreRestaurants = useCallback(() => {
@@ -743,7 +744,7 @@ export function PublicLandingPage() {
                                 <Bell size={24} className="text-slate-400 opacity-50" />
                               </div>
                               <p className="text-[13px] font-bold text-slate-700">No hay notificaciones nuevas</p>
-                              <p className="text-[12px] text-slate-500 leading-relaxed">Aquí te avisaremos sobre el estado de tus pedidos y promociones exclusivas.</p>
+                              <p className="text-[12px] text-slate-500 leading-relaxed">Aquí aparecen los avisos de tus pedidos y las promociones.</p>
                             </>
                          )}
                        </div>
@@ -766,7 +767,7 @@ export function PublicLandingPage() {
               <div className="relative flex-1 w-full">
                  <input 
                    type="text" 
-                   placeholder="Busca tu antojo favorito..."
+                   placeholder="Busca comida o restaurantes"
                    className="w-full bg-white focus:bg-white border border-slate-200/60 focus:border-orange-300 rounded-[18px] py-3.5 pl-5 pr-12 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-[0_4px_24px_rgba(0,0,0,0.06)] focus:shadow-[0_4px_24px_rgba(250,74,12,0.12)]"
                    value={search}
                    onChange={(e) => setSearch(e.target.value)}
@@ -925,12 +926,12 @@ export function PublicLandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="text-center pt-8 pb-16 sm:py-24 bg-white rounded-[32px] border border-slate-100 shadow-[0_2px_20px_rgba(0,0,0,0.02)] mt-0 sm:mt-6 px-4 relative z-10"
           >
-            <h3 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">¡Uy, qué vacío!</h3>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">No encontramos restaurantes</h3>
             <p className="text-slate-500 mt-3 text-[14px] sm:text-[16px] max-w-sm sm:max-w-md mx-auto leading-relaxed">
-              No encontramos restaurantes con este filtro. Pero no te quedes con hambre, tenemos muchísimas opciones deliciosas para ti.
+              {search || selectedCategory ? 'Prueba otro nombre o cambia la categoría.' : activeTab === 'cerca' ? 'No encontramos restaurantes a menos de 2 km de tu ubicación.' : 'Por ahora no hay restaurantes disponibles. Vuelve a revisar más tarde.'}
             </p>
             <button 
-              onClick={() => { setSearch(''); setSelectedCategory(null); }}
+              onClick={() => { setSearch(''); setSelectedCategory(null); setActiveTab('todos'); }}
               className="mt-8 px-8 py-3.5 bg-[#FA4A0C] text-white font-black text-[14px] sm:text-[15px] tracking-wide uppercase rounded-full hover:bg-[#ff551b] shadow-lg shadow-orange-500/30 transition-all hover:scale-105 active:scale-95"
             >
               Ver todos los restaurantes
@@ -1023,7 +1024,7 @@ export function PublicLandingPage() {
             {loadingMore ? (
               <div className="flex flex-col items-center gap-2">
                 <Loader2 size={24} className="animate-spin text-orange-500" />
-                <span className="text-sm font-bold text-slate-500">Cargando más deliciosas opciones...</span>
+                <span className="text-sm font-bold text-slate-500">Cargando más restaurantes…</span>
               </div>
             ) : null}
           </div>

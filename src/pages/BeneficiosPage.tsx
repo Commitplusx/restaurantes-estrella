@@ -2,19 +2,19 @@ import { Star, Heart, ShieldCheck, Wallet, Percent, TrendingUp, ArrowUpRight } f
 import { PublicInfoLayout, PublicInfoLink } from '../components/PublicInfoLayout';
 
 const beneficios = [
-  { icon: Percent, titulo: 'Precios Reales', descripcion: 'En Estrella Eats encuentras los mismos precios que en el menú físico. Sin tarifas ocultas ni platillos inflados.' },
-  { icon: Wallet, titulo: 'Billetera VIP', descripcion: 'Cada pedido suma saldo real a tu cuenta. Úsalo para cubrir tus envíos o pagar tus próximos antojos.' },
-  { icon: TrendingUp, titulo: 'Promos Exclusivas', descripcion: 'Descuentos y combos únicos directamente de tus restaurantes favoritos, pensados especialmente para ti.' },
-  { icon: Heart, titulo: 'Apoyo Local', descripcion: 'Cada pedido impulsa a emprendedores y repartidores de tu comunidad, fortaleciendo nuestra economía.' },
-  { icon: ShieldCheck, titulo: 'Atención Cercana', descripcion: 'Olvídate de las respuestas automáticas. Nuestro equipo te atiende personalmente por WhatsApp.' },
-  { icon: Star, titulo: 'Invita y Gana', descripcion: 'Comparte tu código VIP con amigos y ambos recibirán beneficios inmediatos en sus cuentas.' },
+  { icon: Percent, titulo: 'Precios del menú', descripcion: 'Los mismos precios que en el menú del restaurante, sin cargos ocultos ni aumentos en los platillos.' },
+  { icon: Wallet, titulo: 'Billetera VIP', descripcion: 'Cada pedido suma saldo a tu cuenta. Puedes usarlo para pagar envíos o próximos pedidos.' },
+  { icon: TrendingUp, titulo: 'Promociones', descripcion: 'Consulta los descuentos y combos que ofrece cada restaurante.' },
+  { icon: Heart, titulo: 'Negocios de aquí', descripcion: 'Al pedir aquí, apoyas a restaurantes y repartidores de tu comunidad.' },
+  { icon: ShieldCheck, titulo: 'Ayuda por WhatsApp', descripcion: 'Escríbenos si necesitas ayuda con tu pedido. Te atiende nuestro equipo.' },
+  { icon: Star, titulo: 'Invita y gana', descripcion: 'Comparte tu código VIP con un amigo. Ambos reciben beneficios al momento.' },
 ];
 
 export function BeneficiosPage() {
   return <PublicInfoLayout>
     <div className="info-intro benefits-intro">
       <h1>Pedir aquí tiene<br />sus ventajas.</h1>
-      <p>Conoce las opciones y beneficios de Estrella Eats antes de hacer tu próximo pedido.</p>
+      <p>Revisa las promociones y los beneficios que puedes usar al pedir.</p>
     </div>
     <div className="benefits-list">
       {beneficios.map(({ icon: Icon, titulo, descripcion }) => <section className="benefit-item" key={titulo}>
