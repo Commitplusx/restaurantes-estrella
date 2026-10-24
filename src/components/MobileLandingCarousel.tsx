@@ -144,7 +144,7 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
       <motion.div className="eats-carousel-discovery-foreground" variants={copyMotion} custom={selection.direction}>
         <motion.div className="eats-carousel-discovery-copy" style={{ y: enabled && !preview ? captionY : 0 }}><strong>¿Tacos o<br />hamburguesa?</strong></motion.div>
       </motion.div>
-    </div><motion.div className="eats-banner-caption" variants={copyMotion} custom={selection.direction}><div><strong>Restaurantes de Comitán</strong><span>A domicilio o para recoger.</span></div></motion.div></>;
+    </div><motion.div className="eats-banner-caption" variants={copyMotion} custom={selection.direction}><div><strong>¿Qué se te antoja hoy?</strong><span>Te lo llevamos o pasas por él.</span></div></motion.div></>;
     return link ? <Link className="eats-banner-card" to={link} draggable={false} tabIndex={active ? 0 : -1}>{content}</Link> : <div className="eats-banner-card">{content}</div>;
   };
   const transitionSlides = selection.previous && selection.previous.key !== activeKey ? [selection.previous, activeSlide] : [activeSlide];
