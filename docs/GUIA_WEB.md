@@ -1,5 +1,7 @@
 # Guía técnica de la web — 12 de octubre de 2026
 
+**Banners móviles — candidato local, 24 de octubre:** campañas primero, arte completo 16:9, siguiente tarjeta visible y controles compactos. Misma fuente pública, imágenes de la actual y vecinas y selección estable al refrescar. Build, seis pruebas tipadas y capturas automáticas a 320/390/768 px revisados; interacción táctil física pendiente. Sin subir/publicar. [Presentación, formatos, QA y límites](MOBILE_BANNERS_20261024.md).
+
 **Entrega a GitHub main — 24 de octubre:** optimización del inicio `87b183f` y carga de menú `529605b`, con sus fuentes, assets, pruebas y documentación. Las notas de candidato siguientes conservan la evidencia local previa a esta entrega. Build y 45 pruebas tipadas aprobados; capturas automáticas móvil/PC revisadas. Publicación efectiva en Vercel y recorrido interactivo del dominio pendientes de comprobar. No incluye cambios de backend, SQL, worker, OTP ni APK.
 
 **Carga del menú — candidato local, 24 de octubre:** skeleton con la distribución real en móvil/PC, menú público compartido (20 s fresco/120 s retenido), consultas paralelas con ID conocido y precarga por intención. Errores visibles sin vaciar el menú o carrito por una lectura parcial; selección y animaciones conservadas. 45 pruebas tipadas y build aprobados; medición móvil local de 733 KB a 408 KB, sin mejora clara del primer pintado. Sin publicar; interacción física pendiente. [Contrato, evidencia y límites](MENU_LOADING_20261024.md).

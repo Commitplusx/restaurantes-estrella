@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <path fill="#fff0e7" d="M0 0h1600v900H0z"/>
+  <rect x="48" y="48" width="1504" height="804" rx="12" fill="none" stroke="#bd3818" stroke-width="4"/>
+  <path fill="#ea4e25" d="M1120 0h480v900h-480z"/>
+  <circle cx="1355" cy="448" r="146" fill="#fff0e7"/>
+  <path fill="#ea4e25" d="m1355 345 23 80 82 23-82 23-23 80-23-80-82-23 82-23z"/>
+  <g font-family="Arial,sans-serif" fill="#1d1d1f">
+    <text x="110" y="260" font-size="46">MUESTRA LOCAL</text>
+    <text x="106" y="422" font-size="126" font-weight="700">Formato 16:9</text>
+    <text x="110" y="528" font-size="54">El arte se muestra completo.</text>
+    <text x="110" y="708" font-size="40">1600 × 900 px</text>
+  </g>
+</svg>

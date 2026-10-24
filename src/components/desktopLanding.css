@@ -46,26 +46,7 @@
   .eats-hero-footnote { display: flex; gap: 8px; align-items: center; margin-top: 16px; max-width: 37ch; color: #515154; font-size: 12px; line-height: 1.4; }
   .eats-hero-footnote svg { flex-shrink: 0; }
   .eats-hero-visual { position: relative; min-width: 0; height: clamp(220px, 64vw, 320px); margin: 8px 0 0; }
-  .eats-hero-visual:has(.eats-mobile-carousel) { height: auto; }
-  .eats-mobile-carousel { width: 100%; min-width: 0; min-height: 270px; }
-  .eats-carousel-window { height: 220px; border-radius: 14px 14px 48px 14px; overflow: hidden; touch-action: pan-y; background: #ffffff; }
-  .eats-carousel-track { display: flex; height: 100%; transition: transform 500ms cubic-bezier(.22,1,.36,1); }
-  .eats-carousel-slide { position: relative; flex: 0 0 100%; min-width: 0; height: 100%; }
-  .eats-carousel-slide > a { display: block; width: 100%; height: 100%; }
-  .eats-carousel-slide img { width: 100%; height: 100%; object-fit: contain; }
-  .eats-carousel-slide img.eats-carousel-table { object-fit: cover; object-position: 50% 53%; }
-  .eats-carousel-slide .eats-photo-caption { bottom: 12px; }
-  .eats-carousel-message { height: 100%; padding: 24px; display: flex; flex-direction: column; justify-content: center; gap: 12px; background: #f5f5f7; color: #1d1d1f; }
-  .eats-carousel-message strong { font-size: clamp(22px, 5vw, 32px); line-height: 1.1; white-space: pre-line; }
-  .eats-carousel-message p { font-size: 14px; line-height: 1.4; }
-  .eats-carousel-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; }
-  .eats-carousel-pagination, .eats-carousel-buttons { display: flex; align-items: center; }
-  .eats-carousel-controls button { display: grid; place-items: center; width: 44px; height: 44px; color: #515154; border-radius: 8px; }
-  .eats-carousel-controls button:active { background: #f0f0f2; }
-  .eats-carousel-buttons { margin-left: auto; }
-  .eats-carousel-pagination button { width: 44px; min-height: 44px; }
-  .eats-carousel-pagination button > span { width: 6px; height: 6px; border-radius: 50%; background: #6e6e73; }
-  .eats-carousel-pagination button[aria-pressed="true"] > span { width: 18px; border-radius: 4px; background: #bd3818; }
+  .eats-hero-visual:has(.eats-mobile-carousel) { height: auto; margin-inline: -8px; }
   .eats-hero-photo { width: 100%; height: 100%; object-fit: cover; object-position: 50% 53%; border-radius: 14px 14px 58px 14px; background: #df6c3d; }
   .eats-photo-caption { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: end; gap: 22px; padding: 12px 15px; background: #ffffff; border-radius: 8px; box-shadow: 0 6px 18px #00000014; }
   .eats-photo-caption > span { display: none; }
@@ -131,8 +112,7 @@
   .eats-hero-copy h1 { font-size: clamp(50px, 7.4vw, 72px); }
   .eats-title-star { display: none; }
   .eats-hero-visual { height: 430px; margin: 0; }
-  .eats-carousel-window { height: 380px; }
-  .eats-mobile-carousel { min-height: 430px; }
+  .eats-hero-visual:has(.eats-mobile-carousel) { margin-inline: 0; }
   .eats-hero-copy > p br { display: none; }
   .eats-hero-actions { gap: 8px; }
   .eats-landing .eats-desktop-categories { scroll-margin-top: 160px; }
@@ -263,18 +243,7 @@
 
 @media (max-width: 1023px) {
   body[data-eats-motion=reduced] .eats-landing :is(button, a, img, .eats-category-strip) { transition: none; scroll-behavior: auto; }
-  .eats-mobile-carousel[data-motion=reduced] .eats-carousel-track { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); transition: none; }
-  .eats-mobile-carousel[data-motion=reduced] .eats-carousel-slide { grid-area: 1 / 1; min-height: 0; opacity: 0; pointer-events: none; transition: opacity 360ms cubic-bezier(.4,0,.2,1); }
-  .eats-mobile-carousel[data-motion=reduced] .eats-carousel-slide[data-active="true"] { opacity: 1; pointer-events: auto; z-index: 1; }
   body[data-eats-motion=reduced] .eats-landing > nav { transition: none; }
-}
-
-@media (max-width: 1023px) {
-  body[data-eats-motion=full] .eats-carousel-slide[data-active="true"] > :is(img, a, .eats-carousel-message) { animation: eats-banner-reveal 600ms cubic-bezier(.16,1,.3,1); }
-}
-@keyframes eats-banner-reveal {
-  from { clip-path: inset(0 8% 0 0); }
-  to { clip-path: inset(0); }
 }
 
 

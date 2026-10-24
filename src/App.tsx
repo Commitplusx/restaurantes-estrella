@@ -42,6 +42,7 @@ const PrivacyPage = lazyWithRetry(() => import('./pages/PrivacyPage').then(modul
 const TermsPage = lazyWithRetry(() => import('./pages/TermsPage').then(module => ({ default: module.TermsPage })))
 const NoticeDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/NoticeDesignPreview')) : null
 const WelcomeDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/WelcomeDesignPreview')) : null
+const BannerDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/BannerDesignPreview')) : null
 
 import { CookieBanner } from './components/CookieBanner'
 import { PushNotificationSetup } from './components/PushNotificationSetup'
@@ -119,6 +120,7 @@ function AppContent() {
         <Routes>
           {NoticeDesignPreview && <Route path="/avisos" element={<NoticeDesignPreview />} />}
           {WelcomeDesignPreview && <Route path="/bienvenida" element={<WelcomeDesignPreview />} />}
+          {BannerDesignPreview && <Route path="/banners" element={<BannerDesignPreview />} />}
           <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
           <Route path="/beneficios" element={isPartnerDomain ? <Navigate to="/login" replace /> : <BeneficiosPage />} />
           <Route path="/privacidad" element={<PrivacyPage />} />
