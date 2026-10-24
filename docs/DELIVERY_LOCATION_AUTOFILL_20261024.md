@@ -1,6 +1,6 @@
 # Mapa gris y dirección automática — 24 de octubre de 2026
 
-Estado: candidato local posterior a GitHub main `ee9387c`. Sin subir/publicar. Build normal en 5262; vista repetible DEV en `http://127.0.0.1:5263/mapa-entrega`, usando el mismo `DeliveryLocationPicker` del carrito. No crea pedidos ni guarda la selección fuera de esa vista de pruebas.
+Estado de entrega: fuentes `61e6c4e`, posteriores a GitHub main `ee9387c`, incluidas en la subida autorizada a main del 24 de octubre junto con el logo nuevo. Despliegue efectivo en Vercel pendiente de verificar. Build normal en 5262; vista repetible DEV en `http://127.0.0.1:5263/mapa-entrega`, usando el mismo `DeliveryLocationPicker` del carrito. No crea pedidos ni guarda la selección fuera de esa vista de pruebas.
 
 ## Comportamiento
 

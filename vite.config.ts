@@ -11,7 +11,7 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
-      includeAssets: ['favicon.svg', 'estrella-icon-192.png', 'estrella-icon-512.png'],
+      includeAssets: ['brand/estrella-mark-v2-192.png', 'brand/estrella-mark-v2-512.png', 'brand/estrella-mark-v2-maskable.png'],
       manifest: {
         name: 'Estrella Eats',
         short_name: 'Estrella',
@@ -22,20 +22,20 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'estrella-icon-192.png',
+            src: 'brand/estrella-mark-v2-192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'estrella-icon-512.png',
+            src: 'brand/estrella-mark-v2-512.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'estrella-icon-512.png',
+            src: 'brand/estrella-mark-v2-maskable.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ],
         shortcuts: [
@@ -44,7 +44,7 @@ export default defineConfig({
             short_name: "Pedir",
             description: "Pide de tus restaurantes favoritos",
             url: "/",
-            icons: [{ src: "estrella-icon-192.png", sizes: "192x192" }]
+            icons: [{ src: "brand/estrella-mark-v2-192.png", sizes: "192x192" }]
           }
         ],
         screenshots: [

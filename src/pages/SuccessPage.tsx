@@ -35,7 +35,7 @@ export function SuccessPage() {
   return (
     <main className="min-h-[100dvh] bg-slate-50 flex flex-col items-center justify-center px-4 py-8 font-sans">
       <div className="flex items-center gap-4 mb-6">
-        <img src="/logo.png" alt="" className="w-16 h-16 object-contain" />
+        <img src="/brand/estrella-mark-v2-192.png" alt="" className="w-16 h-16 object-contain" />
         <h1 className="text-2xl font-black text-slate-800">Estrella Eats</h1>
       </div>
       <section className="w-full max-w-md bg-white rounded-2xl p-6 sm:p-10 border border-slate-200 text-center" aria-live="polite">

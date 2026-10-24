@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useIsDesktop } from '../hooks/useIsDesktop';
 import { MobileLandingCarousel } from './MobileLandingCarousel';
+import { BrandLogo } from './BrandLogo';
 import type { LandingBanner } from '../lib/landingBanner';
 import './desktopLanding.css';
 import { ParallaxMedia } from './ParallaxMedia';
@@ -25,8 +26,7 @@ export function DesktopLandingHeader({ search, onSearch, deliveryType, onDeliver
     <header className="eats-desktop-header">
       <div className="eats-desktop-header-inner">
         <Link to="/" className="eats-wordmark" aria-label="Estrella Eats, inicio">
-          <img src="/estrella-icon-192.png" alt="" width="42" height="42" />
-          <span>estrella<span className="eats-wordmark-accent">eats</span><span className="eats-wordmark-dot">.</span></span>
+          <BrandLogo />
         </Link>
         <button type="button" className="eats-header-location" onClick={onLocation} title={address || 'Comitán de Domínguez'} aria-label="Elegir ubicación">
           <MapPin size={17} aria-hidden="true" />

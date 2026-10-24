@@ -28,6 +28,7 @@ import { useLandingCatalog } from '../hooks/useLandingCatalog';
 import { usePublicResource } from '../hooks/usePublicResource';
 import { landingPromotions, landingCategories, landingBanners, landingCoupons } from '../lib/publicLandingCatalog';
 import { CatalogImage } from '../components/CatalogImage';
+import { BrandLogo } from '../components/BrandLogo';
 
 
 
@@ -603,12 +604,7 @@ export function PublicLandingPage() {
            <div className="flex justify-between items-center md:w-auto w-full">
               {/* Desktop Logo (Left) */}
               <div className="hidden md:flex items-center gap-2.5 mr-2 cursor-pointer group" onClick={() => window.scrollTo(0,0)}>
-                 <div className="relative">
-                   <img src="/estrella-icon-192.png" alt="Estrella Eats" className="w-10 h-10 object-contain group-hover:scale-110 transition-transform duration-300" />
-                 </div>
-                 <span className="text-xl font-black tracking-tighter hidden lg:block">
-                   <span className="text-slate-900">Estrella</span><span className="text-[#FA4A0C]">Eats</span>
-                 </span>
+                 <BrandLogo />
               </div>
 
               {/* Delivery Toggle Desktop */}
@@ -1039,12 +1035,7 @@ export function PublicLandingPage() {
           <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-10">
             {/* Brand */}
             <div className="flex flex-col items-center md:items-start gap-4">
-              <div className="flex items-center gap-3">
-                <img src="/estrella-icon-192.png" alt="Estrella Eats" className="w-11 h-11 object-contain brightness-110" />
-                <span className="text-2xl font-black tracking-tighter">
-                  <span className="text-white">Estrella</span><span className="text-[#FA4A0C]">Eats</span>
-                </span>
-              </div>
+              <BrandLogo className="eats-brand-logo--footer" />
               <p className="text-slate-400 text-sm font-medium max-w-[220px] text-center md:text-left leading-relaxed">
                 Pedidos de restaurantes locales, a domicilio o para recoger.
               </p>

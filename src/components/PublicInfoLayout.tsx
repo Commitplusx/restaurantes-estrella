@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, type LinkProps } from 'react-router-dom
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import './publicInfo.css';
 import { useSiteMotion } from '../hooks/useSiteMotion';
+import { BrandLogo } from './BrandLogo';
 
 const InfoNavigation = createContext<((to: string) => void) | null>(null);
 
@@ -56,13 +57,13 @@ export function PublicInfoLayout({ children }: { children: ReactNode }) {
     <header className="info-header">
       <div className="info-header-inner">
         <PublicInfoLink to="/" className="info-back"><ArrowLeft size={18} aria-hidden="true" /><span>Inicio</span></PublicInfoLink>
-        <PublicInfoLink to="/" className="info-brand" aria-label="EstrellaEats, ir al inicio"><img src="/estrella-icon-192.png" width="30" height="30" alt="" /><span>Estrella<span>Eats</span></span></PublicInfoLink>
+        <PublicInfoLink to="/" className="info-brand" aria-label="Estrella Eats, ir al inicio"><BrandLogo /></PublicInfoLink>
         <PublicInfoLink to="/#eats-desktop-categories" className="info-restaurants">Ver restaurantes<ArrowUpRight size={17} aria-hidden="true" /></PublicInfoLink>
       </div>
     </header>
     <main id="info-content" tabIndex={-1} className="info-main">{children}</main>
     <footer className="info-footer">
-      <PublicInfoLink to="/" className="info-footer-brand">Estrella Eats</PublicInfoLink>
+      <PublicInfoLink to="/" className="info-footer-brand"><BrandLogo /></PublicInfoLink>
       <nav aria-label="Información de Estrella Eats">
         <PublicInfoLink to="/beneficios" aria-current={pathname === '/beneficios' ? 'page' : undefined}>Beneficios</PublicInfoLink>
         <PublicInfoLink to="/terminos" aria-current={pathname === '/terminos' ? 'page' : undefined}>Términos y condiciones</PublicInfoLink>

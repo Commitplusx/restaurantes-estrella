@@ -1,6 +1,6 @@
 # Estrella Eats — propuesta de logo, 24 de octubre de 2026
 
-Propuesta generada a petición de Kaleb; archivo local, sin sustituir los activos que consume la web. PNG RGBA con fondo transparente, 2172 × 724 px. Es una imagen raster, no un archivo vectorial.
+Propuesta generada y aprobada por Kaleb. Integración en la web autorizada después: logo horizontal compartido y estrella para iconos. Maestro PNG RGBA con fondo transparente, 2172 × 724 px. Es una imagen raster, no un archivo vectorial.
 
 ## Paleta de referencia
 
@@ -15,14 +15,34 @@ Fuente: DESIGN.md y src/components/desktopLanding.css del frontend actual. Son l
 | Líneas | #E8E8ED |
 | Naranja oscuro de interacción | #BD3818 |
 
-El icono histórico estrella-icon-512.png todavía tiene fondo rojo. Algunas superficies usan variantes #FA4A0C y #D63B17. No se cambiaron esas superficies al generar esta propuesta. Los códigos anteriores son la referencia de diseño; una generación raster no sustituye la definición exacta de tintas o curvas de un maestro vectorial.
+El icono histórico estrella-icon-512.png tiene fondo rojo y queda conservado como activo anterior, sin referencias en las rutas web actualizadas. Algunas superficies usan variantes #FA4A0C y #D63B17. Los códigos anteriores son la referencia de diseño; una generación raster no sustituye la definición exacta de tintas o curvas de un maestro vectorial.
 
 ## Entregable
 
 - design/brand/estrella-eats-logo-propuesta-20261024.png
 - Marca: estrella de cinco puntas con corte que sugiere avance; wordmark horizontal en minúsculas, negro/naranja.
 - Generado con la herramienta integrada image_gen; sin CLI ni clave de API. Texto revisado: «estrella eats». Transparencia y dimensiones comprobadas con Pillow, sin editar el archivo.
-- El usuario respondió «sí» después de ver la propuesta. Integración o sustitución de logos, iconos de app y favicon todavía no ejecutadas en esta entrega.
+- El usuario respondió «sí» y después «ponlo en la web»: integración mediante `src/components/BrandLogo.tsx`. No modifica la APK nativa.
+
+## Activos de la web
+
+`public/brand` contiene el wordmark transparente en WebP lossless a 360 × 120 (~12 KB) y 720 × 240 (~38 KB), la estrella transparente a 192/512 px y un icono maskable de 512 px con fondo blanco y margen seguro. URLs nuevas `v2` para evitar reutilizar el logo histórico del caché. Se conserva el PNG original.
+
+La estrella aislada se generó con `image_gen`, tomando el logo aprobado como referencia. Maestro local `design/brand/estrella-eats-mark-propuesta-20261024.png`. Prompt de extracción:
+
+```text
+Precise asset extraction from the supplied Estrella Eats logo. Produce ONLY the orange star emblem from the LEFT side of the reference image, completely remove the wordmark and all letters. Keep that exact star silhouette, proportions, rounded tips and diagonal negative-space cut; do not redesign or invent a different symbol. Center the isolated star on a square transparent canvas with 16% clear padding around it, preserving the original orange. Flat clean edges, no shadows, no border, no circle, no additional graphic or text. Transparent background. This will be used for browser favicon and mobile app icon.
+```
+
+Las variantes de distribución se redimensionaron/convirtieron con FFmpeg; no se sustituyó el dibujo por una aproximación SVG. El icono maskable se compone sobre blanco, sin convertir transparencias en negro. El componente define dimensiones y `srcSet`, nombre accesible y variante de estrella, sin nuevas dependencias ni descargas externas.
+
+## Integración y entrega
+
+Inicio móvil/PC y footer, bienvenida, menú y skeleton, carrito, páginas informativas y footer, mapa de descubrimiento, aviso PWA, recibo/fallback de seguimiento y acceso/panel de restaurantes. Iconos de notificación del panel y manifiesto PWA/favicon actualizados. Las fotos y logos propios de restaurantes se conservan.
+
+Build TypeScript/Vite y ESLint pertinente aprobados; las páginas heredadas conservan su deuda previa de tipos. Tres capturas automáticas a 390 × 844 (bienvenida/carrito) y 1280 × 900 (beneficios) revisadas: logo legible, proporciones completas y sin error de ejecución. Auditoría 94/100 conserva la limitación heredada de zoom del viewport; no se declara accesibilidad global completa. El primer intento no cargó porque el servidor local había terminado: se restableció y se conservaron los reportes fallidos. La confirmación posterior sí mostró las páginas y logo correctos. Icono maskable revisado separadamente.
+
+Se publica en GitHub main por petición de Kaleb; despliegue efectivo de Vercel pendiente de verificar. Evidencia privada `logo-*` en `.codex-tmp/eats-performance-20261024` del workspace principal. No hubo pedidos, OTP, cambios de servidor ni otros envíos a clientes.
 
 ## Prompt final
 

@@ -1,0 +1,6 @@
+.eats-brand-logo {display:inline-flex;align-items:center;flex-shrink:0;width:188px;max-width:100%;line-height:0;vertical-align:middle;}
+.eats-brand-logo>img.eats-brand-logo-image {display:block;width:100%;height:auto;max-width:none;object-fit:contain;}
+.eats-brand-logo.eats-brand-logo--mark {width:36px;height:36px;}
+.eats-brand-logo--footer {width:220px;}
+.eats-discovery-header>.eats-brand-logo {width:36px;height:36px;margin-right:4px;}
+@media(max-width:640px) {.eats-brand-logo {width:160px;}.eats-brand-logo--footer {width:200px;}}

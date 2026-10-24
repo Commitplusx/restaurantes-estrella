@@ -287,7 +287,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
           if (notifPermission === 'granted' && 'Notification' in window) {
             const notification = new Notification('¡Nuevo pedido!', {
               body: 'Hay una orden nueva para tu restaurante. Revisa el monitor de cocina.',
-              icon: '/favicon.ico'
+              icon: '/brand/estrella-mark-v2-192.png'
             })
             notification.onclick = () => {
               window.focus()

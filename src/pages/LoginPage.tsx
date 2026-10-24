@@ -2,7 +2,8 @@ import { useSiteMotion } from '../hooks/useSiteMotion';
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-import { AlertCircle, ArrowUpRight, CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, PackageCheck, Star, Utensils } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, PackageCheck, Utensils } from 'lucide-react'
+import { BrandLogo } from '../components/BrandLogo'
 import './restaurantLogin.css'
 import { restaurantLoginEmail } from '../lib/restaurantLogin'
 
@@ -48,8 +49,7 @@ export function LoginPage() {
       <div className="restaurant-login__layout">
         <section className="restaurant-login__intro" aria-label="Portal para restaurantes">
           <div className="restaurant-login__brand" aria-label="Estrella Eats, acceso para restaurantes">
-            <span className="restaurant-login__brand-mark" aria-hidden="true"><Star size={21} fill="currentColor" /></span>
-            <span className="restaurant-login__brand-name">Estrella<span>Eats</span></span>
+            <BrandLogo />
           </div>
 
           <div className="restaurant-login__message">

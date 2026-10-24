@@ -13,7 +13,7 @@ export function FloatingOrderTracker() {
   const tracking = useOrderTracking(['/tracker','/success'].includes(location.pathname) ? null : orderId);
   const status = tracking.pedido?.estado ?? null;
   const restaurantName = tracking.restaurante?.nombre ?? tracking.pedido?.restaurante ?? 'Estrella Eats';
-  const restaurantLogo = tracking.restaurante?.logo_url ?? '/logo.png';
+  const restaurantLogo = tracking.restaurante?.logo_url ?? '/brand/estrella-mark-v2-192.png';
   useEffect(() => {
     const check = () => { try { setOrderId(localStorage.getItem('est_active_order')); } catch { setOrderId(null); } };
     check();

@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Banknote, Check, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { BrandLogo } from './BrandLogo';
 
 const steps = ['Tu pedido', 'Entrega', 'Pago'];
 
@@ -11,8 +12,7 @@ export function CheckoutHeader({ step, onBack, backDisabled = false }: { step: n
           <ArrowLeft size={20} aria-hidden="true" />
         </button>
         <a href="/" className="checkout-brand" aria-label="Estrella Eats, inicio">
-          <img src="/estrella-icon-192.png" alt="" width="32" height="32" />
-          <span>Estrella<span>Eats</span></span>
+          <BrandLogo />
         </a>
         <span className="checkout-cash-note"><Banknote size={17} aria-hidden="true" /> Pago en efectivo</span>
       </div>

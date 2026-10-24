@@ -11,6 +11,7 @@ import './restaurantPortal.css'
 import { isAwaitingKitchenOrder } from '../lib/kitchenOrderState'
 import { branchLabel, parseRestaurantBranches, RESTAURANT_PUBLIC_FIELDS } from '../lib/restaurantBranches'
 import './views/SucursalesView.css'
+import { BrandLogo } from '../components/BrandLogo'
 
 type PortalTab = 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales'
 
@@ -169,7 +170,7 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
           if ('Notification' in window && Notification.permission === 'granted') {
              const notif = new Notification('¡Nuevo Pedido Recibido! 🚨', {
                body: `Un cliente acaba de realizar un pedido. Revisa tu Monitor de Cocina.`,
-               icon: '/favicon.ico',
+               icon: '/brand/estrella-mark-v2-192.png',
              })
              notif.onclick = () => {
                window.focus();
@@ -362,9 +363,8 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
       <aside className="restaurant-portal__sidebar">
           
           <div className="restaurant-portal__brand">
-            <span className="restaurant-portal__brand-star" aria-hidden="true"><Star size={17} fill="currentColor" /></span>
             <div>
-              <h1>Estrella<span>Eats</span></h1>
+              <h1><BrandLogo /></h1>
               <p>Panel para restaurantes</p>
             </div>
           </div>

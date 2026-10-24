@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, MapPin, ShoppingBag, Utensils, Route, Package, C
 import { useNoticeSlot } from '../hooks/useNoticeSlot';
 import { writePreference } from '../lib/noticePreferences';
 import { useSiteMotion } from '../hooks/useSiteMotion';
+import { BrandLogo } from './BrandLogo';
 import './OnboardingFlow.css';
 
 interface OnboardingFlowProps { onComplete: () => void }
@@ -112,7 +113,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     <motion.div className="eats-welcome-backdrop" initial={{ opacity: .95 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : .2 }}>
       <div ref={dialog} role="dialog" aria-modal="true" aria-label="Bienvenida a Estrella Eats" tabIndex={-1} className="eats-welcome" onKeyDown={onKeyDown}>
         <header className="eats-welcome-header">
-          <div className="eats-welcome-brand"><img src="/estrella-icon-192.png" alt="" width="38" height="38" /><span>estrella<span>eats.</span></span></div>
+          <div className="eats-welcome-brand"><BrandLogo /></div>
           <div className="eats-welcome-header-actions">
             <button type="button" onClick={complete}>Saltar<ArrowRight size={16} aria-hidden="true" /></button>
           </div>

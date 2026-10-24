@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
 import '../pages/PublicMenuView.css';
 import './RestaurantMenuSkeleton.css';
 
-/** Mirrors the real menu geometry. No requests, images, timers or fabricated product text. */
+/** Mirrors the real menu geometry; only the shared local brand is loaded. */
 export default function RestaurantMenuSkeleton() {
   return <div className="restaurant-menu-page menu-loading-page" role="status" aria-label="Cargando el menú del restaurante" aria-busy="true">
     <header className="menu-topbar"><div className="menu-topbar-inner">
       <Link to="/" className="menu-back" aria-label="Volver a los restaurantes"><ChevronLeft size={20} aria-hidden="true" /></Link>
-      <Link to="/" className="menu-brand" aria-label="Estrella Eats, inicio"><img src="/estrella-icon-192.png" width="32" height="32" alt="" /><span>Estrella<span>Eats</span></span></Link>
+      <Link to="/" className="menu-brand" aria-label="Estrella Eats, inicio"><BrandLogo /></Link>
       <span className="menu-topbar-label">Cargando menú…</span>
     </div></header>
     <div className="menu-shell" aria-hidden="true">
