@@ -1,39 +1,68 @@
 import { CatalogImage } from './CatalogImage';
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play, ImageOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { LandingBanner } from '../lib/landingBanner';
-import { carouselMove, carouselPosition, prepareCarouselImage } from '../lib/landingCarousel';
+import { carouselMove, carouselPosition, startCarouselTransition, finishCarouselTransition, type CarouselSlide as Slide, type CarouselDirection as Direction, type CarouselSelection as Selection } from '../lib/landingCarousel';
 import { useSiteMotion } from '../hooks/useSiteMotion';
 import { ParallaxMedia } from './ParallaxMedia';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform, type Variants } from 'framer-motion';
 import './MobileLandingCarousel.css';
 
-type Slide = { key: string; banner: LandingBanner } | { key: 'discovery'; banner?: never };
+const ARRIVAL = [.16, 1, .3, 1] as const;
+const cardMotion: Variants = {
+  enter: (direction: Direction) => ({ x: `${direction * 100}%` }),
+  center: { x: '0%', transition: { duration: .58, ease: ARRIVAL } },
+  leave: (direction: Direction) => ({ x: `${direction * -100}%`, transition: { duration: .46, ease: [.4, 0, .6, 1] } }),
+};
+const artworkMotion: Variants = {
+  enter: (direction: Direction) => ({ x: `${direction * -4}%`, scale: .9, opacity: .78 }),
+  center: { x: '0%', scale: 1, opacity: 1, transition: { duration: .66, ease: ARRIVAL } },
+  leave: (direction: Direction) => ({ x: `${direction * 3}%`, scale: .94, opacity: .65, transition: { duration: .46, ease: ARRIVAL } }),
+};
+const copyMotion: Variants = {
+  enter: (direction: Direction) => ({ x: direction * 28, y: 6, opacity: .15 }),
+  center: { x: 0, y: 0, opacity: 1, transition: { duration: .52, delay: .045, ease: ARRIVAL } },
+  leave: (direction: Direction) => ({ x: direction * -22, y: -3, opacity: 0, transition: { duration: .24, ease: ARRIVAL } }),
+};
 const plainText = (value: string) => value.replace(/<[^>]*>/g, '').trim();
 
-function CampaignArtwork({ banner, prepared, active }: { banner: LandingBanner; prepared: boolean; active: boolean }) {
+function MotionSlide({ slide, active, animated, direction, label, finish, children }: {
+  slide: Slide; active: boolean; animated: boolean; direction: Direction; label: string; finish: () => void; children: ReactNode;
+}) {
+  return <motion.div className="eats-carousel-slide" data-active={active} custom={direction} variants={cardMotion}
+    initial={animated ? 'enter' : false} animate={active ? 'center' : 'leave'}
+    onAnimationComplete={definition => { if (active && definition === 'center') finish(); }}
+    role="group" aria-roledescription="diapositiva" aria-label={label} aria-hidden={!active} inert={!active} data-banner-id={slide.key}>
+    {children}
+  </motion.div>;
+}
+
+function CampaignArtwork({ banner, active, direction }: { banner: LandingBanner; active: boolean; direction: Direction }) {
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const [loadedSource, setLoadedSource] = useState<string | null>(null);
   const textOnly = banner.imagen_url === 'dynamic-gradient';
   const failed = failedSource === banner.imagen_url;
   return <div className="eats-banner-artwork" data-ready={textOnly || failed || loadedSource === banner.imagen_url}>
+    <motion.div className="eats-banner-art-layer" custom={direction} variants={artworkMotion}>
     {textOnly || failed ? <div className="eats-carousel-message">
       {failed && <><ImageOff size={24} aria-hidden="true" /><span className="eats-banner-image-error">No pudimos cargar la imagen</span></>}
       <strong>{plainText(banner.titulo)}</strong>{banner.subtitulo && <p>{plainText(banner.subtitulo)}</p>}
-    </div> : prepared ? <CatalogImage variant="banner" src={banner.imagen_url} alt={plainText(banner.titulo) || 'Promoción de Estrella Eats'}
+    </div> : <CatalogImage variant="banner" src={banner.imagen_url} alt={plainText(banner.titulo) || 'Promoción de Estrella Eats'}
       draggable={false} loading="eager" fetchPriority={active ? 'high' : 'low'}
-      onLoad={() => setLoadedSource(banner.imagen_url)} onError={() => setFailedSource(banner.imagen_url)} /> : null}
+      onLoad={() => setLoadedSource(banner.imagen_url)} onError={() => setFailedSource(banner.imagen_url)} />}
+    </motion.div>
   </div>;
 }
 
 export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] }) {
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>({ key: null, direction: 1, previous: null, revision: 0 });
   const [paused, setPaused] = useState(false);
   const [inView, setInView] = useState(true);
   const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
   const { enabled } = useSiteMotion();
   const carousel = useRef<HTMLDivElement>(null);
+  const restoreCardFocus = useRef(false);
   const { scrollYProgress } = useScroll({ target: carousel, offset: ['start end', 'end start'] });
   const photoY = useTransform(scrollYProgress, [0, 1], [-26, 26]);
   const photoScale = useTransform(scrollYProgress, [0, 1], [1.015, 1.055]);
@@ -44,9 +73,26 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
   const slides = useMemo<Slide[]>(() => [...banners.map(banner => ({ key: `banner:${banner.id}`, banner })), { key: 'discovery' }], [banners]);
   const keys = useMemo(() => slides.map(slide => slide.key), [slides]);
   const count = slides.length;
-  const activeIndex = carouselPosition(keys, selectedKey);
+  const activeIndex = carouselPosition(keys, selection.key);
   const activeKey = keys[activeIndex];
+  const activeSlide = slides[activeIndex];
+  const nextSlide = slides[(activeIndex + 1) % count];
   const rotating = count > 1 && enabled && !paused && inView && visible;
+  const advance = useCallback((direction: Direction) => {
+    const next = carouselMove(keys, activeIndex, direction);
+    if (!next || next === activeKey) return;
+    // A new gesture replaces the previous outgoing plane, rather than queuing
+    // more copies/images. Existing keys retain their current animation values.
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && carousel.current?.querySelector('[data-active="true"]')?.contains(focused)) restoreCardFocus.current = true;
+    setSelection(previous => startCarouselTransition(previous, activeSlide, next, direction));
+  }, [keys, activeIndex, activeKey, activeSlide]);
+  const finish = (revision: number) => setSelection(current => finishCarouselTransition(current, revision));
+  useEffect(() => {
+    if (!restoreCardFocus.current) return;
+    restoreCardFocus.current = false;
+    carousel.current?.querySelector<HTMLAnchorElement>('.eats-carousel-slide[data-active="true"] a')?.focus({ preventScroll: true });
+  }, [activeKey]);
 
   useEffect(() => {
     const element = carousel.current;
@@ -60,13 +106,13 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
 
   useEffect(() => {
     if (!rotating) return;
-    const timer = window.setTimeout(() => setSelectedKey(keys[(activeIndex + 1) % count]), 6500);
+    const timer = window.setTimeout(() => advance(1), 6500);
     return () => window.clearTimeout(timer);
-  }, [rotating, activeKey, activeIndex, count, keys]);
+  }, [rotating, advance]);
 
-  const select = (direction: number) => {
+  const select = (direction: Direction) => {
     setPaused(true);
-    setSelectedKey(carouselMove(keys, activeIndex, direction));
+    advance(direction);
   };
   const finishGesture = (event: PointerEvent<HTMLDivElement>) => {
     const start = gesture.current;
@@ -78,6 +124,30 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
       select(dx < 0 ? 1 : -1);
     }
   };
+
+  const slideContent = (slide: Slide, active: boolean, preview = false) => {
+    const banner = slide.banner;
+    const link = banner?.link_url && /^(?:\/(?!\/)|https?:\/\/)/.test(banner.link_url) ? banner.link_url : null;
+    const content = banner ? <>
+      <CampaignArtwork banner={banner} active={active} direction={selection.direction} />
+      <motion.div className="eats-banner-caption" variants={copyMotion} custom={selection.direction}><div><strong>{plainText(banner.titulo) || 'Promoción de Estrella Eats'}</strong>
+        {(banner.subtitulo || link) && <span>{banner.subtitulo ? plainText(banner.subtitulo) : 'Ver promoción'}</span>}</div>
+        {link && <span className="eats-banner-action" aria-hidden="true"><ArrowUpRight size={20} /></span>}
+      </motion.div>
+    </> : <><div className="eats-banner-discovery">
+      <motion.div className="eats-banner-art-layer" variants={artworkMotion} custom={selection.direction}>
+        <motion.div className="eats-carousel-photo-plane" style={{ y: enabled && !preview ? photoY : 0, scale: enabled && !preview ? photoScale : 1 }}><ParallaxMedia depth={7} cinematic>
+          <img className="eats-carousel-table" src="/desktop/comitan-table-900.webp" srcSet="/desktop/comitan-table-480.webp 480w, /desktop/comitan-table-900.webp 900w" sizes="(max-width: 639px) 100vw, 50vw"
+            alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" loading="eager" fetchPriority={active ? 'high' : 'low'} draggable={false} />
+        </ParallaxMedia></motion.div>
+      </motion.div>
+      <motion.div className="eats-carousel-discovery-foreground" variants={copyMotion} custom={selection.direction}>
+        <motion.div className="eats-carousel-discovery-copy" style={{ y: enabled && !preview ? captionY : 0 }}><strong>¿Tacos o<br />hamburguesa?</strong></motion.div>
+      </motion.div>
+    </div><motion.div className="eats-banner-caption" variants={copyMotion} custom={selection.direction}><div><strong>Restaurantes de Comitán</strong><span>A domicilio o para recoger.</span></div></motion.div></>;
+    return link ? <Link className="eats-banner-card" to={link} draggable={false} tabIndex={active ? 0 : -1}>{content}</Link> : <div className="eats-banner-card">{content}</div>;
+  };
+  const transitionSlides = selection.previous && selection.previous.key !== activeKey ? [selection.previous, activeSlide] : [activeSlide];
 
   return <div ref={carousel} className="eats-mobile-carousel" data-motion={enabled ? 'full' : 'reduced'} data-multiple={count > 1}
     role="region" aria-roledescription="carrusel" aria-label="Promociones de Estrella Eats"
@@ -96,30 +166,12 @@ export function MobileLandingCarousel({ banners }: { banners: LandingBanner[] })
     }} onPointerUp={finishGesture} onPointerCancel={() => { gesture.current = null; }} onClickCapture={event => {
       if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; }
     }}>
-      <div className="eats-carousel-track" style={{ transform: `translateX(calc(-${activeIndex} * (100% - ${count > 1 ? 16 : 0}px)))` }}>
-        {slides.map((slide, position) => {
-          const active = position === activeIndex;
-          const prepared = prepareCarouselImage(position, activeIndex, count);
-          const banner = slide.banner;
-          const link = banner?.link_url && /^(?:\/(?!\/)|https?:\/\/)/.test(banner.link_url) ? banner.link_url : null;
-          const content = banner ? <>
-            <CampaignArtwork banner={banner} prepared={prepared} active={active} />
-            <div className="eats-banner-caption"><div><strong>{plainText(banner.titulo) || 'Promoción de Estrella Eats'}</strong>
-              {(banner.subtitulo || link) && <span>{banner.subtitulo ? plainText(banner.subtitulo) : 'Ver promoción'}</span>}</div>
-              {link && <span className="eats-banner-action" aria-hidden="true"><ArrowUpRight size={20} /></span>}
-            </div>
-          </> : <><div className="eats-banner-discovery">
-            {prepared && <motion.div className="eats-carousel-photo-plane" style={{ y: enabled ? photoY : 0, scale: enabled ? photoScale : 1 }}><ParallaxMedia depth={7} cinematic>
-              <img className="eats-carousel-table" src="/desktop/comitan-table-900.webp" srcSet="/desktop/comitan-table-480.webp 480w, /desktop/comitan-table-900.webp 900w" sizes="(max-width: 639px) 100vw, 50vw"
-                alt="Una mesa con tacos, hamburguesa y papas para compartir" width="900" height="1125" loading="eager" fetchPriority={active ? 'high' : 'low'} draggable={false} />
-            </ParallaxMedia></motion.div>}
-            <motion.div className="eats-carousel-discovery-copy" style={{ y: enabled ? captionY : 0 }}><strong>¿Tacos o<br />hamburguesa?</strong></motion.div>
-          </div><div className="eats-banner-caption"><div><strong>Restaurantes de Comitán</strong><span>A domicilio o para recoger.</span></div></div></>;
-          return <div key={slide.key} className="eats-carousel-slide" data-active={active} role="group" aria-roledescription="diapositiva"
-            aria-label={`${position + 1} de ${count}: ${banner ? plainText(banner.titulo) : 'Estrella Eats'}`} aria-hidden={!active} inert={!active}>
-            {link ? <Link className="eats-banner-card" to={link} draggable={false} tabIndex={active ? 0 : -1}>{content}</Link> : <div className="eats-banner-card">{content}</div>}
-          </div>;
-        })}
+      <div className="eats-carousel-stage">
+        {count > 1 && <motion.div key={`peek:${nextSlide.key}`} className="eats-carousel-peek" initial={false} animate={{ opacity: selection.previous ? 0 : 1 }}
+          transition={{ duration: .15 }} aria-hidden="true" inert>{slideContent(nextSlide, false, true)}</motion.div>}
+        {transitionSlides.map(slide => <MotionSlide key={slide.key} slide={slide} active={slide.key === activeKey} animated={enabled && selection.previous !== null}
+          direction={selection.direction} label={`${activeIndex + 1} de ${count}: ${slide.banner ? plainText(slide.banner.titulo) : 'Estrella Eats'}`}
+          finish={() => finish(selection.revision)}>{slideContent(slide, slide.key === activeKey)}</MotionSlide>)}
       </div>
     </div>
     {count > 1 && <div className="eats-carousel-controls">

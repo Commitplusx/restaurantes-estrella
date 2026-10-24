@@ -1,13 +1,18 @@
 .eats-mobile-carousel { position: relative; width: 100%; min-width: 0; }
 .eats-carousel-window { overflow: hidden; touch-action: pan-y pinch-zoom; padding: 3px 0; margin: -3px 0; }
-.eats-carousel-track { display: flex; align-items: stretch; gap: 12px; transition: transform 520ms cubic-bezier(.16,1,.3,1); }
-.eats-carousel-slide { position: relative; flex: 0 0 calc(100% - 28px); min-width: 0; }
-.eats-mobile-carousel[data-multiple=false] .eats-carousel-slide { flex-basis: 100%; }
+.eats-carousel-stage { position: relative; display: grid; grid-template-columns: minmax(0,1fr); width: calc(100% - 28px); }
+.eats-mobile-carousel[data-multiple=false] .eats-carousel-stage { width: 100%; }
+.eats-carousel-slide { position: relative; grid-area: 1 / 1; min-width: 0; width: calc(100% + 12px); padding-right: 12px; z-index: 1; }
+.eats-carousel-slide[data-active=true] { z-index: 2; }
+.eats-carousel-slide[data-active=false] { pointer-events: none; }
+.eats-carousel-peek { position: absolute; left: calc(100% + 12px); top: 0; width: 100%; height: 100%; pointer-events: none; }
 .eats-banner-card { display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 16px; background: #f5f5f7; color: #1d1d1f; text-decoration: none; }
 a.eats-banner-card:focus-visible { outline: 2px solid #bd3818; outline-offset: 2px; }
 .eats-banner-artwork { position: relative; flex-shrink: 0; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #f0f0f2; }
-.eats-banner-artwork > img { display: block; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 240ms ease-out; }
-.eats-banner-artwork[data-ready=true] > img { opacity: 1; }
+.eats-banner-art-layer { position: absolute; inset: 0; transform-origin: center; }
+.eats-banner-art-layer > img { display: block; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 240ms ease-out; }
+.eats-banner-artwork[data-ready=true] .eats-banner-art-layer > img { opacity: 1; }
+.eats-banner-discovery .eats-banner-art-layer > .eats-carousel-photo-plane img { opacity: 1; }
 .eats-carousel-message { display: flex; flex-direction: column; justify-content: center; gap: 8px; width: 100%; height: 100%; padding: clamp(14px,4vw,24px); background: #fff0e7; color: #7d2c16; }
 .eats-carousel-message strong { font-size: clamp(19px,5vw,28px); line-height: 1.12; font-weight: 750; letter-spacing: -.025em; white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .eats-carousel-message p { font-size: 13px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -21,6 +26,7 @@ a.eats-banner-card:active .eats-banner-action { background: #bd3818; }
 .eats-banner-discovery { position: relative; isolation: isolate; flex-shrink: 0; min-height: 0; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #ef9c67; }
 .eats-banner-discovery .eats-carousel-table { width: 100%; height: 100%; object-fit: cover; object-position: 50% 53%; }
 .eats-carousel-discovery-copy { position: absolute; left: 14px; bottom: 14px; padding: 12px 14px; background: #fff; border-radius: 10px; }
+.eats-carousel-discovery-foreground { position: absolute; inset: 0; }
 .eats-carousel-discovery-copy strong { display: block; font-size: clamp(21px,5.4vw,28px); font-weight: 750; line-height: 1.05; letter-spacing: -.025em; }
 .eats-carousel-discovery-copy > span { display: block; margin-top: 5px; color: #515154; font-size: 12px; line-height: 1.4; }
 .eats-carousel-controls { display: flex; align-items: center; gap: 12px; min-height: 52px; padding-inline: 4px 0; }
@@ -35,7 +41,6 @@ a.eats-banner-card:active .eats-banner-action { background: #bd3818; }
 .eats-carousel-buttons button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; color: #515154; }
 .eats-carousel-buttons button:active { background: #f0f0f2; color: #1d1d1f; }
 .eats-carousel-buttons button:focus-visible { outline: 2px solid #bd3818; outline-offset: -3px; }
-.eats-mobile-carousel[data-motion=reduced] .eats-carousel-track { transition: none; }
 @keyframes eats-banner-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (min-width: 640px) and (max-width: 1023px) {
   .eats-banner-caption { min-height: 94px; }
