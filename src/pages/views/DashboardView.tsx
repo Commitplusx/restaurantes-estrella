@@ -5,7 +5,8 @@ import {
   Utensils, Package, Tag, Loader2, Power, Download,
   ShoppingBag, DollarSign, ChevronDown, Clock, RefreshCw
 } from 'lucide-react'
-import QRCode from 'qrcode'
+import {createPortalReadCache} from '../../lib/portalReadCache'
+import {createPortalReadQueue} from '../../lib/portalReadQueue'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AnimatedCounter } from '../../components/AnimatedCounter'
 
@@ -22,6 +23,10 @@ interface SalesStats {
   monthTotal: number
   todayOrders: number
 }
+
+const menuCountCache=createPortalReadCache<{platillos:number;combos:number;promos:number}>();
+const salesCache=createPortalReadCache<PedidoRow[]>();
+supabase.auth.onAuthStateChange(()=>{menuCountCache.clear();salesCache.clear();});
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function startOf30DaysAgo(): string {
@@ -75,6 +80,10 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   const [salesStats, setSalesStats] = useState<SalesStats | null>(null)
   const [salesEmpty, setSalesEmpty] = useState(false)
   const [salesLoading, setSalesLoading] = useState(true)
+  const [countsError,setCountsError]=useState(false)
+  const [salesError,setSalesError]=useState(false)
+  const [readQueue]=useState(createPortalReadQueue)
+  useEffect(()=>()=>readQueue.clear(),[readQueue])
 
   // ── Realtime alert state ──────────────────────────────────────────
   const [nuevoPedidoAlert, setNuevoPedidoAlert] = useState(false)
@@ -189,6 +198,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
     async function generateQR() {
       try {
         const url = `https://estrella-eats.mx/menu/${restaurante.slug || restaurante.id}`
+        const {default:QRCode}=await import('qrcode');
         const dataUrl = await QRCode.toDataURL(url, {
           width: 800,
           margin: 2,
@@ -201,24 +211,25 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
       }
     }
     generateQR()
-  }, [restaurante.id])
+  }, [restaurante.id,restaurante.slug])
 
   // ── Menu stats (platillos / combos / promos) ──────────────────────
-  const loadStats = async () => {
-    const [
-      { count: platillos, error: e1 },
-      { count: combos, error: e2 },
-      { count: promos, error: e3 }
-    ] = await Promise.all([
-      supabase.from('menu_items').select('*', { count: 'exact', head: true }).eq('restaurante_id', restaurante.id),
-      supabase.from('menu_combos').select('*', { count: 'exact', head: true }).eq('restaurante_id', restaurante.id),
-      supabase.from('menu_promociones').select('*', { count: 'exact', head: true }).eq('restaurante_id', restaurante.id)
-    ])
-
-    if (e1 || e2 || e3) console.error('Error cargando stats:', e1 || e2 || e3)
-    setStats({ platillos: platillos || 0, combos: combos || 0, promos: promos || 0 })
-    setLoading(false)
-  }
+  const loadStats = (fresh=false) => readQueue.run(`counts:${restaurante.id}`,async() => {
+    if(fresh)menuCountCache.invalidate(restaurante.id);
+    try{
+      const values=await menuCountCache.read(restaurante.id,async()=>{
+        const result=await Promise.all([
+          supabase.from('menu_items').select('id',{count:'exact',head:true}).eq('restaurante_id',restaurante.id).abortSignal(AbortSignal.timeout(10000)),
+          supabase.from('menu_combos').select('id',{count:'exact',head:true}).eq('restaurante_id',restaurante.id).abortSignal(AbortSignal.timeout(10000)),
+          supabase.from('menu_promociones').select('id',{count:'exact',head:true}).eq('restaurante_id',restaurante.id).abortSignal(AbortSignal.timeout(10000)),
+        ]);
+        if(result.some(row=>row.error))throw new Error('dashboard_counts_unavailable');
+        return {platillos:result[0].count??0,combos:result[1].count??0,promos:result[2].count??0};
+      });
+      setStats(values);setCountsError(false);
+    }catch{setCountsError(true);}
+    finally{setLoading(false);}
+  },fresh)
 
   useEffect(() => {
     loadStats()
@@ -226,25 +237,25 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   }, [restaurante.id])
 
   // ── Real sales stats ─────────────────────────────────────────────
-  const loadSales = async () => {
+  const loadSales = (fresh=false) => readQueue.run(`sales:${restaurante.id}`,async() => {
+    if(fresh)salesCache.invalidate(restaurante.id);
     setSalesLoading(true)
 
     // Courier-only requests already existed outside the web checkout. Their
     // collection total is not another menu sale and must not inflate sales.
-    const { data, error } = await supabase
-      .from('pedidos')
-      .select('created_at, total, estado')
-      .eq('restaurante_id', restaurante.id)
-      .or('origen.is.null,origen.neq.portal_restaurante')
-      .gte('created_at', startOf30DaysAgo())
-
-    if (error || !data || data.length === 0) {
-      setSalesEmpty(true)
-      setSalesLoading(false)
-      return
-    }
-
-    const rows = data as PedidoRow[]
+    let rows:PedidoRow[];
+    try{
+      rows=await salesCache.read(restaurante.id,async()=>{
+        const {data,error}=await supabase.from('pedidos').select('created_at,total,estado')
+          .eq('restaurante_id',restaurante.id).or('origen.is.null,origen.neq.portal_restaurante')
+          .gte('created_at',startOf30DaysAgo()).order('created_at',{ascending:false}).limit(1000)
+          .abortSignal(AbortSignal.timeout(10000));
+        if(error||!data||data.length>=1000)throw new Error('dashboard_sales_unavailable');
+        return data;
+      });
+    }catch{setSalesError(true);setSalesLoading(false);return;}
+    setSalesError(false);
+    if(rows.length===0){setSalesEmpty(true);setSalesLoading(false);return;}
 
     // Weekly data: last 7 days
     const today = startOfToday()
@@ -279,7 +290,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
     setSalesStats({ weeklyData, weeklyLabels, monthTotal, todayOrders })
     setSalesEmpty(false)
     setSalesLoading(false)
-  }
+  },fresh)
 
   useEffect(() => {
     loadSales()
@@ -297,16 +308,16 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
           setNuevoPedidoAlert(true)
           clearTimeout(alertTimeout)
           alertTimeout = window.setTimeout(() => setNuevoPedidoAlert(false), 4000)
-          loadSales()
+          loadSales(true)
         }
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
-        () => { loadSales() }
+        () => { loadSales(true) }
       )
       .on('postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'pedidos', filter: `restaurante_id=eq.${restaurante.id}` },
-        () => { loadSales() }
+        () => { loadSales(true) }
       )
       .subscribe()
     return () => {
@@ -322,15 +333,15 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
       .channel(`dashboard:menu:${restaurante.id}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'menu_items', filter: `restaurante_id=eq.${restaurante.id}` },
-        () => { loadStats() }
+        () => { loadStats(true) }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'menu_combos', filter: `restaurante_id=eq.${restaurante.id}` },
-        () => { loadStats() }
+        () => { loadStats(true) }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'menu_promociones', filter: `restaurante_id=eq.${restaurante.id}` },
-        () => { loadStats() }
+        () => { loadStats(true) }
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -371,6 +382,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
           </motion.div>
         )}
       </AnimatePresence>
+      {(countsError||salesError)&&<p role="alert" className="portal-delivery-access-error">No pudimos actualizar {countsError&&salesError?'las estadísticas':countsError?'los conteos del menú':'las ventas'}. Conservamos la última información. <button type="button" onClick={()=>{void loadStats(true);void loadSales(true)}}>Reintentar</button></p>}
 
       {/* ── Encabezado & Panic Button ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

@@ -41,3 +41,10 @@ Deno.test('automatic pin pricing requires its server H3 provenance and a real co
  for(const patch of[{locationSource:'address'},{h3Index:null},{h3Index:'bad'},{destination:{lat:null,lng:null,address:'No es un pin'}}])rejected(()=>parseRestaurantDeliveryQuote({...pin,...patch}));
  rejected(()=>parseRestaurantDeliveryQuote({...quote,origin:{...origin,id:id(99)}}));
 });
+
+Deno.test('pickup PIN preserves leading zeros and is hidden after collection without inventing a missing PIN',()=>{
+ equal(parseRestaurantDeliveryReceipt({...receipt,pickupPin:'0042'}).pickupPin,'0042');
+ equal(parseRestaurantDeliveryReceipt(receipt).pickupPin,null);
+ equal(parseRestaurantDeliveryReceipt({...receipt,pickupPin:'0042',state:'en_camino'}).pickupPin,null);
+ for(const pickupPin of[42,'42','12345','abcd'])rejected(()=>parseRestaurantDeliveryReceipt({...receipt,pickupPin}));
+});

@@ -134,8 +134,8 @@ function AppContent() {
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/tracker" element={<TrackerPage />} />
           <Route path="/login" element={session ? <Navigate to="/portal" replace /> : <LoginPage />} />
-          <Route path="/portal/pedidos/:pedidoId" element={session ? <PortalPage initialTab="pedidos" /> : <Navigate to="/login" replace />} />
-          <Route path="/portal/*" element={session ? <PortalPage /> : <Navigate to="/login" replace />} />
+          <Route path="/portal/pedidos/:pedidoId" element={session ? <PortalPage key={session.user.id} userId={session.user.id} initialTab="pedidos" /> : <Navigate to="/login" replace />} />
+          <Route path="/portal/*" element={session ? <PortalPage key={session.user.id} userId={session.user.id} /> : <Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

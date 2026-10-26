@@ -30,7 +30,7 @@ const api:RestaurantDeliveryApi={
   if(!quote||quote.id!==intent.quoteId)throw new Error('Revisa otra vez los importes de la demostración.');
   const existing=receipts.find(row=>row.requestId===requestId);if(existing)return existing;
   if(previewResponse==='rejected')throw new DeliverySubmissionError('La solicitud de prueba fue rechazada. No se guardó ningún envío.',false);
-  const row:RestaurantDeliveryReceipt={...quote,requestId,orderId:crypto.randomUUID(),state:'buscando_repartidor',total:quote.customerToCollect,trackingKey:crypto.randomUUID(),incident:null,createdAt:new Date().toISOString()};
+  const row:RestaurantDeliveryReceipt={...quote,requestId,orderId:crypto.randomUUID(),state:'buscando_repartidor',total:quote.customerToCollect,trackingKey:crypto.randomUUID(),incident:null,pickupPin:'0042',createdAt:new Date().toISOString()};
   branchReceipts.set(row.requestId,quote.restaurantId);receipts.unshift(row);
   if(previewResponse==='lost')throw new DeliverySubmissionError('La respuesta de prueba se perdió después de guardar. Comprueba la solicitud sin crear otra.',true);
   return row;

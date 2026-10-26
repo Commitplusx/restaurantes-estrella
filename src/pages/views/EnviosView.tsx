@@ -31,6 +31,10 @@ function Settlement({value}:{value:DeliveryBreakdown}){
   ? <>A la sucursal le corresponden <strong>{money(value.restaurantSettlement)}</strong>. Su parte del envío ya está descontada.</>
   : <>La sucursal entrega <strong>{money(-value.restaurantSettlement)}</strong> al repartidor para completar el envío.</>}</p>;
 }
+function PickupPin({value}:{value:string|null}){
+ if(!value)return null;
+ return <div className="delivery-request__pickup"><div><strong>PIN de recolección</strong><p>Dáselo al repartidor cuando recoja el pedido.</p></div><span aria-label={'PIN de recolección: '+value.split('').join(' ')}>{value}</span></div>;
+}
 
 export function EnviosView({capability,api=restaurantDeliveryApi,onOpenOrders,now=Date.now}: {
  capability:Extract<DeliveryCapability,{enabled:true}>;api?:RestaurantDeliveryApi;onOpenOrders?:()=>void;now?:()=>number;
@@ -142,6 +146,7 @@ export function EnviosView({capability,api=restaurantDeliveryApi,onOpenOrders,no
    <h3 id="delivery-confirmation-title" ref={confirmationHeadingRef} tabIndex={-1}>{receipt.state==='cancelado'?'Envío cancelado':receipt.state==='entregado'?'Envío entregado':'¡Envío solicitado!'}</h3>
    <p>{receipt.state==='cancelado'?'Este servicio está cancelado. Revisa el seguimiento para consultar los detalles.':receipt.state==='entregado'?'Este servicio ya terminó. Puedes consultar los detalles en el seguimiento.':'Tu pedido ya está guardado. Consulta el seguimiento para ver el avance del repartidor.'}</p>
    <div className="delivery-request__receipt"><div><span>Folio del envío</span><strong>#{receipt.orderId.replaceAll('-','').slice(-6).toUpperCase()}</strong></div><p role="status" aria-live="polite"><span aria-hidden="true"/>{deliveryStateLabel[receipt.state]}</p></div>
+   <PickupPin value={receipt.pickupPin}/>
    {receipt.incident&&<p className="delivery-request__error" role="alert">El envío quedó registrado, pero necesita revisión. Consulta su estado antes de solicitar otro.</p>}
    <CostBreakdown value={receipt}/><Settlement value={receipt}/>
    <div className="delivery-request__actions"><a className="delivery-request__primary" href={trackingLink('/tracker',receipt.orderId,receipt.trackingKey)}>Ver seguimiento <ExternalLink size={17}/></a><button type="button" className="delivery-request__secondary" onClick={newRequest}>Solicitar otro envío</button></div>
@@ -181,7 +186,7 @@ export function EnviosView({capability,api=restaurantDeliveryApi,onOpenOrders,no
   </form>}
   <section className="delivery-request__recent" aria-label="Envíos recientes"><header><div><h3>Envíos de esta sucursal</h3><p>Los últimos 20 servicios de los últimos 30 días.</p></div><button type="button" className="delivery-request__refresh" onClick={()=>void refreshRecent()} aria-label="Actualizar envíos"><RefreshCw size={18}/></button></header>
    {recentError&&<p role="alert" className="delivery-request__error">{recentError} <button type="button" onClick={()=>void refreshRecent()}>Reintentar</button></p>}
-   {recentLoading?<p role="status" className="delivery-request__empty">Consultando tus envíos…</p>:recent.length===0?<div className="delivery-request__empty"><Truck size={25} aria-hidden="true"/><p>Aquí verás los envíos que solicites desde este panel.</p></div>:<ul>{recent.map(row=><li key={row.orderId}><div><strong>#{row.orderId.replaceAll('-','').slice(-6).toUpperCase()}</strong><span>{new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(row.createdAt))}</span></div><div><span className="delivery-request__status">{deliveryStateLabel[row.state]}</span>{row.incident&&<small>El servicio necesita revisión. Consulta su estado.</small>}</div><div><span>Cobrar al cliente</span><strong>{money(row.total)}</strong></div><a href={trackingLink('/tracker',row.orderId,row.trackingKey)} aria-label={'Ver seguimiento del envío '+row.orderId.slice(-6)}>Ver <ArrowRight size={16}/></a></li>)}</ul>}
+   {recentLoading?<p role="status" className="delivery-request__empty">Consultando tus envíos…</p>:recent.length===0?<div className="delivery-request__empty"><Truck size={25} aria-hidden="true"/><p>Aquí verás los envíos que solicites desde este panel.</p></div>:<ul>{recent.map(row=><li key={row.orderId}><div><strong>#{row.orderId.replaceAll('-','').slice(-6).toUpperCase()}</strong><span>{new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(row.createdAt))}</span></div><div><span className="delivery-request__status">{deliveryStateLabel[row.state]}</span>{row.pickupPin&&<strong className="delivery-request__recent-pin">PIN de recolección: {row.pickupPin}</strong>}{row.incident&&<small>El servicio necesita revisión. Consulta su estado.</small>}</div><div><span>Cobrar al cliente</span><strong>{money(row.total)}</strong></div><a href={trackingLink('/tracker',row.orderId,row.trackingKey)} aria-label={'Ver seguimiento del envío '+row.orderId.slice(-6)}>Ver <ArrowRight size={16}/></a></li>)}</ul>}
    {onOpenOrders&&<button type="button" className="delivery-request__orders-link" onClick={onOpenOrders}>Ir a pedidos activos <ChevronRight size={17}/></button>}
   </section>
   {mapOpen&&<Suspense fallback={<p role="status">Abriendo mapa…</p>}><DeliveryLocationPicker initialLocation={destination} restaurantLocation={originReady?{lat:origin.lat!,lng:origin.lng!}:null} onClose={()=>setMapOpen(false)} onConfirm={location=>{setDestination(location);setMapsUrl('');setSource('pin');setMapOpen(false);resetQuote();}}/></Suspense>}

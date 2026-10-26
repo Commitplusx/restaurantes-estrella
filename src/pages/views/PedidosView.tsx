@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
 import { BottomSheet } from '../../components/BottomSheet'
 import { createKitchenAlarm } from '../../lib/kitchenAlarm'
+import { createPortalReadQueue } from '../../lib/portalReadQueue'
 import {
   createKitchenOrderFeed,
   isActiveKitchenOrder,
@@ -57,7 +58,7 @@ function ActionButton({ onClick, children, className, loadingText = "Cargando...
   );
 }
 
-export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight, onOpenOrders }: { restaurante: Restaurante, highlightedPedidoId?: string | null, onClearHighlight?: () => void, onOpenOrders?: () => void }) {
+export function PedidosView({ restaurante, branchIds, highlightedPedidoId, onClearHighlight, onOpenOrders }: { restaurante: Restaurante, branchIds?:string[], highlightedPedidoId?: string | null, onClearHighlight?: () => void, onOpenOrders?: () => void }) {
   const [pedidos, setPedidos] = useState<KitchenOrderSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [kitchenError, setKitchenError] = useState<string | null>(null)
@@ -72,21 +73,24 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
   const wakeInFlightRef = useRef(false)
   const orderLoadRequestRef = useRef(0)
   const [orderFeed] = useState(createKitchenOrderFeed)
+  const [orderReadQueue]=useState(createPortalReadQueue)
   // Incrementar este valor fuerza la reconexión del canal de Supabase Realtime
   const [channelKey, setChannelKey] = useState(0)
 
-  const loadPedidos = React.useCallback(async (ids: string[]): Promise<void> => {
+  const loadPedidos = React.useCallback((ids: string[], afterPending=false): Promise<void> => {
+    const key=ids.join(',');
+    const execute=async()=>{
     const requestId = ++orderLoadRequestRef.current
     const revision = orderFeed.revision()
     try {
       const { data, error } = await supabase
         .from('pedidos')
-        .select('*, restaurantes(nombre,nombre_sucursal)')
+        .select('id,restaurante_id,cliente_nombre,descripcion,estado,estado_cocina,created_at,updated_at,wb_message_id,items,total,pickup_pin,tipo_pedido,restaurantes(nombre,nombre_sucursal)')
         .in('restaurante_id', ids)
         .or('and(or(estado.is.null,estado.not.in.(entregado,cancelado,rechazado,pendiente_pago)),or(estado_cocina.is.null,estado_cocina.in.(pendiente,en_cocina,listo_para_recoger)))')
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }).limit(1000).abortSignal(AbortSignal.timeout(12000))
       if (requestId !== orderLoadRequestRef.current) return
-      if (error || !data) throw new Error('kitchen_load_failed')
+      if (error || !data || data.length >= 1000) throw new Error('kitchen_load_failed')
       orderFeed.reconcile(data, revision)
       setPedidos(orderFeed.activeOrders())
       setLoadError(null)
@@ -97,9 +101,11 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     } finally {
       if (requestId === orderLoadRequestRef.current) setLoading(false)
     }
-  }, [orderFeed])
+    };
+    return orderReadQueue.run(key,execute,afterPending);
+  }, [orderFeed,orderReadQueue])
 
-  useEffect(() => () => { orderLoadRequestRef.current += 1 }, [orderFeed])
+  useEffect(() => () => { orderLoadRequestRef.current += 1; orderReadQueue.clear() }, [orderReadQueue])
 
   // Scroll al pedido resaltado cuando carga
   useEffect(() => {
@@ -117,17 +123,19 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     }
   }, [highlightedPedidoId, pedidos, onClearHighlight])
 
-  const [linkedIds, setLinkedIds] = useState<string[]>([restaurante.id])
+  const [fallbackLinkedIds, setLinkedIds] = useState<string[]>([restaurante.id])
+  const linkedIds=branchIds??fallbackLinkedIds
 
   // Cargar IDs vinculados (matriz + sucursales) al montar
   useEffect(() => {
     if (!restaurante.id) return
+    if(branchIds){void loadPedidos(branchIds);return;}
     let cancelled = false
     const init = async () => {
       const { data, error } = await supabase
         .from('restaurantes')
         .select('id')
-        .eq('matriz_id', restaurante.id)
+        .eq('matriz_id', restaurante.id).limit(100).abortSignal(AbortSignal.timeout(10000))
       if (cancelled) return
       if (error) {
         setKitchenError('No pudimos consultar las sucursales. Vuelve a cargar el panel para incluir sus pedidos.')
@@ -139,7 +147,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
     }
     init()
     return () => { cancelled = true }
-  }, [restaurante.id, loadPedidos])
+  }, [restaurante.id, branchIds, loadPedidos])
 
   useEffect(() => {
     if (!restaurante.id || linkedIds.length === 0) return
@@ -169,7 +177,7 @@ export function PedidosView({ restaurante, highlightedPedidoId, onClearHighlight
       )
       .subscribe(status => {
         // Refresh after subscribing so orders arriving during reconnect are read.
-        if (status === 'SUBSCRIBED' && !disposed) void loadPedidos(linkedIds)
+        if (status === 'SUBSCRIBED' && !disposed) void loadPedidos(linkedIds,true)
       })
 
     return () => {
@@ -693,7 +701,7 @@ function PedidoCard({ pedido, actionLabel, actionColor, onAction, isHighlighted 
           <div className="mt-2.5 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-2 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></div>
-              <span className="kitchen-order-card__pin-label font-bold tracking-wide text-orange-800 uppercase">PIN de Entrega</span>
+              <span className="kitchen-order-card__pin-label font-bold tracking-wide text-orange-800 uppercase">PIN de recolección</span>
             </div>
             <span className="text-lg font-black text-orange-600 tracking-[0.25em] bg-white px-2 rounded-md shadow-sm border border-orange-100">{pedido.pickup_pin}</span>
           </div>

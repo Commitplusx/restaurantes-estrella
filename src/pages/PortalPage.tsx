@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2, Ticket, BellRing, Truck } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
@@ -27,10 +27,12 @@ const PedidosView = lazy(() => import('./views/PedidosView').then(m => ({ defaul
 const SucursalesView = lazy(() => import('./views/SucursalesView').then(m => ({ default: m.SucursalesView })))
 const EnviosView = lazy(() => import('./views/EnviosView').then(m => ({ default: m.EnviosView })))
 
-export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
+export function PortalPage({ initialTab, userId }: { initialTab?: PortalTab; userId?:string }) {
   const { pedidoId } = useParams<{ pedidoId?: string }>()
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null)
   const [managedBranches, setManagedBranches] = useState<Restaurante[]>([])
+  const restaurantId=restaurante?.id
+  const kitchenBranchIds=useMemo(()=>restaurantId?[restaurantId,...managedBranches.map(branch=>branch.id)]:[],[restaurantId,managedBranches])
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [branchesError, setBranchesError] = useState('')
   const [branchesVersion, setBranchesVersion] = useState(0)
@@ -134,28 +136,20 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
     }
   }, [])
 
-  useEffect(() => {
-    loadRestaurante()
-  }, [])
-
-  const loadRestaurante = async () => {
-    setLoading(true)
-    setNetworkError(false)
-    try {
-      const res = await getMyRestaurante()
+  const loadRestaurante = useCallback(() => getMyRestaurante(userId).then(res => {
       setRestaurante(res)
+      setNetworkError(false)
       
       // Solicitar permisos de notificación si no se han pedido
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission()
       }
-    } catch (e) {
+    }).catch((e:unknown) => {
       console.error(e)
       setNetworkError(true)
-    } finally {
-      setLoading(false)
-    }
-  }
+    }).finally(() => setLoading(false)), [userId])
+
+  useEffect(() => {void loadRestaurante()},[loadRestaurante])
 
   // 🔔 Escucha global de Nuevos Pedidos (Push + Sonido)
   useEffect(() => {
@@ -313,7 +307,7 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
             No pudimos conectar con el servidor. Por favor revisa tu conexión a internet e intenta nuevamente.
           </p>
           <button
-            onClick={loadRestaurante}
+            onClick={()=>{setLoading(true);setNetworkError(false);void loadRestaurante()}}
             className="block w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all shadow-lg shadow-slate-900/20 mb-3 text-sm"
           >
             Reintentar
@@ -512,8 +506,8 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
                         {restaurante.categorias && restaurante.categorias.length > 0 ? <CheckCircle2 size={12}/> : <span className="w-3 h-3 rounded-full border-2 border-amber-400 shrink-0"/>}
                         Categorías
                       </div>
-                      <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${ restaurante.horarios && Object.values(restaurante.horarios).some((d: any) => d?.activo) ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-amber-200 text-amber-700'}`}>
-                        {restaurante.horarios && Object.values(restaurante.horarios).some((d: any) => d?.activo) ? <CheckCircle2 size={12}/> : <span className="w-3 h-3 rounded-full border-2 border-amber-400 shrink-0"/>}
+                      <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${ restaurante.horarios && Object.values(restaurante.horarios).some(d => d?.activo) ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-amber-200 text-amber-700'}`}>
+                        {restaurante.horarios && Object.values(restaurante.horarios).some(d => d?.activo) ? <CheckCircle2 size={12}/> : <span className="w-3 h-3 rounded-full border-2 border-amber-400 shrink-0"/>}
                         Horarios
                       </div>
                     </div>
@@ -534,19 +528,19 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
                       <Loader2 className="animate-spin" size={26} />
                     </div>
                   }>
-                    <PedidosView key={`${restaurante.id}:${branchesVersion}`} restaurante={restaurante} highlightedPedidoId={highlightedPedidoId} onClearHighlight={() => setHighlightedPedidoId(null)} onOpenOrders={openOrders} />
+                    <PedidosView key={`${restaurante.id}:${branchesVersion}`} restaurante={restaurante} branchIds={kitchenBranchIds} highlightedPedidoId={highlightedPedidoId} onClearHighlight={() => setHighlightedPedidoId(null)} onOpenOrders={openOrders} />
                   </Suspense>
                 </div>
               )}
 
-              <AnimatePresence mode="wait">
+              <AnimatePresence initial={false}>
                 {activeTab !== 'pedidos' && (
                   <motion.div
                     key={activeTab}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.16 }}
                     className="restaurant-portal__view-transition"
                   >
                     <Suspense fallback={

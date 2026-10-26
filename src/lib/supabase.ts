@@ -70,37 +70,28 @@ export async function subirFoto(file: File, path: string): Promise<string | null
   }
 }
 
-export async function getMyRestaurante(): Promise<Restaurante | null> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError) throw authError
-  if (!user) return null
+export async function getMyRestaurante(sessionUserId?:string): Promise<Restaurante | null> {
+  // The route already has the session. This ID is a query filter only;
+  // PostgreSQL RLS remains the authority on ownership for every response.
+  let userId=sessionUserId;
+  if(!userId){const{data:{user},error}=await supabase.auth.getUser();if(error)throw error;userId=user?.id;}
+  if(!userId)return null;
 
   const query = supabase
     .from('restaurantes')
     .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, logo_url, descripcion_corta, correo, hora_apertura, hora_cierre, horarios, categorias, perfil_completo, es_socio, programa_lealtad_activo, mp_access_token, acepta_pago_online, es_matriz, matriz_id, nombre_sucursal, lat, lng')
-    .eq('admin_id', user.id)
+    .eq('admin_id', userId)
     .order('matriz_id', { ascending: true, nullsFirst: true })
     // Damos prioridad a las matrices en caso de que existan varias filas por error
     .order('es_matriz', { ascending: false, nullsFirst: false })
     .limit(1)
+    .abortSignal(AbortSignal.timeout(12000))
     .maybeSingle();
 
   const { data, error } = await query;
 
   if (data) return data
 
-  // Fallback: si hay error (ej. columnas nuevas no existen aún), query con campos base
-  if (error) {
-    console.warn('getMyRestaurante: fallback a campos base. Ejecuta la migración SQL.', error.message)
-    const { data: fallback } = await supabase
-      .from('restaurantes')
-      .select('id, nombre, telefono, direccion, activo, slug, foto_fachada_url, hora_apertura, hora_cierre, horarios, categorias')
-      .eq('admin_id', user.id)
-      .order('es_matriz', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle()
-    return fallback ?? null
-  }
-
+  if(error)throw error
   return null
 }
