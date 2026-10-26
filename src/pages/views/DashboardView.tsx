@@ -229,23 +229,14 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
   const loadSales = async () => {
     setSalesLoading(true)
 
-    // Try with restaurante_id first
-    let { data, error } = await supabase
+    // Courier-only requests already existed outside the web checkout. Their
+    // collection total is not another menu sale and must not inflate sales.
+    const { data, error } = await supabase
       .from('pedidos')
       .select('created_at, total, estado')
       .eq('restaurante_id', restaurante.id)
+      .or('origen.is.null,origen.neq.portal_restaurante')
       .gte('created_at', startOf30DaysAgo())
-
-    // Fallback: if restaurante_id column doesn't exist (error code 42703) try tipo_pedido
-    if (error && (error.code === '42703' || error.message?.includes('restaurante_id'))) {
-      const res = await supabase
-        .from('pedidos')
-        .select('created_at, total, estado')
-        .eq('tipo_pedido', 'restaurante_delivery')
-        .gte('created_at', startOf30DaysAgo())
-      data = res.data
-      error = res.error
-    }
 
     if (error || !data || data.length === 0) {
       setSalesEmpty(true)

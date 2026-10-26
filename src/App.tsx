@@ -44,6 +44,7 @@ const NoticeDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/Notic
 const WelcomeDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/WelcomeDesignPreview')) : null
 const BannerDesignPreview = import.meta.env.DEV ? lazy(() => import('./dev/BannerDesignPreview')) : null
 const DeliveryMapPreview = import.meta.env.DEV ? lazy(() => import('./dev/DeliveryMapPreview')) : null
+const DeliveryRequestPreview = import.meta.env.DEV ? lazy(() => import('./dev/DeliveryRequestPreview')) : null
 
 import { CookieBanner } from './components/CookieBanner'
 import { PushNotificationSetup } from './components/PushNotificationSetup'
@@ -123,6 +124,7 @@ function AppContent() {
           {WelcomeDesignPreview && <Route path="/bienvenida" element={<WelcomeDesignPreview />} />}
           {BannerDesignPreview && <Route path="/banners" element={<BannerDesignPreview />} />}
           {DeliveryMapPreview && <Route path="/mapa-entrega" element={<DeliveryMapPreview />} />}
+          {DeliveryRequestPreview && <Route path="/envios-diseno" element={<DeliveryRequestPreview />} />}
           <Route path="/" element={isPartnerDomain ? <Navigate to="/login" replace /> : <PublicLandingPage />} />
           <Route path="/beneficios" element={isPartnerDomain ? <Navigate to="/login" replace /> : <BeneficiosPage />} />
           <Route path="/privacidad" element={<PrivacyPage />} />

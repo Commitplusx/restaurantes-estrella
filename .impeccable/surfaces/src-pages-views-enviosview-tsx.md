@@ -1,0 +1,15 @@
+# Solicitar envío desde el panel de restaurantes
+
+Primary target: `src/pages/views/EnviosView.tsx`. Related: `EnviosView.css`, `src/lib/restaurantDelivery.ts`, `src/lib/restaurantDeliveryApi.ts`, `src/pages/PortalPage.tsx`.
+
+Mode: Operate. Local extension of the existing restaurant portal. Keep Outfit, white/pale-gray surfaces, ink #1d1d1f and orange #ea4e25. The current portal CSS is the visual authority here; the global DESIGN.md only defines the public home.
+
+Kaleb authorized service requests only for Pollo Robin’s and its branches. Identity/permission comes from server entitlement plus restaurant owner relationships, never a matching public name. A branch operator cannot choose another branch; the matrix owner uses the existing branch selector.
+
+One main task: capture customer/contact, choose a Maps pin (pasted URL or existing gray Mapbox picker) or copy the customer's written address, describe the package/preparation and enter pending food. A pin receives the server's resolution-10 H3 tariff; a written address keeps the full manually agreed fee, as numerals or Spanish words. A precise unique geocoder match can supply navigation, but an unresolved address remains text without a fabricated pin and asks the driver to confirm with the customer. The employee does not need to know the city. Pin selection and URL are mutually exclusive. The server snapshots the fee, the usual $15 restaurant contribution (or explicit per-service override), customer payment and restaurant settlement before dispatch. Origin is locked to the chosen branch. Review does not create an order; confirming sends the existing PostgreSQL order/dispatch flow to the driver APK with the exact customer total and full fee. No browser ranking or provider sends.
+
+Composition: origin summary followed by grouped form fields on the left, a narrow cost/review area on desktop, stacked summary/action after fields on mobile. Recent requests below. No new visual world, hero, invented metrics or shipping ETA claims. Footer actions remain reachable at 360px; keyboard labels/focus and inline failure recovery are required. A pending or uncertain create cannot clear the form, rotate its key or claim success. A confirmed receipt opens the existing tracker and offers explicit new request.
+
+Review desktop and mobile together, then one batch of fixes and one confirmation round. Local fixture preview is development-only, clearly marked as demonstration, and must not call the real create RPC.
+
+Finish evidence 2026-10-26: desktop 1366×900 and mobile 390×844 captures under `.impeccable/review/restaurant-delivery-20261025/`. Fresh reviewer identified expiry button default-action reuse (fixed and visibly verified) and URL not cleared by a replacement map pin (fixed in onConfirm). Final replacement visual round was interrupted by Work browser access being disabled; reviewer later hit usage limit. Do not claim that round or a physical APK delivery was completed. Synthetic H3 price is presentation evidence only; real SQL rollback uses the configured production table price.

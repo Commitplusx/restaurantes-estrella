@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2, Ticket, BellRing } from 'lucide-react'
+import { LogOut, LayoutDashboard, Utensils, Tag, Package, Store, Loader2, Star, AlertCircle, CheckCircle2, Ticket, BellRing, Truck } from 'lucide-react'
 import { supabase, getMyRestaurante } from '../lib/supabase'
 import type { Restaurante } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,8 +12,10 @@ import { isAwaitingKitchenOrder } from '../lib/kitchenOrderState'
 import { branchLabel, parseRestaurantBranches, RESTAURANT_PUBLIC_FIELDS } from '../lib/restaurantBranches'
 import './views/SucursalesView.css'
 import { BrandLogo } from '../components/BrandLogo'
+import { restaurantDeliveryCapability } from '../lib/restaurantDeliveryApi'
+import type { DeliveryCapability } from '../lib/restaurantDelivery'
 
-type PortalTab = 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales'
+type PortalTab = 'dashboard' | 'pedidos' | 'productos' | 'combos' | 'promos' | 'cupones' | 'perfil' | 'sucursales' | 'envios'
 
 const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })))
 const MenuProductosView = lazy(() => import('./views/MenuProductosView').then(m => ({ default: m.MenuProductosView })))
@@ -23,6 +25,7 @@ const CuponesView = lazy(() => import('./views/CuponesView').then(m => ({ defaul
 const PerfilView = lazy(() => import('./views/PerfilView').then(m => ({ default: m.PerfilView })))
 const PedidosView = lazy(() => import('./views/PedidosView').then(m => ({ default: m.PedidosView })))
 const SucursalesView = lazy(() => import('./views/SucursalesView').then(m => ({ default: m.SucursalesView })))
+const EnviosView = lazy(() => import('./views/EnviosView').then(m => ({ default: m.EnviosView })))
 
 export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
   const { pedidoId } = useParams<{ pedidoId?: string }>()
@@ -32,6 +35,10 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
   const [branchesError, setBranchesError] = useState('')
   const [branchesVersion, setBranchesVersion] = useState(0)
   const operatingRestaurant = managedBranches.find(branch => branch.id === selectedBranchId) || restaurante
+  const [deliveryAccess, setDeliveryAccess] = useState<{ restaurantId: string; capability: DeliveryCapability | null; error: string } | null>(null)
+  const [deliveryAccessVersion, setDeliveryAccessVersion] = useState(0)
+  const deliveryRestaurantId = operatingRestaurant?.id
+  const deliveryCapability = deliveryAccess?.restaurantId === deliveryRestaurantId ? deliveryAccess?.capability : null
   const [activeTab, setActiveTab] = useState<PortalTab>(initialTab ?? 'dashboard')
   const [pedidosMounted, setPedidosMounted] = useState(true)
   const [highlightedPedidoId, setHighlightedPedidoId] = useState<string | null>(pedidoId ?? null)
@@ -45,6 +52,15 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
     setActiveTab(tab)
   }, [])
   const openOrders = useCallback(() => navigateTab('pedidos'), [navigateTab])
+
+  useEffect(() => {
+    if (!deliveryRestaurantId) return
+    const controller = new AbortController()
+    void restaurantDeliveryCapability(deliveryRestaurantId, AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]))
+      .then(capability => { if (!controller.signal.aborted) setDeliveryAccess({ restaurantId: deliveryRestaurantId, capability, error: '' }) })
+      .catch(() => { if (!controller.signal.aborted) setDeliveryAccess({ restaurantId: deliveryRestaurantId, capability: null, error: 'No pudimos comprobar el acceso a solicitudes de envío.' }) })
+    return () => controller.abort()
+  }, [deliveryRestaurantId, deliveryAccessVersion])
 
   useEffect(() => {
     if (!restaurante || restaurante.matriz_id) return
@@ -384,6 +400,7 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
             active={activeTab === 'pedidos'} icon={<BellRing size={20}/>} label="Pedidos Activos" 
             onClick={() => navigateTab('pedidos')}
           />
+          {deliveryCapability?.enabled && <NavButton active={activeTab === 'envios'} icon={<Truck size={20}/>} label="Solicitar envío" onClick={() => navigateTab('envios')} />}
           
           <NavButton 
             id="desktop-tour-platillos"
@@ -453,7 +470,7 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
           <header id="tour-welcome" className="restaurant-portal__header">
             <div className="restaurant-portal__page-heading">
               <h2>
-                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'pedidos' ? 'Pedidos Activos' : activeTab === 'productos' ? 'Platillos' : activeTab === 'combos' ? 'Combos' : activeTab === 'promos' ? 'Promociones' : activeTab === 'cupones' ? 'Cupones de Descuento' : activeTab === 'sucursales' ? 'Mis Sucursales' : 'Perfil'}
+                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'pedidos' ? 'Pedidos Activos' : activeTab === 'envios' ? 'Solicitar envío' : activeTab === 'productos' ? 'Platillos' : activeTab === 'combos' ? 'Combos' : activeTab === 'promos' ? 'Promociones' : activeTab === 'cupones' ? 'Cupones de Descuento' : activeTab === 'sucursales' ? 'Mis Sucursales' : 'Perfil'}
               </h2>
               <div className="restaurant-portal__breadcrumb">Estrella Eats <span>/</span> {activeTab}</div>
             </div>
@@ -474,6 +491,8 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
               {branchesError && <p role="alert">{branchesError} <button type="button" onClick={() => setBranchesVersion(value => value + 1)}>Reintentar</button></p>}
               {managedBranches.length > 0 && activeTab !== 'sucursales' && activeTab !== 'pedidos' && operatingRestaurant && <div className="portal-branch-picker"><label htmlFor="portal-branch">Administrando</label><select id="portal-branch" value={operatingRestaurant.id} onChange={event => setSelectedBranchId(event.target.value)}>{[restaurante, ...managedBranches].map(branch => <option key={branch.id} value={branch.id}>{branchLabel(branch)}{branch.activo ? '' : ' · Pausada'}</option>)}</select></div>}
               {managedBranches.length > 0 && activeTab === 'pedidos' && <p className="portal-branch-picker">Pedidos de todas tus sucursales. Cada orden indica dónde se prepara.</p>}
+              {deliveryAccess && deliveryAccess.restaurantId === deliveryRestaurantId && deliveryAccess.error && <p role="alert" className="portal-delivery-access-error">{deliveryAccess.error} <button type="button" onClick={() => setDeliveryAccessVersion(value => value + 1)}>Reintentar</button></p>}
+              {deliveryCapability?.enabled && activeTab !== 'envios' && <button type="button" className="portal-delivery-shortcut" onClick={() => navigateTab('envios')}><Truck size={19} aria-hidden="true"/>Solicitar un envío</button>}
 
               {/* ── Banner: Perfil Incompleto ── Bug Fix 6: solo en dashboard ── */}
               {!restaurante.perfil_completo && activeTab === 'dashboard' && (
@@ -542,6 +561,7 @@ export function PortalPage({ initialTab }: { initialTab?: PortalTab }) {
                       {activeTab === 'cupones' && operatingRestaurant && <CuponesView key={operatingRestaurant.id} restaurante={operatingRestaurant} />}
                       {activeTab === 'perfil' && operatingRestaurant && <PerfilView key={operatingRestaurant.id} restaurante={operatingRestaurant} ownAccount={operatingRestaurant.id === restaurante.id} onUpdate={loadRestaurante} />}
                       {activeTab === 'sucursales' && <SucursalesView restaurante={restaurante} onManage={branch => { setSelectedBranchId(branch.id); navigateTab('productos') }} onSaved={() => setBranchesVersion(value => value + 1)} />}
+                      {activeTab === 'envios' && (deliveryCapability?.enabled ? <EnviosView key={deliveryCapability.origin.id} capability={deliveryCapability} onOpenOrders={openOrders} /> : <p role="status">{deliveryAccess?.capability?.enabled === false ? 'Esta sucursal no tiene habilitadas las solicitudes de envío.' : 'Comprobando acceso a envíos…'}</p>)}
                     </Suspense>
                   </motion.div>
                 )}

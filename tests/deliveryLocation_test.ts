@@ -1,6 +1,7 @@
 import {
   AddressLookupError, canConfirmLocation, isDeliveryCoordinates, isPublicMapboxToken,
   parseAddressResults, readSavedCoordinates, requestAddresses,
+  uniqueCertainAddress,
 } from '../src/lib/deliveryLocation.ts';
 import type { MapboxAddressConfig } from '../src/lib/deliveryLocation.ts';
 
@@ -25,6 +26,14 @@ const feature = {
     context: { country: { country_code: 'MX' } } },
 };
 const body = { type: 'FeatureCollection', features: [feature] };
+Deno.test('only a unique high-confidence address point in Comitán can be inferred for a written address',()=>{
+ const properties={...feature.properties,match_code:{confidence:'exact',address_number:'matched',street:'matched'},coordinates:{accuracy:'rooftop'},context:{country:{country_code:'MX'},place:{name:'Comitán de Domínguez'}}};
+ const rows=parseAddressResults({type:'FeatureCollection',features:[{...feature,properties}]});assert(rows[0].certain===true);equal(uniqueCertainAddress(rows),rows[0]);
+ equal(uniqueCertainAddress([...rows,{...rows[0],id:'another'}]),null);
+ for(const patch of[{match_code:{...properties.match_code,confidence:'low'}},{match_code:{...properties.match_code,address_number:'unmatched'}},{coordinates:{accuracy:'interpolated'}},{context:{country:{country_code:'MX'},place:{name:'Otra ciudad'}}}]){
+  const result=parseAddressResults({type:'FeatureCollection',features:[{...feature,properties:{...properties,...patch}}]});equal(uniqueCertainAddress(result),null);
+ }
+});
 
 Deno.test('coordinates accept zero but reject swapped Mexico coordinates, strings and non-finite values', () => {
   assert(isDeliveryCoordinates({ lat: 0, lng: 0 }));

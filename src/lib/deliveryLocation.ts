@@ -9,6 +9,7 @@ export interface DeliveryLocation extends DeliveryCoordinates {
 
 export interface AddressResult extends DeliveryLocation {
   id: string;
+  certain?: true;
 }
 
 export interface MapboxAddressConfig {
@@ -19,6 +20,7 @@ export interface MapboxAddressConfig {
 export type AddressRequest = { query: string; proximity: DeliveryCoordinates } | { point: DeliveryCoordinates };
 
 export class AddressLookupError extends Error {}
+export function uniqueCertainAddress(rows:AddressResult[]):AddressResult|null {const matches=rows.filter(row=>row.certain);return matches.length===1?matches[0]:null;}
 
 export function isDeliveryCoordinates(value: unknown): value is DeliveryCoordinates {
   if (typeof value !== 'object' || value === null) return false;
@@ -69,7 +71,14 @@ export function parseAddressResults(value: unknown): AddressResult[] {
       && typeof properties.context.country.country_code === 'string'
       && properties.context.country.country_code.toLowerCase() !== 'mx') continue;
     if (results.some(result => result.id === properties.mapbox_id)) continue;
-    results.push({ id: properties.mapbox_id, lat: point.lat, lng: point.lng, address: address.trim() });
+    const match=properties.match_code,accuracyData=properties.coordinates,context=properties.context;
+    const place=record(context)&&record(context.place)&&typeof context.place.name==='string'
+      ?context.place.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase():'';
+    const certain=properties.feature_type==='address'&&record(match)&&['exact','high'].includes(String(match.confidence))
+      &&match.address_number==='matched'&&match.street==='matched'&&record(accuracyData)
+      &&['rooftop','point'].includes(String(accuracyData.accuracy))&&place.includes('comitan')
+      &&record(context)&&record(context.country)&&String(context.country.country_code).toLowerCase()==='mx';
+    results.push({ id: properties.mapbox_id, lat: point.lat, lng: point.lng, address: address.trim(),...(certain?{certain:true as const}:{}) });
   }
   return results;
 }
