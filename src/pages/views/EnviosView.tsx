@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock3, ExternalLink, Loader2, MapPin, RefreshCw, Store, Truck } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, ChevronRight, CircleX, Clock3, ExternalLink, Loader2, MapPin, RefreshCw, Store, Truck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { restaurantDeliveryApi } from '../../lib/restaurantDeliveryApi';
 import { DeliverySubmissionError,deliveryStateLabel, normalizeDeliveryPhone } from '../../lib/restaurantDelivery';
@@ -47,13 +47,15 @@ export function EnviosView({capability,api=restaurantDeliveryApi,onOpenOrders,no
  const[recent,setRecent]=useState<RestaurantDeliveryReceipt[]>([]),[recentError,setRecentError]=useState(''),[recentLoading,setRecentLoading]=useState(true);
  const live=useRef(true),running=useRef(false),recentRunning=useRef(false),requestId=useRef<string|null>(pendingAtMount),intentRef=useRef<RestaurantDeliveryIntent|null>(null);
  const errorRef=useRef<HTMLParagraphElement>(null);
+ const reviewHeadingRef=useRef<HTMLHeadingElement>(null),confirmationHeadingRef=useRef<HTMLHeadingElement>(null);
+ const quoteId=quote?.id,receiptId=receipt?.orderId;
  const originReady=typeof origin.lat==='number'&&typeof origin.lng==='number';
  const locked=busy!==null||uncertain;
  const resetQuote=()=>{setQuote(null);setError('');};
 
  const refreshRecent=useCallback(()=>{
   if(recentRunning.current)return Promise.resolve();recentRunning.current=true;
-  return api.recent(origin.id).then(rows=>{if(live.current){setRecent(rows);setRecentError('');}})
+  return api.recent(origin.id).then(rows=>{if(live.current){setRecent(rows);setRecentError('');setReceipt(current=>current?rows.find(row=>row.orderId===current.orderId&&row.requestId===current.requestId)??current:null);}})
    .catch((failure:unknown)=>{if(live.current)setRecentError(message(failure));})
    .finally(()=>{recentRunning.current=false;if(live.current)setRecentLoading(false);});
  },[api,origin.id]);
@@ -65,6 +67,11 @@ export function EnviosView({capability,api=restaurantDeliveryApi,onOpenOrders,no
   return()=>{live.current=false;window.clearInterval(timer);window.removeEventListener('focus',refresh);};
  },[api,origin.id,pendingAtMount,refreshRecent]);
  useEffect(()=>{if(error)errorRef.current?.focus();},[error]);
+ useEffect(()=>{
+  const heading=receiptId?confirmationHeadingRef.current:quoteId?reviewHeadingRef.current:null;
+  heading?.scrollIntoView({block:'nearest'});
+  heading?.focus({preventScroll:true});
+ },[quoteId,receiptId]);
 
  function intent(quoteId:string):RestaurantDeliveryIntent{
   if(name.trim().length<2||name.length>100)throw new Error('Escribe el nombre del cliente.');
@@ -130,8 +137,12 @@ export function EnviosView({capability,api=restaurantDeliveryApi,onOpenOrders,no
  return <section className="delivery-request">
   <header className="delivery-request__heading"><div><h2>¿Ya tienes un pedido para enviar?</h2><p>Captura los datos y solicita un repartidor de Estrella Eats.</p></div><Truck size={27} aria-hidden="true"/></header>
   <div className="delivery-request__origin"><Store size={21} aria-hidden="true"/><div><strong>{origin.name}{origin.branch?' · '+origin.branch:''}</strong><span>Recolectamos aquí · {origin.address||'Revisa la dirección de la sucursal'}</span></div><span className="delivery-request__origin-label">Sucursal de origen</span></div>
-  {receipt?<motion.div className="delivery-request__confirmation" initial={{opacity:.6,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>
-   <CheckCircle2 size={36} aria-hidden="true"/><h3>Tu solicitud quedó registrada</h3><p>Servicio #{receipt.orderId.replaceAll('-','').slice(-6).toUpperCase()} · {deliveryStateLabel[receipt.state]}</p>
+  {receipt?<motion.div className={'delivery-request__confirmation'+(receipt.state==='cancelado'?' is-cancelled':'')} role="region" aria-labelledby="delivery-confirmation-title" initial={{opacity:.6,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>
+   {receipt.state==='cancelado'?<CircleX size={36} aria-hidden="true"/>:<CheckCircle2 size={36} aria-hidden="true"/>}
+   <h3 id="delivery-confirmation-title" ref={confirmationHeadingRef} tabIndex={-1}>{receipt.state==='cancelado'?'Envío cancelado':receipt.state==='entregado'?'Envío entregado':'¡Envío solicitado!'}</h3>
+   <p>{receipt.state==='cancelado'?'Este servicio está cancelado. Revisa el seguimiento para consultar los detalles.':receipt.state==='entregado'?'Este servicio ya terminó. Puedes consultar los detalles en el seguimiento.':'Tu pedido ya está guardado. Consulta el seguimiento para ver el avance del repartidor.'}</p>
+   <div className="delivery-request__receipt"><div><span>Folio del envío</span><strong>#{receipt.orderId.replaceAll('-','').slice(-6).toUpperCase()}</strong></div><p role="status" aria-live="polite"><span aria-hidden="true"/>{deliveryStateLabel[receipt.state]}</p></div>
+   {receipt.incident&&<p className="delivery-request__error" role="alert">El envío quedó registrado, pero necesita revisión. Consulta su estado antes de solicitar otro.</p>}
    <CostBreakdown value={receipt}/><Settlement value={receipt}/>
    <div className="delivery-request__actions"><a className="delivery-request__primary" href={trackingLink('/tracker',receipt.orderId,receipt.trackingKey)}>Ver seguimiento <ExternalLink size={17}/></a><button type="button" className="delivery-request__secondary" onClick={newRequest}>Solicitar otro envío</button></div>
   </motion.div>:<form onSubmit={review} className="delivery-request__layout">
@@ -151,18 +162,18 @@ export function EnviosView({capability,api=restaurantDeliveryApi,onOpenOrders,no
     </div></fieldset>
     <fieldset disabled={locked}><legend>Lo que se va a entregar</legend><label>Detalle del pedido<textarea value={description} rows={3} maxLength={2000} required minLength={3} onChange={event=>{setDescription(event.target.value);resetQuote();}} placeholder="Por ejemplo: un pollo bañado y dos órdenes de papas"/></label><label>¿En cuánto está listo?<select value={preparation} onChange={event=>{setPreparation(event.target.value);resetQuote();}}><option value="0">Ya está listo para recoger</option>{[5,10,15,20,30,45,60,90,120].map(minutes=><option key={minutes} value={minutes}>{minutes} minutos</option>)}</select></label></fieldset>
     <fieldset disabled={locked}><legend>Importes de este envío</legend><div className="delivery-request__fields">
-     <label>Comida pendiente de cobro<input value={food} onChange={event=>{setFood(event.target.value);resetQuote();}} maxLength={100} required placeholder="Ej. 200 pesos"/><small>Si la comida ya está pagada, escribe 0.</small></label>
+     <label>Comida pendiente de cobro<input value={food} onChange={event=>{setFood(event.target.value);resetQuote();}} maxLength={100} required placeholder="Ej. 200 pesos"/><small>Sólo la comida, sin envío ni descuentos por la aportación. Si ya está pagada, escribe 0.</small></label>
      {source==='address'?<label>Envío completo<input value={shipping} onChange={event=>{setShipping(event.target.value);resetQuote();}} maxLength={100} required placeholder="Ej. 50 o cincuenta pesos"/><small>El precio acordado para esta dirección.</small></label>:<div className="delivery-request__automatic"><MapPin size={21} aria-hidden="true"/><strong>Envío por ubicación</strong><p>Calcularemos el costo con el pin, antes de solicitar al repartidor.</p></div>}
     </div><div className="delivery-request__rule"><Check size={17} aria-hidden="true"/><p>Robin’s pone normalmente <strong>{money(defaultContribution)}</strong> del envío. El cliente paga el resto.</p><button type="button" onClick={()=>{setCustom(!custom);resetQuote();}}>{custom?'Usar regla habitual':'Cambiar para este envío'}</button></div>
     {custom&&<label>Lo que pone Robin’s en este envío<input value={contribution} onChange={event=>{setContribution(event.target.value);resetQuote();}} maxLength={100} required placeholder="Ej. 15 pesos"/><small>Puede cubrir una parte o el envío completo. Nunca más que su costo.</small></label>}
     </fieldset>
    </div>
    <aside className="delivery-request__review" aria-label="Resumen antes de solicitar">
-    <h3>Antes de enviarlo</h3><p>Revisa quién paga cada parte. La ganancia del repartidor sigue siendo el envío completo.</p>
+    <h3 ref={reviewHeadingRef} tabIndex={-1}>{quote?'Confirma el envío':'Revisa el cobro'}</h3><p>{quote?'Todavía no hemos pedido al repartidor. Revisa el cobro y pulsa «Confirmar y solicitar repartidor».':'Primero calcularemos el cobro. Revisar los importes todavía no envía el pedido.'}</p>
     {quote?<><p className="delivery-request__pricing-label">{quote.pricing==='h3'?'Tarifa automática por pin':'Precio indicado por la sucursal'}</p><p className="delivery-request__quoted-address">{quote.destination.address}{quote.destination.lat===null&&<small>Sin pin confirmado. El repartidor verificará la ubicación con el cliente.</small>}</p><CostBreakdown value={quote}/><Settlement value={quote}/><p className="delivery-request__quote-validity"><Clock3 size={15} aria-hidden="true"/>Resumen válido por 5 minutos</p></>:<div className="delivery-request__review-empty"><Truck size={29} aria-hidden="true"/><p>Completa el formulario para revisar el cobro exacto.</p><span>Comida + parte del envío que paga el cliente.</span></div>}
     {error&&<p className="delivery-request__error" role="alert" ref={errorRef} tabIndex={-1}>{error}</p>}
     {uncertain?<div className="delivery-request__uncertain"><p>No envíes otra solicitud. Primero comprueba ésta o reinténtala con la misma referencia.</p><button type="button" className="delivery-request__secondary" disabled={busy!==null} onClick={()=>void recover()}>{busy==='recover'?<Loader2 className="animate-spin" size={17}/>:<RefreshCw size={17}/>}Comprobar solicitud</button>{quote&&<button type="button" className="delivery-request__primary" disabled={busy!==null} onClick={event=>{event.preventDefault();void send();}}>{busy==='create'?'Confirmando…':'Reintentar el mismo envío'}</button>}</div>
-     :quote?<button key="send" type="button" className="delivery-request__primary" disabled={busy!==null} onClick={event=>{event.preventDefault();void send();}}>{busy==='create'?<><Loader2 size={17} className="animate-spin"/>Confirmando solicitud…</>:<>Solicitar repartidor <ArrowRight size={18}/></>}</button>
+     :quote?<button key="send" type="button" className="delivery-request__primary" disabled={busy!==null} onClick={event=>{event.preventDefault();void send();}}>{busy==='create'?<><Loader2 size={17} className="animate-spin"/>Guardando tu solicitud…</>:<>Confirmar y solicitar repartidor <ArrowRight size={18}/></>}</button>
       :<button key="review" className="delivery-request__primary" disabled={busy!==null||!originReady||source==='address'&&addressLookup.busy} type="submit">{busy==='quote'?<><Loader2 size={17} className="animate-spin"/>Revisando importes…</>:<>Revisar importes <ArrowRight size={18}/></>}</button>}
     {!originReady&&<p className="delivery-request__error" role="alert">La sucursal necesita su ubicación. Revísala en el perfil antes de pedir un repartidor.</p>}
     <p className="delivery-request__cash-note">El cobro al cliente es en efectivo. Si cambias un importe o el destino, revisaremos el resumen otra vez.</p>

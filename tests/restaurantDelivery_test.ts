@@ -24,6 +24,10 @@ Deno.test('a mismatched or malformed financial response cannot become a confirme
 Deno.test('only bounded and validated receipts can populate the recent list',()=>{
  equal(parseDeliveryReceipts([receipt]).length,1);rejected(()=>parseDeliveryReceipts({rows:[receipt]}));rejected(()=>parseDeliveryReceipts(Array.from({length:21},()=>receipt)));
 });
+Deno.test('creation and recovery cannot confirm a receipt belonging to another request',()=>{
+ equal(parseRestaurantDeliveryReceipt(receipt,receipt.requestId).orderId,receipt.orderId);
+ rejected(()=>parseRestaurantDeliveryReceipt(receipt,id(99)));
+});
 Deno.test('phone formatting retains the Mexican customer identity without accepting partial numbers',()=>{
  equal(normalizeDeliveryPhone('+52 555 000 0000'),'5550000000');equal(normalizeDeliveryPhone('5550000000'),'5550000000');
  for(const value of['555000','+1 555 000 0000','5550000000999'])rejected(()=>normalizeDeliveryPhone(value));

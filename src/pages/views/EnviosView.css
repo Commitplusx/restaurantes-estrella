@@ -77,7 +77,17 @@
 .delivery-request__uncertain>button+button{margin-top:10px}
 .delivery-request__confirmation{max-width:600px;margin:30px auto 45px;padding:28px;background:var(--delivery-paper);border:1px solid var(--delivery-line);border-radius:14px}
 .delivery-request__confirmation>svg{color:#1b795d;margin-bottom:15px}
+.delivery-request__confirmation.is-cancelled>svg{color:var(--delivery-error)}
+.delivery-request__confirmation h3{font-size:26px;line-height:1.2;scroll-margin-block:24px}
 .delivery-request__confirmation>p{color:var(--portal-secondary,#515154)}
+.delivery-request__receipt{display:flex;justify-content:space-between;align-items:center;gap:20px;padding-block:18px;margin-top:24px;border-block:1px solid var(--delivery-line)}
+.delivery-request__receipt>div{display:grid;gap:4px}
+.delivery-request__receipt>div>span{font-size:13px;color:var(--portal-secondary,#515154)}
+.delivery-request__receipt strong{font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.delivery-request__receipt>p{display:flex;align-items:center;gap:8px;max-width:220px;margin:0;color:var(--delivery-ink);font-size:14px}
+.delivery-request__receipt>p>span{width:7px;height:7px;flex-shrink:0;border-radius:50%;background:#1b795d}
+.delivery-request__confirmation.is-cancelled .delivery-request__receipt>p>span{background:var(--delivery-error)}
+.delivery-request__review h3{scroll-margin-block:24px}
 .delivery-request__actions{display:flex;gap:12px}
 .delivery-request__recent{margin-top:30px;border-top:1px solid var(--delivery-line);padding-top:28px}
 .delivery-request__recent>header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
@@ -92,6 +102,7 @@
 .delivery-request__recent li>a{min-height:44px;display:flex;align-items:center;justify-content:flex-end;gap:4px;color:var(--delivery-orange);font-size:13px;font-weight:600}
 .delivery-request__empty{display:flex;align-items:center;justify-content:center;gap:12px;padding:25px 12px;color:var(--portal-secondary,#515154);font-size:14px;text-align:center}
 .delivery-request__orders-link{display:flex;align-items:center;gap:5px;margin-top:12px;font-size:13px}
+@media(max-width:520px){.delivery-request__receipt{align-items:flex-start;flex-direction:column;gap:12px}.delivery-request__confirmation>p{font-size:16px}.delivery-request__receipt>p{max-width:none}}
 @media(max-width:1200px){.delivery-request__layout{grid-template-columns:minmax(0,1fr) 285px;gap:26px}.delivery-request__review{padding-left:20px}}
 @media(max-width:850px){.delivery-request__layout{grid-template-columns:1fr;gap:0}.delivery-request__review{position:static;border-left:0;padding:0}.delivery-request__review-empty{padding:14px 0}.delivery-request__origin-label{display:none}.delivery-request__amounts>div{font-size:14px}.delivery-request__cash-note{max-width:65ch}.delivery-request__recent li{grid-template-columns:110px minmax(0,1fr) 100px;gap:14px}.delivery-request__recent li>a{grid-column:3;justify-content:flex-start}.delivery-request__recent li>div:nth-child(3){grid-column:1/3;grid-row:2}}
 @media(max-width:520px){.delivery-request__heading{align-items:flex-start}.delivery-request__heading h2{font-size:24px}.delivery-request__heading p{font-size:14px}.delivery-request__fields{grid-template-columns:1fr;gap:17px}.delivery-request__form fieldset{padding-bottom:24px;margin-bottom:24px}.delivery-request input,.delivery-request select,.delivery-request textarea{font-size:16px}.delivery-request__rule{flex-wrap:wrap}.delivery-request__rule button{margin-top:0;text-align:left;max-width:none;min-height:44px;margin-left:26px}.delivery-request__actions{flex-direction:column}.delivery-request__confirmation{padding:20px 16px}.delivery-request__recent li{grid-template-columns:100px minmax(0,1fr);gap:10px}.delivery-request__recent li>a{grid-column:2;grid-row:2;justify-content:flex-end}.delivery-request__recent li>div:nth-child(3){grid-column:1;grid-row:2}.delivery-request__origin{align-items:flex-start}.delivery-request__empty{align-items:flex-start;text-align:left}.delivery-request__empty p{margin:0}}
