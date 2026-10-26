@@ -23,12 +23,12 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    
+
     setUploadingImage(true)
     const fileExt = file.name.split('.').pop()
     const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
     const filePath = `${restaurante.id}/combos/${fileName}`
-    
+
     const url = await subirFoto(file, filePath)
     if (url) {
       setEditingItem(prev => ({...prev, foto_url: url}))
@@ -73,7 +73,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    
+
     // Validar grupos de opciones
     const opciones = editingItem.opciones || []
     for (let g = 0; g < opciones.length; g++) {
@@ -99,7 +99,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
 
     const arrayIncluye = incluyeInput.split(',').map(s => s.trim()).filter(Boolean)
     const payload = { ...editingItem, restaurante_id: restaurante.id, incluye: arrayIncluye }
-    
+
     if (payload.id) {
       const { error } = await supabase.from('menu_combos').update(payload).eq('id', payload.id)
       if (error) { setErrorModal('Error al guardar: ' + error.message); setSaving(false); return }
@@ -107,7 +107,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
       const { error } = await supabase.from('menu_combos').insert(payload)
       if (error) { setErrorModal('Error al crear: ' + error.message); setSaving(false); return }
     }
-    
+
     await loadData()
     setSaving(false)
     setIsModalOpen(false)
@@ -132,7 +132,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
     const newVal = !item.disponible
     // Optimistic UI
     setCombos(combos.map(i => i.id === item.id ? { ...i, disponible: newVal } : i))
-    
+
     const { error } = await supabase.from('menu_combos').update({ disponible: newVal }).eq('id', item.id)
     if (error) {
       // Rollback
@@ -148,30 +148,30 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
   )
 
   return (
-    <div className="pb-24">
+    <div className="portal-workspace-view pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-800 mb-2 tracking-tight">Paquetes / Combos</h1>
-          <p className="text-slate-500 font-medium">Agrupa productos a un mejor precio.</p>
+          <h1 className="text-3xl md:text-4xl font-black text-zinc-800 mb-2 tracking-tight">Paquetes / Combos</h1>
+          <p className="text-zinc-500 font-medium">Agrupa productos a un mejor precio.</p>
         </div>
-        <button 
-          className="w-full sm:w-auto px-6 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-2xl shadow-lg shadow-[#FF7A6A]/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 group" 
+        <button
+          className="w-full sm:w-auto px-6 py-3 bg-[#bd3818] hover:bg-[#9f2f17] text-white font-bold rounded-2xl shadow-none transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
           onClick={() => handleOpenModal()}
         >
-          <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
+          <Plus size={20} className="group-hover:rotate-90 transition-transform" />
           Crear Combo
         </button>
       </div>
 
       {combos.length === 0 ? (
-        <div className="bg-white rounded-[32px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] text-center py-20 px-6">
-          <div className="w-20 h-20 bg-[#FFF0EE] rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-sm">
-            <Package className="text-[#FF7A6A]" size={32} />
+        <div className="bg-white rounded-[32px] border border-zinc-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] text-center py-20 px-6">
+          <div className="w-20 h-20 bg-[#fff1ea] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <Package className="text-[#bd3818]" size={32} />
           </div>
-          <h3 className="text-2xl font-black text-slate-800 mb-2">Aún no tienes combos</h3>
-          <p className="text-slate-500 font-medium mb-8 max-w-sm mx-auto">No tienes combos activos. Los combos son excelentes para subir el ticket promedio.</p>
-          <button 
-            className="px-8 py-3 bg-[#FF7A6A] hover:bg-[#ff6250] text-white font-bold rounded-xl shadow-lg shadow-[#FF7A6A]/30 transition-all active:scale-[0.98]" 
+          <h3 className="text-2xl font-black text-zinc-800 mb-2">Aún no tienes combos</h3>
+          <p className="text-zinc-500 font-medium mb-8 max-w-sm mx-auto">No tienes combos activos. Los combos son excelentes para subir el ticket promedio.</p>
+          <button
+            className="px-8 py-3 bg-[#bd3818] hover:bg-[#9f2f17] text-white font-bold rounded-xl shadow-none transition-all active:scale-[0.98]"
             onClick={() => handleOpenModal()}
           >
             Crear Primer Combo
@@ -180,36 +180,36 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {combos.map(combo => (
-            <div key={combo.id} className="bg-white rounded-[24px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-lg hover:shadow-[#FF7A6A]/10 transition-all p-5 flex flex-col sm:flex-row gap-4 group">
-              
-              <div className="w-full sm:w-32 h-40 sm:h-32 rounded-[16px] bg-[#FFF0EE] shrink-0 flex items-center justify-center overflow-hidden border border-slate-50">
+            <div key={combo.id} className="bg-white rounded-2xl border border-zinc-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-lg hover:shadow-[#bd3818]/10 transition-all p-5 flex flex-col sm:flex-row gap-4 group">
+
+              <div className="w-full sm:w-32 h-40 sm:h-32 rounded-[16px] bg-[#fff1ea] shrink-0 flex items-center justify-center overflow-hidden border border-zinc-50">
                 {combo.foto_url ? (
                   <img src={combo.foto_url} alt={combo.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 ) : (
-                  <ImageIcon size={32} className="text-[#FF7A6A]/40" />
+                  <ImageIcon size={32} className="text-[#bd3818]/40" />
                 )}
               </div>
-              
+
               <div className="flex-1 flex flex-col justify-center">
-                <h3 className="m-0 mb-1 text-lg font-black text-slate-800 tracking-tight">{combo.nombre}</h3>
-                <p className="m-0 mb-3 text-sm text-slate-500 font-medium line-clamp-2">{combo.descripcion}</p>
+                <h3 className="m-0 mb-1 text-lg font-black text-zinc-800 tracking-tight">{combo.nombre}</h3>
+                <p className="m-0 mb-3 text-sm text-zinc-500 font-medium line-clamp-2">{combo.descripcion}</p>
                 <div className="flex flex-wrap gap-1.5 mb-auto">
                   {combo.incluye?.map((inc, i) => (
-                    <span key={i} className="px-2 py-1 bg-slate-50 text-slate-500 rounded-lg text-xs font-bold border border-slate-100">{inc}</span>
+                    <span key={i} className="px-2 py-1 bg-zinc-50 text-zinc-500 rounded-lg text-xs font-bold border border-zinc-100">{inc}</span>
                   ))}
                 </div>
                 <div className="flex items-center justify-between mt-3">
-                  <p className="m-0 font-black text-[#FF7A6A] text-xl">${Number(combo.precio).toFixed(2)}</p>
-                  
-                  <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
+                  <p className="m-0 font-black text-[#bd3818] text-xl">${Number(combo.precio).toFixed(2)}</p>
+
+                  <div className="flex items-center gap-3 border-l border-zinc-100 pl-4">
                     <label className="toggle mr-1">
                       <input type="checkbox" checked={combo.disponible} onChange={() => toggleDisponible(combo)} />
                       <span className="toggle-slider"></span>
                     </label>
-                    <button className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleOpenModal(combo)}>
+                    <button className="p-2.5 text-zinc-400 hover:text-blue-500 hover:bg-[#fff1ea] rounded-xl transition-colors" onClick={() => handleOpenModal(combo)}>
                       <Edit2 size={16} />
                     </button>
-                    <button className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-[#FFF0EE] rounded-xl transition-colors" onClick={() => handleDelete(combo.id)}>
+                    <button className="p-2.5 text-zinc-400 hover:text-red-500 hover:bg-[#fff1ea] rounded-xl transition-colors" onClick={() => handleDelete(combo.id)}>
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -221,8 +221,8 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
       )}
 
       {/* Modal CRUD (BottomSheet) */}
-      <BottomSheet 
-        isOpen={isModalOpen} 
+      <BottomSheet
+        isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false)
           setIsEditingOptions(false)
@@ -238,43 +238,43 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
         ) : (
         <form onSubmit={handleSave} className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nombre del combo *</label>
-            <input required type="text" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.nombre || ''} onChange={e => setEditingItem({...editingItem, nombre: e.target.value})} placeholder="Ej. Paquete Familiar" />
-          </div>
-          
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Descripción</label>
-            <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none transition-colors text-slate-800 font-medium min-h-[80px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Ideal para 4 personas..." />
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Nombre del combo *</label>
+            <input required type="text" className="w-full px-4 py-3 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-emerald-500 outline-none transition-colors text-zinc-800 font-medium" value={editingItem.nombre || ''} onChange={e => setEditingItem({...editingItem, nombre: e.target.value})} placeholder="Ej. Paquete Familiar" />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Elementos incluidos *</label>
-            <input required type="text" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none transition-colors text-slate-800 font-medium" value={incluyeInput} onChange={e => setIncluyeInput(e.target.value)} placeholder="Ej. 2 Pizzas, 1 Refresco, 1 Helado" />
-            <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Escribe los items separados por una coma (,).</span>
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Descripción</label>
+            <textarea className="w-full px-4 py-3 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-emerald-500 outline-none transition-colors text-zinc-800 font-medium min-h-[80px]" value={editingItem.descripcion || ''} onChange={e => setEditingItem({...editingItem, descripcion: e.target.value})} placeholder="Ideal para 4 personas..." />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Precio del combo ($) *</label>
-            <input required type="number" step="0.01" min="0" className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 outline-none transition-colors text-slate-800 font-medium" value={editingItem.precio || 0} onChange={e => setEditingItem({...editingItem, precio: parseFloat(e.target.value)})} />
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Elementos incluidos *</label>
+            <input required type="text" className="w-full px-4 py-3 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-emerald-500 outline-none transition-colors text-zinc-800 font-medium" value={incluyeInput} onChange={e => setIncluyeInput(e.target.value)} placeholder="Ej. 2 Pizzas, 1 Refresco, 1 Helado" />
+            <span className="text-[10px] font-bold text-zinc-400 mt-1 uppercase">Escribe los items separados por una coma (,).</span>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Foto del Combo (Opcional)</label>
-            <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Precio del combo ($) *</label>
+            <input required type="number" step="0.01" min="0" className="w-full px-4 py-3 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-emerald-500 outline-none transition-colors text-zinc-800 font-medium" value={editingItem.precio || 0} onChange={e => setEditingItem({...editingItem, precio: parseFloat(e.target.value)})} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Foto del Combo (Opcional)</label>
+            <div className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50">
               {editingItem.foto_url ? (
                 <img src={editingItem.foto_url} alt="Vista previa" className="w-16 h-16 rounded-xl object-cover shadow-sm shrink-0" />
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
-                  <ImageIcon size={24} className="text-slate-400" />
+                <div className="w-16 h-16 rounded-xl bg-zinc-200 flex items-center justify-center shrink-0">
+                  <ImageIcon size={24} className="text-zinc-400" />
                 </div>
               )}
               <div className="flex-1">
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept="image/jpeg, image/png, image/webp"
                   onChange={handleImageUpload}
                   disabled={uploadingImage}
-                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-wider file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200 cursor-pointer transition-colors"
+                  className="w-full text-sm text-zinc-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:tracking-wider file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200 cursor-pointer transition-colors"
                 />
                 {uploadingImage && <p className="text-xs text-emerald-500 mt-2 font-bold flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Comprimiendo y subiendo...</p>}
               </div>
@@ -295,26 +295,26 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
           </div>
 
           {/* Opciones y Modificadores */}
-          <div className="mt-6 border-t border-slate-100 pt-6">
+          <div className="mt-6 border-t border-zinc-100 pt-6">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h3 className="font-black text-slate-800">Opciones y Extras</h3>
-                <p className="text-xs text-slate-500 mt-1">Configura Variantes o Extras para este combo.</p>
+                <h3 className="font-black text-zinc-800">Opciones y Extras</h3>
+                <p className="text-xs text-zinc-500 mt-1">Configura Variantes o Extras para este combo.</p>
               </div>
             </div>
-            
+
             <button
               type="button"
               onClick={() => setIsEditingOptions(true)}
-              className="w-full mt-2 py-4 px-4 bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 rounded-xl shadow-sm transition-all flex items-center justify-between group"
+              className="w-full mt-2 py-4 px-4 bg-white border border-zinc-200 hover:border-emerald-300 hover:bg-emerald-50 rounded-xl shadow-sm transition-all flex items-center justify-between group"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Settings2 size={20} />
                 </div>
                 <div className="text-left">
-                  <span className="block font-bold text-slate-700">Configurar Opciones</span>
-                  <span className="block text-xs text-slate-500">
+                  <span className="block font-bold text-zinc-700">Configurar Opciones</span>
+                  <span className="block text-xs text-zinc-500">
                     {(editingItem.opciones?.length || 0)} {editingItem.opciones?.length === 1 ? 'grupo configurado' : 'grupos configurados'}
                   </span>
                 </div>
@@ -323,7 +323,7 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
             </button>
           </div>
 
-          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-slate-900 hover:bg-emerald-500 shadow-xl shadow-slate-900/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
+          <button type="submit" className="w-full mt-4 py-4 rounded-xl font-black text-white text-lg bg-zinc-900 hover:bg-emerald-500 shadow-xl shadow-zinc-900/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" disabled={saving}>
             {saving ? (
               <>
                 <Loader2 size={20} className="animate-spin" />
@@ -335,21 +335,21 @@ export function MenuCombosView({ restaurante }: { restaurante: Restaurante }) {
         )}
       </BottomSheet>
 
-      <ConfirmDialog 
-        isOpen={!!itemToDelete} 
-        title="Eliminar Combo" 
-        message="¿Estás seguro de que deseas eliminar este paquete/combo? Esta acción no se puede deshacer." 
-        onConfirm={confirmDelete} 
-        onCancel={() => setItemToDelete(null)} 
+      <ConfirmDialog
+        isOpen={!!itemToDelete}
+        title="Eliminar Combo"
+        message="¿Estás seguro de que deseas eliminar este paquete/combo? Esta acción no se puede deshacer."
+        onConfirm={confirmDelete}
+        onCancel={() => setItemToDelete(null)}
       />
 
-      <ConfirmDialog 
-        isOpen={!!errorModal} 
-        title="Oops, algo salió mal" 
-        message={errorModal || ''} 
-        onConfirm={() => setErrorModal(null)} 
-        onCancel={() => setErrorModal(null)} 
-        confirmText="Entendido" 
+      <ConfirmDialog
+        isOpen={!!errorModal}
+        title="Oops, algo salió mal"
+        message={errorModal || ''}
+        onConfirm={() => setErrorModal(null)}
+        onCancel={() => setErrorModal(null)}
+        confirmText="Entendido"
         showCancel={false}
         isDanger={false}
       />

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Restaurante } from '../../lib/supabase'
 import {
-  Utensils, Package, Tag, Loader2, Power, Download,
-  ShoppingBag, DollarSign, ChevronDown, Clock, RefreshCw
+  Loader2, Power, Download,
+  ShoppingBag, ChevronDown, Clock, RefreshCw
 } from 'lucide-react'
 import {createPortalReadCache} from '../../lib/portalReadCache'
 import {createPortalReadQueue} from '../../lib/portalReadQueue'
@@ -367,7 +367,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-    <div className="pb-8 flex flex-col gap-8">
+    <div className="portal-workspace-view eats-dashboard">
 
       {/* ── Notificación de nuevo pedido en tiempo real ── */}
       <AnimatePresence>
@@ -376,7 +376,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-5 py-3 rounded-2xl shadow-xl font-bold text-sm flex items-center gap-2"
+            className="fixed top-4 left-1/2 -tranzinc-x-1/2 z-50 bg-emerald-500 text-white px-5 py-3 rounded-2xl shadow-xl font-bold text-sm flex items-center gap-2"
           >
             <ShoppingBag size={16} /> ¡Nuevo pedido recibido!
           </motion.div>
@@ -387,23 +387,19 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
       {/* ── Encabezado & Panic Button ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">
-            ¡Hola, <span className="text-[#FF7A6A]">{restaurante.nombre}</span>! 👋
-          </h1>
-          <p className="text-slate-500 text-sm font-medium mt-1">
-            Información General y métricas de tu negocio
-          </p>
+          <h2 className="eats-dashboard__intro">Así va tu restaurante</h2>
+          <p>Pedidos, ventas y menú, en un solo lugar.</p>
         </div>
 
         {/* Tarjeta de Estado Operativo */}
         <div className="relative" ref={pauseMenuRef}>
-          <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-slate-100">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${isActive ? 'bg-[#FF7A6A] text-white shadow-md shadow-[#FF7A6A]/30' : 'bg-slate-100 text-slate-400'}`}>
+          <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-zinc-100">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${isActive ? 'bg-[#bd3818] text-white shadow-none' : 'bg-zinc-100 text-zinc-400'}`}>
               <Power size={22} className={toggling ? 'animate-pulse' : ''} />
             </div>
             <div className="pr-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado</p>
-              <p className={`text-sm font-black ${isActive ? 'text-[#FF7A6A]' : 'text-slate-500'}`}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Estado</p>
+              <p className={`text-sm font-black ${isActive ? 'text-[#bd3818]' : 'text-zinc-500'}`}>
                 {isActive ? 'Local Abierto' : 'Pausado'}
               </p>
               {!isActive && countdown && (
@@ -419,8 +415,8 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
               disabled={toggling}
               className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 isActive
-                  ? 'bg-[#FF7A6A] hover:bg-[#ff6755] text-white'
-                  : 'bg-slate-200 hover:bg-slate-300 text-slate-600'
+                  ? 'bg-[#bd3818] hover:bg-[#9f2f17] text-white'
+                  : 'bg-zinc-200 hover:bg-zinc-300 text-zinc-600'
               }`}
             >
               {toggling ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} className={`transition-transform ${showPauseMenu ? 'rotate-180' : ''}`} />}
@@ -436,20 +432,20 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-slate-100 overflow-hidden z-50"
+                className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-zinc-100 overflow-hidden z-50"
               >
                 {isActive ? (
                   <>
-                    <p className="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Pausar local</p>
+                    <p className="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Pausar local</p>
                     {[
-                      { label: '⏱ Pausar 30 min', minutes: 30 },
-                      { label: '⏰ Pausar 1 hora', minutes: 60 },
-                      { label: '🔒 Pausar hasta que yo lo reactive', minutes: null },
+                      { label: 'Pausar 30 minutos', minutes: 30 },
+                      { label: 'Pausar una hora', minutes: 60 },
+                      { label: 'Pausar hasta que lo reactive', minutes: null },
                     ].map(opt => (
                       <button
                         key={opt.label}
                         onClick={() => pauseFor(opt.minutes)}
-                        className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-[#FFF0EE] hover:text-[#FF7A6A] transition-colors"
+                        className="w-full text-left px-4 py-3 text-sm font-semibold text-zinc-700 hover:bg-[#fff1ea] hover:text-[#bd3818] transition-colors"
                       >
                         {opt.label}
                       </button>
@@ -458,7 +454,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
                 ) : (
                   <button
                     onClick={reopenNow}
-                    className="w-full text-left px-4 py-3.5 text-sm font-bold text-[#FF7A6A] hover:bg-[#FFF0EE] transition-colors flex items-center gap-2"
+                    className="w-full text-left px-4 py-3.5 text-sm font-bold text-[#bd3818] hover:bg-[#fff1ea] transition-colors flex items-center gap-2"
                   >
                     <RefreshCw size={14} /> Reabrir ahora
                   </button>
@@ -469,106 +465,54 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
         </div>
       </div>
 
-      {/* ── Tarjetas de Métricas (Top Row) ── */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          {[...Array(5)].map((_, i) => <div key={i} className="shimmer h-32 rounded-[24px]" />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          {/* Platillos */}
-          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
-            <div>
-              <p className="text-sm font-bold text-slate-600 mb-2">Platillos</p>
-              <h3 className="text-4xl font-black text-[#FF7A6A]"><AnimatedCounter to={stats.platillos} /></h3>
-            </div>
-            <div className="text-[#FF7A6A]/30"><Utensils size={48} strokeWidth={1.5} /></div>
-          </motion.div>
-
-          {/* Combos */}
-          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
-            <div>
-              <p className="text-sm font-bold text-slate-600 mb-2">Combos Armados</p>
-              <h3 className="text-4xl font-black text-[#FF7A6A]"><AnimatedCounter to={stats.combos} /></h3>
-            </div>
-            <div className="text-[#FF7A6A]/30"><Package size={48} strokeWidth={1.5} /></div>
-          </motion.div>
-
-          {/* Promos */}
-          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
-            <div>
-              <p className="text-sm font-bold text-slate-600 mb-2">Promociones</p>
-              <h3 className="text-4xl font-black text-[#FF7A6A]"><AnimatedCounter to={stats.promos} /></h3>
-            </div>
-            <div className="text-[#FF7A6A]/30"><Tag size={48} strokeWidth={1.5} /></div>
-          </motion.div>
-
-          {/* Pedidos Hoy */}
-          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
-            <div>
-              <p className="text-sm font-bold text-slate-600 mb-2">Pedidos Hoy</p>
-              <h3 className="text-4xl font-black text-[#FF7A6A]">
-                {salesLoading ? <Loader2 size={28} className="animate-spin text-[#FF7A6A]/40" /> : <AnimatedCounter to={salesStats?.todayOrders ?? 0} />}
-              </h3>
-            </div>
-            <div className="text-[#FF7A6A]/30"><ShoppingBag size={48} strokeWidth={1.5} /></div>
-          </motion.div>
-
-          {/* Ventas del Mes */}
-          <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }} className="bg-[#FFF0EE] rounded-[24px] p-6 flex justify-between items-center shadow-[0_4px_20px_rgba(255,122,106,0.05)] border border-white/50">
-            <div>
-              <p className="text-sm font-bold text-slate-600 mb-2">Ventas del Mes</p>
-              <h3 className="text-2xl font-black text-[#FF7A6A]">
-                {salesLoading
-                  ? <Loader2 size={28} className="animate-spin text-[#FF7A6A]/40" />
-                  : `$${(salesStats?.monthTotal ?? 0).toFixed(2)}`}
-              </h3>
-            </div>
-            <div className="text-[#FF7A6A]/30"><DollarSign size={48} strokeWidth={1.5} /></div>
-          </motion.div>
-        </div>
-      )}
+      <dl className="portal-stat-strip" aria-label="Resumen del restaurante">
+        <div><dt>Platillos</dt><dd>{loading?<span className="shimmer block"/>:<AnimatedCounter to={stats.platillos}/>}</dd></div>
+        <div><dt>Combos</dt><dd>{loading?<span className="shimmer block"/>:<AnimatedCounter to={stats.combos}/>}</dd></div>
+        <div><dt>Promociones</dt><dd>{loading?<span className="shimmer block"/>:<AnimatedCounter to={stats.promos}/>}</dd></div>
+        <div><dt>Pedidos de hoy</dt><dd>{salesLoading?<span className="shimmer block"/>:salesError&&!salesStats?'—':<AnimatedCounter to={salesStats?.todayOrders??0}/>}</dd></div>
+        <div><dt>Ventas del mes</dt><dd>{salesLoading?<span className="shimmer block"/>:salesError&&!salesStats?'—':`$${(salesStats?.monthTotal??0).toFixed(2)}`}</dd></div>
+      </dl>
 
       {/* ── Grid Inferior (Gráfico & Menú Público) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
 
         {/* Left Column: Real Bar Chart */}
-        <div className="lg:col-span-2 bg-white rounded-[24px] border border-slate-100 p-6 flex flex-col shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-zinc-100 p-6 flex flex-col shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h3 className="text-lg font-black text-slate-800">Ventas de la Semana</h3>
-              <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
+              <h3 className="text-lg font-black text-zinc-800">Ventas de la Semana</h3>
+              <p className="text-xs font-bold text-zinc-400 mt-1 uppercase tracking-widest">
                 {salesStats
                   ? `Total del mes: $${salesStats.monthTotal.toFixed(2)}`
                   : new Date().toLocaleString('es-MX', { month: 'long', year: 'numeric' })}
               </p>
             </div>
             <div className="flex bg-[#F2F2F2] rounded-full p-1">
-              <span className="bg-[#FF7A6A] text-white rounded-full px-4 py-1 text-xs font-bold shadow-sm">7 días</span>
+              <span className="bg-[#bd3818] text-white rounded-full px-4 py-1 text-xs font-bold shadow-sm">7 días</span>
             </div>
           </div>
 
           {/* Chart area */}
           {salesLoading ? (
             <div className="flex-1 flex items-center justify-center h-[200px]">
-              <Loader2 className="animate-spin text-[#FF7A6A]/40 w-10 h-10" />
+              <Loader2 className="animate-spin text-[#bd3818]/40 w-10 h-10" />
             </div>
           ) : salesEmpty ? (
             <div className="flex-1 flex flex-col items-center justify-center h-[200px] gap-3 text-center px-6">
-              <span className="text-4xl">📊</span>
-              <p className="text-sm font-semibold text-slate-500 leading-snug">
+              <ShoppingBag size={30} className="text-zinc-400" aria-hidden="true"/>
+              <p className="text-sm font-semibold text-zinc-500 leading-snug">
                 Aún no tienes pedidos registrados.<br />
-                <span className="text-[#FF7A6A]">¡Comparte tu menú para empezar!</span>
+                <span className="text-[#bd3818]">¡Comparte tu menú para empezar!</span>
               </p>
             </div>
           ) : (
             <div className="flex flex-col flex-1">
               {/* Bars */}
-              <div className="flex items-end justify-between h-[200px] gap-2 md:gap-3 mt-auto pt-4 border-t border-slate-50">
+              <div className="flex items-end justify-between h-[200px] gap-2 md:gap-3 mt-auto pt-4 border-t border-zinc-50">
                 {normalizedBars.map((val, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <div key={i} className="flex-1 h-full flex flex-col justify-end items-center gap-1">
                     <div
-                      className={`w-full rounded-t-lg transition-all duration-500 hover:opacity-80 ${i === normalizedBars.length - 1 ? 'bg-[#FF7A6A]' : 'bg-[#FFF0EE]'}`}
+                      className={`w-full rounded-t-lg transition-all duration-500 hover:opacity-80 ${i === normalizedBars.length - 1 ? 'bg-[#bd3818]' : 'bg-[#fff1ea]'}`}
                       style={{ height: `${Math.max(val, 4)}%` }}
                       title={`$${salesStats!.weeklyData[i].toFixed(2)}`}
                     />
@@ -578,7 +522,7 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
               {/* Day labels */}
               <div className="flex justify-between mt-2 gap-2 md:gap-3">
                 {salesStats!.weeklyLabels.map((label, i) => (
-                  <div key={i} className="flex-1 text-center text-[10px] font-bold text-slate-400 uppercase">
+                  <div key={i} className="flex-1 text-center text-[10px] font-bold text-zinc-400 uppercase">
                     {label}
                   </div>
                 ))}
@@ -588,35 +532,35 @@ export function DashboardView({ restaurante }: { restaurante: Restaurante }) {
         </div>
 
         {/* Right Column: Public Menu Widget */}
-        <div className="bg-white rounded-[24px] border border-slate-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col">
-          <div className="bg-[#FFF0EE] text-[#FF7A6A] rounded-2xl py-3 text-center font-black text-sm mb-6">
-            Código QR de tu Menú
+        <div className="bg-white rounded-2xl border border-zinc-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col">
+          <div className="bg-[#fff1ea] text-[#bd3818] rounded-2xl py-3 text-center font-black text-sm mb-6">
+            Comparte tu menú
           </div>
 
           <div className="flex flex-col items-center flex-1">
-            <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-100 mb-4 flex items-center justify-center min-h-[144px] min-w-[144px]">
+            <div className="bg-white p-2 rounded-2xl shadow-sm border border-zinc-100 mb-4 flex items-center justify-center min-h-[144px] min-w-[144px]">
               {qrDataUrl ? (
-                <img src={qrDataUrl} alt="QR Code" className="w-32 h-32 rounded-xl" />
+                <img src={qrDataUrl} alt="Código QR para abrir tu menú" className="w-32 h-32 rounded-xl" />
               ) : (
-                <Loader2 className="animate-spin text-slate-300 w-8 h-8" />
+                <Loader2 className="animate-spin text-zinc-300 w-8 h-8" />
               )}
             </div>
 
-            <p className="text-sm font-medium text-slate-500 text-center mb-6 px-4">
+            <p className="text-sm font-medium text-zinc-500 text-center mb-6 px-4">
               Tus clientes pueden escanear este código desde sus mesas para ver tu menú en sus celulares.
             </p>
 
             <div className="mt-auto w-full flex flex-col gap-3">
               <button
                 onClick={handleDownloadQR}
-                className="w-full bg-[#FF7A6A] hover:bg-[#ff6755] text-white font-bold py-3.5 rounded-2xl transition-colors text-sm flex items-center justify-center gap-2"
+                className="w-full bg-[#bd3818] hover:bg-[#9f2f17] text-white font-bold py-3.5 rounded-2xl transition-colors text-sm flex items-center justify-center gap-2"
               >
                 <Download size={18} />
                 Descargar QR HD
               </button>
 
               <button
-                className="w-full bg-[#F8F9FA] hover:bg-[#F0F2F5] text-slate-700 font-bold py-3.5 rounded-2xl transition-colors text-sm border border-slate-200"
+                className="w-full bg-[#F8F9FA] hover:bg-[#F0F2F5] text-zinc-700 font-bold py-3.5 rounded-2xl transition-colors text-sm border border-zinc-200"
                 onClick={() => window.open(`https://estrella-eats.mx/menu/${restaurante.slug || restaurante.id}`, '_blank')}
               >
                 Ver enlace del menú

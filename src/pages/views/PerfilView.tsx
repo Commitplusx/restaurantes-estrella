@@ -205,10 +205,10 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
   }
 
   return (
-    <div className="pb-24">
+    <div className="portal-workspace-view pb-24">
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-slate-800 mb-2">Mi Perfil</h1>
-        <p className="text-slate-500">Configura la información pública de tu restaurante.</p>
+        <h1 className="text-3xl font-black text-zinc-800 mb-2">Mi Perfil</h1>
+        <p className="text-zinc-500">Configura la información pública de tu restaurante.</p>
       </div>
 
       {/* ── Banner de estado de visibilidad ── */}
@@ -251,28 +251,28 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
               <span className="text-[#009EE3]">🤝</span>
               Pagos con Mercado Pago
             </h2>
-            <p className="text-sm text-slate-500 mb-6">Vincula tu cuenta de Mercado Pago para recibir el dinero de tus ventas directamente y al instante.</p>
-            <div className="flex flex-col sm:flex-row items-center justify-between bg-slate-50 p-5 rounded-2xl border border-slate-200">
+            <p className="text-sm text-zinc-500 mb-6">Vincula tu cuenta de Mercado Pago para recibir el dinero de tus ventas directamente y al instante.</p>
+            <div className="flex flex-col sm:flex-row items-center justify-between bg-zinc-50 p-5 rounded-2xl border border-zinc-200">
               <div>
-                <p className="font-bold text-slate-800">
+                <p className="font-bold text-zinc-800">
                   {restaurante.mp_access_token ? 'Cuenta Vinculada' : 'Cuenta No Vinculada'}
                 </p>
-                <p className="text-xs text-slate-500 mt-1 mb-3">
+                <p className="text-xs text-zinc-500 mt-1 mb-3">
                   {restaurante.mp_access_token ? 'Ya puedes recibir pagos con tarjeta y SPEI directamente.' : 'Los clientes solo podrán pagar en efectivo o al cajero general por ahora.'}
                 </p>
-                
+
                 {restaurante.mp_access_token && (
-                  <label className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 cursor-pointer hover:border-blue-400 transition-colors w-max">
+                  <label className="flex items-center gap-3 bg-white p-3 rounded-xl border border-zinc-200 cursor-pointer hover:border-blue-400 transition-colors w-max">
                     <div className="relative inline-block w-10 h-6">
-                      <input 
-                        type="checkbox" 
-                        className="peer opacity-0 w-0 h-0" 
+                      <input
+                        type="checkbox"
+                        className="peer opacity-0 w-0 h-0"
                         checked={formData.acepta_pago_online}
                         onChange={(e) => setFormData({...formData, acepta_pago_online: e.target.checked})}
                       />
-                      <span className="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-slate-300 rounded-full duration-300 peer-checked:bg-[#009EE3] before:absolute before:content-[''] before:h-4 before:w-4 before:left-1 before:bottom-1 before:bg-white before:rounded-full before:duration-300 peer-checked:before:translate-x-4"></span>
+                      <span className="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-zinc-300 rounded-full duration-300 peer-checked:bg-[#009EE3] before:absolute before:content-[''] before:h-4 before:w-4 before:left-1 before:bottom-1 before:bg-white before:rounded-full before:duration-300 peer-checked:before:tranzinc-x-4"></span>
                     </div>
-                    <span className="text-sm font-bold text-slate-700">Aceptar Pagos en Línea</span>
+                    <span className="text-sm font-bold text-zinc-700">Aceptar Pagos en Línea</span>
                   </label>
                 )}
               </div>
@@ -280,49 +280,49 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
                 type="button"
                 onClick={handleMPConnect}
                 disabled={loadingStripe}
-                className={`mt-4 sm:mt-0 px-6 py-2.5 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2 ${loadingStripe ? 'bg-slate-400' : 'bg-[#009EE3] hover:bg-[#0089C5]'}`}
+                className={`mt-4 sm:mt-0 px-6 py-2.5 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2 ${loadingStripe ? 'bg-zinc-400' : 'bg-[#009EE3] hover:bg-[#0089C5]'}`}
               >
                 {loadingStripe && <Loader2 className="animate-spin" size={16} />}
                 {restaurante.mp_access_token ? 'Volver a Vincular' : 'Vincular Mercado Pago'}
               </button>
             </div>
           </div>
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm hover:shadow-md transition-shadow">
             <h2 className="text-lg font-black flex items-center gap-2 mb-6">
               <Store className="text-orange-500" size={20} />
               Información Básica
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-1">Nombre del Restaurante</label>
+                <label className="text-sm font-semibold text-zinc-700 block mb-1">Nombre del Restaurante</label>
                 <input
                   type="text" required
                   value={formData.nombre}
                   readOnly={Boolean(restaurante.matriz_id)}
                   onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
+                  className="w-full p-3 border border-zinc-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
                   placeholder="Ej. Tacos El Paisa"
                 />
-                {restaurante.matriz_id && <p className="text-sm text-slate-600 mt-2">La marca se administra desde la cuenta principal. Puedes cambiar el nombre de esta sucursal debajo.</p>}
+                {restaurante.matriz_id && <p className="text-sm text-zinc-600 mt-2">La marca se administra desde la cuenta principal. Puedes cambiar el nombre de esta sucursal debajo.</p>}
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-1">Teléfono (WhatsApp para recibir pedidos)</label>
+                <label className="text-sm font-semibold text-zinc-700 block mb-1">Teléfono (WhatsApp para recibir pedidos)</label>
                 <input
                   type="tel" required
                   value={formData.telefono}
                   onChange={e => setFormData({ ...formData, telefono: e.target.value })}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
+                  className="w-full p-3 border border-zinc-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
                   placeholder="Ej. 9631234567"
                 />
-                <p className="text-xs text-slate-500 mt-1">Este número recibirá los pedidos por WhatsApp.</p>
+                <p className="text-xs text-zinc-500 mt-1">Este número recibirá los pedidos por WhatsApp.</p>
               </div>
 
               {/* Solo visible si el restaurante forma parte de una familia de sucursales */}
               {(restaurante.matriz_id || restaurante.es_matriz) && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                  <label className="text-sm font-semibold text-slate-700 block mb-1">
+                  <label className="text-sm font-semibold text-zinc-700 block mb-1">
                     📍 Nombre de esta sucursal
-                    <span className="text-slate-400 font-normal ml-1">(opcional)</span>
+                    <span className="text-zinc-400 font-normal ml-1">(opcional)</span>
                   </label>
                   <input
                     type="text"
@@ -332,39 +332,39 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
                     className="w-full p-3 border border-amber-200 bg-white rounded-xl focus:border-orange-400 outline-none transition-colors"
                     placeholder="Ej. Centro, Belisario, Norte..."
                   />
-                  <p className="text-xs text-slate-500 mt-1">Este nombre aparece en el selector de sucursales para que el cliente elija. No cambia el nombre de tu marca.</p>
+                  <p className="text-xs text-zinc-500 mt-1">Este nombre aparece en el selector de sucursales para que el cliente elija. No cambia el nombre de tu marca.</p>
                 </div>
               )}
               <div>
-                <label className="text-sm font-semibold text-slate-700 block mb-1">Descripción Corta <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <label className="text-sm font-semibold text-zinc-700 block mb-1">Descripción Corta <span className="text-zinc-400 font-normal">(opcional)</span></label>
                 <input
                   type="text"
                   maxLength={80}
                   value={formData.descripcion_corta}
                   onChange={e => setFormData({ ...formData, descripcion_corta: e.target.value })}
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
+                  className="w-full p-3 border border-zinc-200 rounded-xl focus:border-orange-400 outline-none transition-colors"
                   placeholder="Ej. Los mejores tacos de la ciudad desde 2010"
                 />
-                <p className="text-xs text-slate-400 mt-1">{formData.descripcion_corta.length}/80 caracteres</p>
+                <p className="text-xs text-zinc-400 mt-1">{formData.descripcion_corta.length}/80 caracteres</p>
               </div>
             </div>
           </div>
 
           {/* FOTO DE PORTADA */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm hover:shadow-md transition-shadow">
             <h2 className="text-lg font-black flex items-center gap-2 mb-6">
               <ImageIcon className="text-orange-500" size={20} />
               Foto de Portada <span className="text-red-500 text-sm font-black ml-1">*requerida</span>
             </h2>
             <div className="flex flex-col sm:flex-row gap-6 items-start">
-              <div className="w-full sm:w-52 h-36 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+              <div className="w-full sm:w-52 h-36 rounded-2xl bg-zinc-50 border-2 border-dashed border-zinc-200 flex items-center justify-center overflow-hidden shrink-0">
                 {formData.foto_fachada_url
                   ? <img src={formData.foto_fachada_url} alt="Portada" className="w-full h-full object-cover" />
-                  : <Store className="text-slate-300" size={40} />
+                  : <Store className="text-zinc-300" size={40} />
                 }
               </div>
               <div className="flex-1 space-y-3">
-                <label className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all ${uploadingImage ? 'bg-slate-200 text-slate-400 pointer-events-none' : 'bg-slate-900 hover:bg-orange-500 text-white shadow-lg'}`}>
+                <label className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all ${uploadingImage ? 'bg-zinc-200 text-zinc-400 pointer-events-none' : 'bg-zinc-900 hover:bg-orange-500 text-white shadow-lg'}`}>
                   {uploadingImage ? <Loader2 className="animate-spin" size={16} /> : <ImageIcon size={16} />}
                   {uploadingImage ? 'Subiendo...' : 'Seleccionar Foto'}
                   <input type="file" accept="image/jpeg, image/png, image/webp" onChange={handleImageUpload} disabled={uploadingImage} className="hidden" />
@@ -374,60 +374,60 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
                     Quitar foto
                   </button>
                 )}
-                <p className="text-xs text-slate-500">Usa una foto atractiva de tu fachada o tu mejor platillo. Se comprime automáticamente.</p>
+                <p className="text-xs text-zinc-500">Usa una foto atractiva de tu fachada o tu mejor platillo. Se comprime automáticamente.</p>
               </div>
             </div>
           </div>
 
           {/* HORARIOS POR DÍA */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm hover:shadow-md transition-shadow">
             <h2 className="text-lg font-black flex items-center gap-2 mb-2">
               <Clock className="text-blue-500" size={20} />
               Horarios de Atención <span className="text-red-500 text-sm font-black ml-1">*requeridos</span>
             </h2>
-            <p className="text-sm text-slate-500 mb-6">Activa los días que atiendes y configura el horario de cada uno.</p>
+            <p className="text-sm text-zinc-500 mb-6">Activa los días que atiendes y configura el horario de cada uno.</p>
 
             <div className="space-y-3">
               {DIAS_SEMANA.map(({ key, label }) => {
                 const dia = horarios[key] ?? { ...DEFAULT_DIA }
                 return (
-                  <div key={key} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border transition-all ${dia.activo ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                  <div key={key} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border transition-all ${dia.activo ? 'bg-blue-50 border-blue-200' : 'bg-zinc-50 border-zinc-100'}`}>
                     {/* Toggle día activo */}
                     <label className="flex items-center gap-3 min-w-[130px] cursor-pointer select-none">
                       <div
                         onClick={() => updateHorario(key, 'activo', !dia.activo)}
-                        className={`relative w-11 h-6 rounded-full transition-all cursor-pointer ${dia.activo ? 'bg-blue-500' : 'bg-slate-300'}`}
+                        className={`relative w-11 h-6 rounded-full transition-all cursor-pointer ${dia.activo ? 'bg-blue-500' : 'bg-zinc-300'}`}
                       >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${dia.activo ? 'translate-x-5' : ''}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${dia.activo ? 'tranzinc-x-5' : ''}`} />
                       </div>
-                      <span className={`text-sm font-bold ${dia.activo ? 'text-blue-800' : 'text-slate-400'}`}>{label}</span>
+                      <span className={`text-sm font-bold ${dia.activo ? 'text-blue-800' : 'text-zinc-400'}`}>{label}</span>
                     </label>
 
                     {/* Inputs de hora (solo si está activo) */}
                     {dia.activo ? (
                       <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-slate-500">Abre</span>
+                          <span className="text-xs font-semibold text-zinc-500">Abre</span>
                           <input
                             type="time" required
                             value={dia.abre}
                             onChange={e => updateHorario(key, 'abre', e.target.value)}
-                            className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-slate-700"
+                            className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-zinc-700"
                           />
                         </div>
-                        <span className="text-slate-400 font-bold">–</span>
+                        <span className="text-zinc-400 font-bold">–</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-slate-500">Cierra</span>
+                          <span className="text-xs font-semibold text-zinc-500">Cierra</span>
                           <input
                             type="time" required
                             value={dia.cierra}
                             onChange={e => updateHorario(key, 'cierra', e.target.value)}
-                            className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-slate-700"
+                            className="p-2 border border-blue-200 rounded-lg text-sm focus:border-blue-400 outline-none bg-white font-semibold text-zinc-700"
                           />
                         </div>
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-400 font-semibold">Cerrado este día</span>
+                      <span className="text-xs text-zinc-400 font-semibold">Cerrado este día</span>
                     )}
                   </div>
                 )
@@ -436,17 +436,17 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
           </div>
 
           {/* CATEGORÍAS */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-black flex items-center gap-2">
                 <span className="text-orange-500">🏷️</span>
                 Categorías <span className="text-red-500 text-sm font-black ml-1">*requeridas</span>
               </h2>
-              <span className="text-xs font-black px-3 py-1 bg-slate-100 text-slate-500 rounded-full">
+              <span className="text-xs font-black px-3 py-1 bg-zinc-100 text-zinc-500 rounded-full">
                 {formData.categorias?.length || 0} / 3
               </span>
             </div>
-            <p className="text-sm text-slate-500 mb-4">Selecciona hasta 3 categorías que mejor describan tu menú.</p>
+            <p className="text-sm text-zinc-500 mb-4">Selecciona hasta 3 categorías que mejor describan tu menú.</p>
             <div className="flex flex-wrap gap-2">
               {CATEGORIAS_COMUNES.map(cat => {
                 const isSelected = formData.categorias?.includes(cat)
@@ -456,7 +456,7 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
                     onClick={() => toggleCategoria(cat)}
                     className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${isSelected
                       ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20 scale-105'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300 hover:text-slate-800'
+                      : 'bg-white text-zinc-500 border-zinc-200 hover:border-orange-300 hover:text-zinc-800'
                     }`}
                   >
                     {cat}
@@ -471,7 +471,7 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
             <button
               type="submit"
               disabled={saving}
-              className={`w-full px-8 py-4 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${success ? 'bg-emerald-500 shadow-xl shadow-emerald-500/30' : 'bg-slate-900 hover:bg-orange-500 shadow-xl shadow-slate-900/20 hover:shadow-orange-500/30'}`}
+              className={`w-full px-8 py-4 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${success ? 'bg-emerald-500 shadow-xl shadow-emerald-500/30' : 'bg-zinc-900 hover:bg-orange-500 shadow-xl shadow-zinc-900/20 hover:shadow-orange-500/30'}`}
             >
               {saving
                 ? <><Loader2 className="animate-spin" size={20} /> Guardando...</>
@@ -496,30 +496,30 @@ export function PerfilView({ restaurante, onUpdate, ownAccount = true }: { resta
 
         {/* Security belongs to the signed-in account, not the location selected by a root owner. */}
         {ownAccount &&
-        <div className="mt-8 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-          <h2 className="text-lg font-black flex items-center gap-3 mb-6 text-slate-800">
+        <div className="mt-8 bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm">
+          <h2 className="text-lg font-black flex items-center gap-3 mb-6 text-zinc-800">
             <div className="p-2 bg-red-50 rounded-xl"><Lock className="text-red-500" size={20} /></div>
             Seguridad
           </h2>
           <form onSubmit={handlePasswordChange} className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
-              <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Lock size={18} className="absolute left-4 top-1/2 -tranzinc-y-1/2 text-zinc-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Nueva contraseña (mín. 6 caracteres)"
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 required
-                className="w-full pl-11 pr-11 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:border-red-300 focus:ring-4 focus:ring-red-500/10 outline-none transition-all font-medium text-slate-800"
+                className="w-full pl-11 pr-11 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl focus:border-red-300 focus:ring-4 focus:ring-red-500/10 outline-none transition-all font-medium text-zinc-800"
               />
-              <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-4 top-1/2 -tranzinc-y-1/2 text-zinc-400 hover:text-zinc-600">
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
             <button
               type="submit"
               disabled={changingPassword}
-              className={`px-8 py-3.5 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-2 ${passwordMsg.type === 'success' ? 'bg-emerald-500' : 'bg-slate-900 hover:bg-slate-800'}`}
+              className={`px-8 py-3.5 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-2 ${passwordMsg.type === 'success' ? 'bg-emerald-500' : 'bg-zinc-900 hover:bg-zinc-800'}`}
             >
               {changingPassword ? <Loader2 className="animate-spin" size={18} /> : 'Actualizar'}
             </button>
